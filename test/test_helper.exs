@@ -31,15 +31,37 @@ Application.put_env(:formentation, FormentationDemo.Endpoint, endpoint_base ++ e
   )
 
 if browser? do
+  install_root =
+    case System.cmd("mise", ["where", "npm:playwright"], stderr_to_stdout: true) do
+      {path, 0} ->
+        String.trim(path)
+
+      {out, _} ->
+        raise "Playwright not found (`mise where npm:playwright` failed): #{out}. " <>
+                "Run `mise install` and `mise run playwright-browsers`."
+    end
+
+  # mise's npm backend lays npm:playwright under different subpaths across
+  # versions (`<root>/lib/node_modules/...` on mise 2026.7.5, `<root>/node_modules/...`
+  # on 2026.7.12+), so locate playwright's cli.js wherever it actually landed
+  # instead of assuming a fixed subdir. PHX_TEST_PLAYWRIGHT_ASSETS_DIR overrides.
+  cli_candidates =
+    [
+      Path.join([install_root, "lib", "node_modules", "playwright", "cli.js"]),
+      Path.join([install_root, "node_modules", "playwright", "cli.js"])
+    ] ++ Path.wildcard(Path.join(install_root, "**/node_modules/playwright/cli.js"))
+
   assets_dir =
     System.get_env("PHX_TEST_PLAYWRIGHT_ASSETS_DIR") ||
-      case System.cmd("mise", ["where", "npm:playwright"], stderr_to_stdout: true) do
-        {path, 0} ->
-          Path.join(String.trim(path), "lib")
+      case Enum.find(cli_candidates, &File.exists?/1) do
+        nil ->
+          raise "Playwright package (node_modules/playwright/cli.js) not found under " <>
+                  "#{install_root} (searched: #{Enum.join(cli_candidates, ", ")}). " <>
+                  "Set PHX_TEST_PLAYWRIGHT_ASSETS_DIR or re-run `mise install`."
 
-        {out, _} ->
-          raise "Playwright not found (`mise where npm:playwright` failed): #{out}. " <>
-                  "Run `mise install` and `mise run playwright-browsers`."
+        cli ->
+          # assets_dir is the directory that contains node_modules/
+          cli |> Path.dirname() |> Path.dirname() |> Path.dirname()
       end
 
   Application.put_env(:phoenix_test, :otp_app, :formentation)
