@@ -1,0 +1,268 @@
+---
+title: Decision Log
+tags:
+  - formentation
+  - decisions
+status: active
+---
+
+# Decision log
+
+Running log of architecture decisions, ADR-style but lightweight. Each entry records context, the decision, and its consequences. Reversing a decision gets a new entry that links back; entries are never silently rewritten. Questions still open live in [[16-open-questions|Open questions]].
+
+## D-001 — Scope is driven by a recorded use case
+
+*2026-07-20*
+
+**Context.** The original notes designed a general form platform without naming a consumer, while the scope-control checklist demanded that features trace to user requirements.
+
+**Decision.** The concrete customer project — spreadsheet migration with expert-defined JSON payloads beside relational data — is recorded in [[00-use-case|Motivating use case]] and is the reference for scope decisions until a second use case is recorded.
+
+**Consequences.** Subset choices (flat objects, groups, enums first; conditionals later; no Ash, no second theme, no remote refs) now have a justification and an expiry condition: a new requirement or use case, not taste.
+
+## D-002 — Phase 1 is a walking skeleton
+
+*2026-07-20*
+
+**Context.** The original roadmap split "static foundation" (no rendering) from "Phoenix runtime". That contradicted the design principle [[02-design-principles#Pragmatism first|"start with one end-to-end useful path"]], and the foundation phase could not retire its own headline risk: whether the IR is any good is only proven by a consumer. It also front-loaded introspection machinery (explain, fingerprints, support reports, generated UI hints) that has no consumer before a renderer exists.
+
+**Decision.** Former Phases 1 and 2 are merged into [[phase-1-walking-skeleton|Phase 1 — Walking skeleton]]: a thin end-to-end slice from declaration to submitted data. Later phases renumber to 2–5. Deferred introspection items move to [[phase-2-compiler-diagnostics|Phase 2]].
+
+**Consequences.** First usable forms arrive one phase earlier; the definition-only API is validated by its first consumer instead of in isolation. The phase is larger, so it is explicitly organized as thin TDD iterations with two milestones. Later phase notes (2–5) are direction sketches expected to be revised by Phase 1 learning.
+
+## D-003 — Simplified provenance first
+
+*2026-07-20*
+
+**Context.** Provenance-as-architecture — `Decision` structs with superseded candidates, derivation chains, `Info.explain/3` — is the most expensive standing commitment in the design, and it serves the library developer and a future schema-editor UI, not the form user. Nothing in Phase 1 consumes it.
+
+**Decision.** Phase 1 records provenance as compact **origin tags** only: `{:json_schema, pointer}`, `{:map_source, key}`, `{:ui_hints, pointer}`, `{:inference, rule_name}` — enough for diagnostics to point at the right place. The full model described in [[03-conceptual-model#Decision|Decision]] and [[09-diagnostics-provenance-introspection|Diagnostics, provenance, and introspection]] remains the target and arrives with [[phase-2-compiler-diagnostics|Phase 2]], where the compiler pipeline gives it structure and the explain API gets its first consumers.
+
+**Consequences.** Every resolved value still knows where it came from, so upgrading to full derivation chains later is additive. `explain/3` is not public API in Phase 1. If a Phase 1 diagnostic turns out to need "why", that is evidence for pulling part of the model forward — record it here.
+
+## D-004 — Two declaration sources from the start
+
+*2026-07-20*
+
+**Context.** "Source-independent definition" was the central claim, but the original roadmap would not have tested it against a second source until Ash integration in the final phase. An IR validated against one source quietly mirrors that source.
+
+**Decision.** Phase 1 ships two source adapters: the JSON Schema adapter and a plain Elixir data source (`Formentation.Source.Map`, working name) living in core with zero dependencies. The same fixture form compiles from both, and a differential test asserts the definitions answer `Info` queries identically apart from origins. See [[17-end-to-end-example|the end-to-end example]] for both declarations.
+
+**Consequences.** The map source doubles as the reference adapter, the cheapest fixture format for tests, and a useful escape hatch for application-defined forms. Cost: a second (small) vocabulary to keep honest. The differential test must define equivalence explicitly (ordering, origins, defaults).
+
+## D-005 — Scalar enums are fields, not choice nodes
+
+*2026-07-20*
+
+**Context.** The `:choice` node kind conflated two different things: a scalar with a fixed option set (`enum` — a select input over one value) and structural alternatives (`oneOf`/union — different subtrees with branch state, branch errors, and discriminators). They differ in state, projection, error mapping, and rendering; conflating them also made `Info.fields/1` skip enum fields.
+
+**Decision.** A scalar `enum`/`const` compiles to a `:field` node with a fixed option set (typically role `:select`). The `:choice` kind is reserved for structural alternatives and does not appear before [[phase-4-dynamic-schemas|Phase 4]].
+
+**Consequences.** Phase 1 needs no `:choice` machinery at all. The conceptual model's node table is updated accordingly. Enum-of-objects and other structural cases remain out of scope until Phase 4 defines them.
+
+## D-006 — One `:group` kind, flagged for data nesting
+
+*2026-07-21*
+
+**Context.** [[16-open-questions|Open question]]: are presentation groups and object-like containers one `:group` kind or two? Slice 1 of Phase 1 had to pick a representation to compile [[17-end-to-end-example|the end-to-end example]], whose fieldset groups flat data while nested objects nest it.
+
+**Decision.** Both compile to `kind: :group` nodes distinguished by a `nests_data?` flag. A data-nesting group contributes an instance-path segment; a presentation group is transparent to instance paths and `Info.node_at/2` looks through it. In the map source, group membership is declared only by the group's `fields:` list; per-field `group:` keys are not part of the vocabulary (the compiler stamps `group` onto member nodes as output, not input).
+
+**Consequences.** Renderers treat every container uniformly and consult `nests_data?` when deriving names and params. The end-to-end example's map declaration dropped a stray `group: "electrical"` on `notes`. If Phoenix work later shows the two behaviours diverging (naming, error routing, projection), splitting into two kinds is a new decision that links here.
+
+## D-007 — Node-ID segments are escaped, not restricted
+
+*2026-07-21*
+
+**Context.** Node IDs join template-path segments with `/` and suffix presentation groups with `#`, so a property named `"#electrical"` collided with a group ID and `"a/b"` with a nested path ([[16-open-questions|open question]]). The slice-2 differential test pins ID equivalence across adapters, which forced the decision.
+
+**Decision.** Per-segment escaping: `~` → `~0`, `/` → `~1` (RFC 6901), plus `#` → `~2` as a Formentation extension. Implemented once in `Formentation.NodeId` and used by both adapters; all legal property names compile. Escaping over rejection because expert-authored schemas arrive at runtime ([[00-use-case|use case]]) — rejecting a whole schema over one odd key is worse than an ugly ID.
+
+**Consequences.** IDs stay deterministic and collision-free by construction (property-tested round-trip and uniqueness in `test/formentation/node_id_test.exs`). Node IDs now align with the JSON-Pointer escaping used by `{:json_schema, pointer}` origins. Phase 2's hashed stable IDs ([[10-algorithms#Stable node IDs|algorithms]]) take escaped segments as input.
+
+## D-008 — JSV is the JSON Schema validator
+
+*2026-07-21*
+
+**Context.** [[phase-1-walking-skeleton|Phase 1]] required choosing one validator after evaluating ex_json_schema and JSV against the criteria in [[12-ecosystem-and-dependencies#JSON Schema|Ecosystem and dependencies]]. The fixture pins dialect 2020-12.
+
+**Decision.** JSV (`~> 0.21`). The dialect criterion was dispositive: ex_json_schema supports drafts 4/6/7 only, while JSV has compliance-suite-verified 2020-12 support, ships the metaschema family embedded (offline schema-document validation), returns structured errors with instance and schema locations, has a build-once API, and makes remote `$ref` fetching opt-in behind an allowlist. It sits behind `Formentation.JSONSchema.Validator` — the swap point — with contract tests in `test/formentation/json_schema/validator_test.exs`.
+
+**Consequences.** Three extra runtime dependencies (`abnf_parsec`, `texture`, `idna`). `atoms: false` is explicit in the validator module; format enforcement stays at JSV's default (off). Instance validation (implementation strategy step 4 onwards) reuses the same build/validate flow.
+
+## D-009 — Form state separates transport from operation
+
+*2026-07-22*
+
+**Context.** Step 4 of [[phase-1-walking-skeleton|Phase 1]] requires deciding browser-parameter semantics on paper before coding the state layer. `%Phoenix.HTML.Form{}` deliberately abstracts away facts the state model needs — whether a key was present, whether decoding succeeded, what the user actually typed — and its `input_value/2` may return raw parameter strings. The discussion in `docs/discussion/encoding-and-decoding.md` distilled the requirement into one invariant: never confuse "not submitted", "explicitly cleared", "successfully decoded", and "attempted but undecodable".
+
+**Decision.** `Formentation.Form` records, per field, the transport fact (`:not_provided` | `{:provided, raw}`) separately from the decode operation (`:keep` | `:unset` | `{:set, value}` | `{:invalid, issue}`). The candidate JSON instance materializes only from `{:set, _}` and `:unset`; while any field is `{:invalid, _}` there is no complete candidate instance. (`:delete` was renamed `:unset` at implementation — symmetric with `{:set, _}`, and it marks candidate-instance absence, not destructive mutation of stored data; step-4 spec `docs/superpowers/specs/2026-07-22-phase1-step4-state-and-codecs-design.md`. `:keep` was originally recorded as `:untouched`; renamed by [[#D-014 — Usage is a first-class interaction axis|D-014]], which gives interaction state its own axis.) Decoding precedes `Phoenix.HTML.FormData`: the Phoenix form is a projection of already-decoded state, never the owner of decoding, and `input_value` returns the raw attempted value when decoding failed.
+
+**Consequences.** Raw-input preservation falls out of the model instead of ad-hoc params copying, and the policies in [[#D-010 — Empty-string, null, and absent-key decode policies|D-010]]–[[#D-012 — Schema validation defers while any decode fails|D-012]] become expressible rather than implicit. Deliberately deferred as unconsumed in Phase 1: a participation/stashing dimension (Phase 4 branch work) and stored display values (derivable from transport and operation). Touched/used-input tracking across the transport boundary (Phoenix's `_unused_` convention) was left open here and is decided in [[#D-014 — Usage is a first-class interaction axis|D-014]].
+
+## D-010 — Empty-string, null, and absent-key decode policies
+
+*2026-07-22*
+
+**Context.** Browsers send `""` for every empty text control and cannot distinguish "cleared" from "never typed"; JSON Schema `required` checks key presence only, so each policy choice changes what validation means in practice. [[17-end-to-end-example|The end-to-end example]] forces the question (`"notes": ""`). Ecto's convention (`""` → `nil` via `empty_values`) suits typed changesets, not JSON semantics.
+
+**Decision.** `""` is a transport encoding whose meaning depends on the target type: in a string control it decodes to `{:set, ""}` — preserved, because the schema accepts it and Formentation does not silently redefine the schema; in a typed control (integer, number) it decodes to `:unset`, since empty text was never a candidate value there. `null` is never produced implicitly; it can only occur in original data. Within a replace transition's scope, absent keys decode to `:unset` ([[#D-013 — Transitions take an explicit params envelope|D-013]]). These are global codec defaults; per-node overrides wait for a use case that demands them (scope-control question 6). Two compensations: the compiler emits an advisory diagnostic when a required string property permits empty input ("add `minLength: 1` if non-empty input is intended"), and HTML validation attributes derive from schema plus input policy, never from `required` alone — a bare HTML `required` would reject input the schema accepts. (Amended at step-4 implementation: date/email/URI are *roles on string fields*, not typed controls — they follow the string codec, so a cleared date submits `{:set, ""}`; format conformance belongs to the validator per [[#D-008 — JSV is the JSON Schema validator|D-008]], whose format assertion is currently off. Spec: `docs/superpowers/specs/2026-07-22-phase1-step4-state-and-codecs-design.md`.)
+
+**Consequences.** The example's stored `"notes": ""` stays truthful. A required string submitted empty validates — the diagnostic pushes the fix to the schema author, keeping [[02-design-principles#Validation semantics have a single owner|validation ownership]] intact. Clearing a required typed field produces a genuine `required` error: real absence, in contrast with failed decodes ([[#D-012 — Schema validation defers while any decode fails|D-012]]).
+
+## D-011 — Booleans use the hidden-input transport contract
+
+*2026-07-22*
+
+**Context.** Browsers omit unchecked checkboxes from submissions. Recovering the `false` either couples the codec to absence — conflating "unchecked" with "not rendered" and "not mentioned" — or makes the control's markup guarantee a value. Phoenix already renders a hidden `"false"` input for exactly this reason.
+
+**Decision.** Boolean controls follow a transport contract: the checkbox always submits `"true"` or `"false"` via the hidden-input convention, and the decoder never manufactures `false` from an absent key. The contract belongs to the control's theme contract and is enforced by renderer conformance tests — no more special than requiring a select to submit option values in the expected encoding. Nullable/tri-state booleans use an explicit select or radio control, not a checkbox.
+
+**Consequences.** Absence keeps one meaning across all field types, partial params cannot fabricate values, and `required` on booleans stays meaningful. A theme that omits the hidden input fails conformance tests instead of silently making unchecking impossible; the reference theme's checkbox carries the first such test. The contract binds editable checkboxes only: a read-only boolean renders as a disabled checkbox with no hidden input ([[#D-016 — Participation is definition-driven, not transport-driven|D-016]]).
+
+## D-012 — Schema validation defers while any decode fails
+
+*2026-07-22*
+
+**Context.** The `"51o2"` walkthrough in [[17-end-to-end-example#A validation round-trip|the end-to-end example]]: omitting the failed field from the validated instance piles a misleading `required`-style error onto the decode issue, while submitting the raw text changes validator semantics — a permissive or union schema might accept it. The [[phase-1-walking-skeleton|Phase 1]] definition of done demands this policy be written down "even if crude".
+
+**Decision.** Phase 1: when any decode issue exists, report every decode issue, retain all raw values, materialize no candidate instance, and defer whole-instance schema validation entirely. Raw undecoded text never enters the validator's instance. The recorded target (not Phase 1 scope) is progressive validation built on three-valued property presence: the decode operation determines the candidate status — `{:set, _}` → present, `:unset` → absent, `{:invalid, _}` → unknown — and `required` evaluates as `present → valid`, `absent → invalid`, `unknown → deferred`. When the progressive validator omits an undecodable property from its temporary instance, it suppresses schema errors whose result depends on that unknown property; a deliberate `:unset` is *known* absence and remains subject to `required`. Transport presence alone can never drive suppression: `{:provided, ""}` proves the control participated in the submission, not that a JSON property exists — only the operation establishes candidate status. Suppression operates on issues normalized inside the validator adapter (instance paths plus affected paths), keeping JSV's recursive error-tree shape behind the [[#D-008 — JSV is the JSON Schema validator|D-008]] boundary.
+
+**Consequences.** Exactly one error per broken field and no fabricated instances. Cost, accepted for Phase 1: schema feedback elsewhere in the form disappears while any decode issue exists; the upgrade path is recorded here so it can be built without changing the state model. This closes the definition-of-done item on decode/validate interplay.
+
+## D-013 — Transitions take an explicit params envelope
+
+*2026-07-22*
+
+**Context.** A bare params map is ambiguous: an absent key could mean "cleared" or "untouched". Step 4's transitions must be pure and usable from IEx — before any Phoenix machinery guarantees full-form posts — and embedding under a parent form ([[00-use-case|use case, requirement 5]]) means the payload's params arrive scoped inside a larger map.
+
+**Decision.** Transitions accept an explicit envelope — values plus a `mode` and a `scope` path — never a bare map. Phase 1 implements `:replace` only: within the declared scope, absent keys decode to `:unset` for participating fields (read-only fields are excluded from the replace scope — [[#D-016 — Participation is definition-driven, not transport-driven|D-016]]). A `:patch` mode (absent keys untouched) is reserved in the envelope shape but rejected explicitly, because no Phase 1 producer exists — LiveView `phx-change`/`phx-submit` and controller posts all deliver the full form.
+
+**Consequences.** Transition semantics are explicit and property-testable instead of implied by transport habits. The `:keep` operation ([[#D-009 — Form state separates transport from operation|D-009]]) stays dormant but named, so patch support is additive. Expiry condition for the deferral: the first real patch producer (per-field events, JS hooks, or a programmatic API) — the first concrete candidate is an input-level `phx-change`, which sends only that input ([[#D-014 — Usage is a first-class interaction axis|D-014]]).
+
+## D-014 — Usage is a first-class interaction axis
+
+*2026-07-22*
+
+**Context.** Error visibility follows Phoenix conventions: untouched forms do not display every error. LiveView's transport convention for this is `_unused_<field>` sibling parameters consumed by `Phoenix.Component.used_input?/1` — which reads `form.params` directly and never asks the `FormData` implementation. The operation model ([[#D-009 — Form state separates transport from operation|D-009]]) overloaded `:untouched` to mean both "this patch does not mention the field" and "the user has not interacted with this control"; the two provably diverge in the most common scenario — a form-level `phx-change` submits every field, so under `:replace` every field carries a real operation on every keystroke while interaction state varies per field. Discussion: `docs/discussion/untouched.md`.
+
+**Decision.** Interaction state is a separate axis from the decode operation. Per-path usage (`:unused` | `:used` | `:unknown`) is bookkept once, in a form-level map keyed by path, populated by transport normalization; the patch operation is renamed `:keep`, freeing "untouched" for interaction vocabulary. Transport normalization produces two parameter views: domain params with Phoenix transport metadata stripped (`_unused_*`, `_csrf_token`, `_target`, and — since [[#D-021 — LiveView integration is wrappers plus a demo, not framework machinery|D-021]] — `_persistent_id`; sort/drop params remain a Milestone B item), and Phoenix-compatible params with the markers preserved. The `FormData` implementation exposes the Phoenix-compatible view as `form.params` so `used_input?/1` keeps working with standard core components, while decoding consumes only domain params. Issues are always complete in form state; usage controls visibility, not validation — an issue renders when the form's `action` is submit or the field's usage is `:used`; cross-field issues attach to a declared primary path, root issues show only after submit. Nested usage propagates to parents (a parent is used when any descendant is) — recorded as Formentation's rule, not Phoenix's, to be verified against `used_input?/1` in a contract test. When markers are absent (`phx-no-unused-field`, plain HTTP posts), usage degrades honestly to `:unknown` and defaults; nothing fabricates interaction data. Property names colliding with reserved transport prefixes get a diagnostic in the LiveView transport adapter for Phase 1; escaping through a reversible encoder is the expected endgame, per the [[#D-007 — Node-ID segments are escaped, not restricted|D-007]] precedent.
+
+Kept deliberately small for Phase 1: the transition envelope grows only `event: :change | :submit` — no `source` field (transport identity must not leak past normalization) and no `:recover` event (LiveView auto-recovery replays a change whose params already carry the markers). The form lifecycle stays the already-planned `action` field; no separate phase concept.
+
+**Consequences.** Standard Phoenix core components work unchanged against a Formentation form; renderer-independent themes read `show_errors?` from the projection instead of knowing about `_unused_`. The transport normalizer's contract is "Phoenix transport metadata never reaches domain decoding", with `_unused_` as the first implemented case. Usage keyed by path meets Milestone B's stable item identities later — index-keyed usage would transfer used-state and errors across a reorder. [[#D-009 — Form state separates transport from operation|D-009]]'s operation list and [[#D-013 — Transitions take an explicit params envelope|D-013]]'s expiry condition are updated in place with links here. New open question recorded: fields that legitimately never submit (disabled, read-only without a hidden mirror) versus replace-mode deletion.
+
+## D-015 — One struct per node kind
+
+*2026-07-22*
+
+**Context.** Slice 1 deliberately shipped a single tagged `%Formentation.Node{}` with a revisit marker ([[031-form-definition|Form definition]], [[16-open-questions|open question]]). By the end of step 4 the shared struct carried 18 fields, 8 of them field-only and 2 group-only; invalid states (a group with a `value_type`, a field with `children`) were representable and excluded only by compiler discipline, and inspecting a definition printed a sea of mostly-nil structs. Step 5 (`FormData`) and milestone B (`:collection`) would each enlarge the consumer surface before Phase 3 extension authors freeze the representation — this was close to the last cheap moment.
+
+**Decision.** Each node kind is its own struct: `Formentation.Node.Field`, `Formentation.Node.Group`, `Formentation.Node.Unsupported`. The struct name is the tag; the `kind` field is gone. `Formentation.Node` remains as the vocabulary module holding the `t()` union and the shared `origin` type. `Group` enforces `nests_data?` so every construction site declares its [[#D-006 — One `:group` kind, flagged for data nesting|D-006]] flavor; `Field` enforces `value_type`. The splitting rule: a kind gets its own struct when its *shape* differs, not when its values differ — scalar fields stay one struct; `:collection` and `:choice` get their own structs when they land. Presentation-group membership (`group:`) and field-level UI hints now apply only to `Field` nodes; a hint claiming a non-field property still places or ignores it silently (edge recorded in [[16-open-questions|open questions]]).
+
+**Consequences.** Illegal states are unrepresentable and `inspect` output self-describes. Consumers dispatch on struct patterns (`%Node.Field{}`), translated one-to-one from the old `kind:` matches. New kinds are additive modules instead of more nil fields on every node. The differential test drops `:kind` from its fact list — kind equivalence is struct equality. Whether `Group`'s two flavors split further stays open and links to D-006.
+
+## D-016 — Participation is definition-driven, not transport-driven
+
+*2026-07-22*
+
+**Context.** [[#D-013 — Transitions take an explicit params envelope|D-013]]'s `:replace` mode reads an absent key as user intent: absence decodes to `:unset`. That inference presumes every field in scope would have submitted a key if it had a value — and HTML breaks the premise: disabled controls never submit, `readonly` exists only for text-like inputs (selects, checkboxes, and radios must be disabled or rendered static to be read-only), and a field hidden from the UI submits nothing unless rendered as a hidden input. Meanwhile the Milestone A hints vocabulary promises `hidden` and `read-only` fields preservation. Recorded as an open question by [[#D-014 — Usage is a first-class interaction axis|D-014]]; source discussion: `docs/discussion/encoding-and-decoding.md`; spec: `docs/superpowers/specs/2026-07-22-phase1-non-submitting-fields-design.md`.
+
+**Decision.** Participation in a replace transition is determined by the definition, not by what the browser happens to submit. Two hints, two trust models. `read_only` is a server-enforced guarantee: the field compiles to a `read_only?` flag on its node and is excluded from the replace scope — its operation is always `:keep`, its candidate and display values come from original data, and submitted values are silently discarded for decoding (readonly text inputs legitimately submit, so arriving values are routine; the Phoenix-compatible params view keeps them verbatim per [[#D-014 — Usage is a first-class interaction axis|D-014]]). `hidden` is presentation only: the field renders as `<input type="hidden">`, submits and decodes under unamended replace semantics — hiding is not protection, and tampering with a hidden input is trust-equivalent to typing in a visible one. Combined, `read_only` wins for decoding and the field renders as nothing. Non-boolean hint values warn (`:invalid_hint_value`) in both adapters. `:keep`, dormant since [[#D-009 — Form state separates transport from operation|D-009]], gains its first producer with pinned candidate semantics: copy the original value at the path, or stay absent when the original has none.
+
+**Consequences.** The read-only guarantee never depends on the client echoing data back, so the theme (Phase 1 step 6) needs no hidden mirrors: `readonly` attributes for text-like controls, `disabled` for selects, checkboxes, and radios. A read-only boolean renders as a disabled checkbox outside [[#D-011 — Booleans use the hidden-input transport contract|D-011]]'s contract, which is scoped to editable checkboxes. Server-side preservation assumes original data is re-suppliable on every transition — free in LiveView, a record-reload obligation for stateless controller flows. [[#D-013 — Transitions take an explicit params envelope|D-013]]'s replace semantics are amended in place: absent keys decode to `:unset` for participating fields.
+
+## D-017 — Phoenix integration ships in-tree behind a namespace boundary
+
+*2026-07-23*
+
+**Context.** Step 5 of [[phase-1-walking-skeleton|Phase 1]] needs `defimpl Phoenix.HTML.FormData, for: Formentation.Form`, but the phase's definition of done says core compiles without Phoenix. phoenix_html is protocols and escaping — not the framework — while the D-014 contract test needs the real `Phoenix.Component.used_input?/1` from phoenix_live_view. Spec: `docs/superpowers/specs/2026-07-23-phase1-step5-formdata-design.md`.
+
+**Decision.** `{:phoenix_html, "~> 4.2"}` is a required dependency and `{:phoenix_live_view, "~> 1.0", only: :test}` supports contract tests. All Phoenix-facing code lives in `lib/formentation/phoenix/` — the enforced boundary is the directory, since a `defimpl`'s generated module name lives under the protocol's own namespace rather than `Formentation.Phoenix.*`; no module outside that directory may reference `Phoenix.*`, asserted by an AST-walking boundary test. The "core compiles without Phoenix" deliverable is met by boundary, not packaging; extracting a `formentation_phoenix` package is a [[phase-3-extensibility|Phase 3]] concern, revisited when the theme contract is extracted. (Amended at step 6: `{:phoenix_live_view, "~> 1.1"}` was promoted from test-only to a required dependency, since HEEx function components live there and phoenix_html 4.x ships no tag helpers — the `~> 1.1` floor because the HEEx formatter normalizes templates to `{...}` body interpolation, which 1.0.0 lacks. The boundary rule is unchanged. See [[#D-019 — Projection is Phoenix-generic|D-019]].)
+
+**Consequences.** Step 5 stays one small `defimpl` instead of package machinery while the representation is still moving (D-015 just churned every consumer). The boundary test makes the directory rule enforceable rather than aspirational. Error entries are keyed by existing atom with string fallback — `String.to_existing_atom/1` never creates an atom, so the no-atoms guarantee holds while `form[:field].errors` works for core components.
+
+## D-018 — Reach is the architecture gate
+
+*2026-07-23*
+
+**Context.** The layer boundaries in [[04-architecture|Architecture]] — a source-independent core with adapters on both sides — were enforced only by convention plus the single AST-walking boundary test from [[#D-017 — Phoenix integration ships in-tree behind a namespace boundary|D-017]]. Reach was already wired into `mix ci` (`reach.check --arch --smells`) but ran against an empty `.reach.exs`, so the gate asserted nothing.
+
+**Decision.** `.reach.exs` declares four layers mirroring the package-boundaries table in [[04-architecture|Architecture]] — `core`, `source`, `json_schema`, `phoenix` — with forbidden layer edges, call bans keeping `Phoenix.*` inside the projection namespace and `JSV.*` behind the [[#D-008 — JSV is the JSON Schema validator|D-008]] swap point, an effects policy (no real IO anywhere in the library), `Source.Shared` internal to the adapters, and full layer coverage. Smells run strict: a new finding fails `mix ci`, matching `credo --strict` and `ex_dna --max-clones 0`. One known finding is baselined in `.reach-baseline.json`: the core↔json_schema layer cycle created by `Formentation.Form` dispatching the opaque validator slot ([[#D-012 — Schema validation defers while any decode fails|D-012]]) directly through the hard-coded D-008 swap point.
+
+**Consequences.** Boundary violations now fail `mix ci` with concrete call-edge evidence instead of relying on review; the D-017 boundary test remains as the spec-level assertion of the Phoenix rule. The baselined cycle is acknowledged debt that dissolves once the validator slot dispatches through a behaviour — natural when a second validating source appears. Two config exceptions document tool limits rather than policy holes: reach classifies the pure `IO.iodata_to_binary/1` and `Enum.each/2` as `:io` (module-level effect allowances in the path modules), and its behaviour-candidate heuristic cannot see `@behaviour` declarations, so the fixtures implementing the extracted `Formentation.Fixture` contract carry a per-check ignore.
+
+## D-019 — Projection is Phoenix-generic
+
+*2026-07-23*
+
+**Context.** Step 6 needs a projector between definition and markup ([[06-runtime-projection|Runtime projection]]'s rendering boundary). [[phase-1-walking-skeleton|Phase 1]] cautions against coupling it to `%Formentation.Form{}` if `%Phoenix.HTML.Form{}` suffices, and [[phase-5-ash-integration|Phase 5]] wants the renderer working against any compatible Phoenix form. Spec: `docs/superpowers/specs/2026-07-23-phase1-step6-projector-components-theme-design.md`.
+
+**Decision.** `Formentation.Phoenix.Projector` consumes a definition plus any `%Phoenix.HTML.Form{}` and reads state exclusively through Phoenix conventions: values via the form field, errors via the action-gated `field.errors` ([[#D-017 — Phoenix integration ships in-tree behind a namespace boundary|D-017]]), usage via `Phoenix.Component.used_input?/1` — so `show_errors?` is computed once, in the plan, and themes never see `_unused_` ([[#D-014 — Usage is a first-class interaction axis|D-014]]). It emits per-kind render nodes ([[#D-015 — One struct per node kind|D-015]]) carrying the `%Phoenix.HTML.FormField{}`; nested objects are materialized directly through `Phoenix.HTML.FormData.to_form/4`, never `<.inputs_for>`, so nothing injects `_persistent_id`. Field access uses the existing-atom-with-string-fallback convention so atom-keyed errors attach without atom creation. One deliberate special case: root and object-level issues for the submit-gated error summary are read from `form.source` when it is a `%Formentation.Form{}`; other sources degrade to visible per-field entries. Widget resolution (hidden → hint → options → boolean → number → role → text) lives in the projector; a nonsense hint falls back to the inferred widget with a `:widget_fallback` plan diagnostic. The dependency posture: `phoenix_live_view` became required (amending [[#D-017 — Phoenix integration ships in-tree behind a namespace boundary|D-017]] in place).
+
+**Consequences.** An `AshPhoenix.Form` is just another `FormData` implementation to project ([[phase-5-ash-integration|Phase 5]]). Projection tests build a form and assert the plan — no HEEx involved — keeping the layers separable. The projector lives behind the D-017/D-018 directory boundary, so core still compiles without Phoenix by boundary, not packaging.
+
+## D-020 — The reference theme is a markup set, not a contract
+
+*2026-07-23*
+
+**Context.** Step 6's deliverable is "a plain, accessible, deliberately unpolished reference theme", while the phase cautions that a theme *contract* is [[phase-3-extensibility|Phase 3]]'s job, extracted from a second implementation. The planning sketch's `theme={MyApp.FormTheme}` attribute predates that caution.
+
+**Decision.** Phase 1 has no theme parameter. `Formentation.Phoenix.Theme.Reference` holds per-widget function components called directly by `Formentation.Phoenix.fields/1` and `field/1`; nothing dispatches through a configurable module. The accessibility contract is documented and Floki-tested against these components: labels for every control, `aria-describedby` for help and visible errors, `aria-invalid`, fieldsets with legends (groups and radio groups), a submit-gated error summary linking to controls, no duplicate ids, all schema text escaped. Conformance obligations bind here: the editable checkbox carries the [[#D-011 — Booleans use the hidden-input transport contract|D-011]] hidden input; read-only renders `readonly`/`disabled` with no hidden mirrors and a read-only boolean drops the hidden input ([[#D-016 — Participation is definition-driven, not transport-driven|D-016]]); selects always lead with a blank option; a required boolean never renders the HTML `required` attribute on its checkbox (HTML required means must-be-*checked*).
+
+**Consequences.** Users cannot plug a theme in before Phase 3 designs the real contract, so nothing informal freezes. The reference components are the executable specification a second theme will be measured against when the contract is extracted.
+
+## D-021 — LiveView integration is wrappers plus a demo, not framework machinery
+
+*2026-07-24*
+
+**Context.** Step 7 needed a lifecycle surface for `phx-change`/`phx-submit` handlers and the phase's example application ([[phase-1-walking-skeleton|Phase 1]]'s LiveView definition-of-done item), while [[07-phoenix-integration|Phoenix integration]] forbids the renderer from owning business submission. Spec: `docs/superpowers/specs/2026-07-24-phase1-step7-liveview-design.md`.
+
+**Decision.** `Form.validate/2` and `Form.submit/2` are thin wrappers that build the [[18-decisions#D-013 — Transitions take an explicit params envelope|D-013]] envelope internally (`event: :change` / `:submit`); extracting the caller's subtree from the event params stays in the handler, which alone knows its embedding namespace — no `use` macro, no auto-wired `handle_event`, no event-handling helpers beyond the two wrappers. `_persistent_id` joins the [[18-decisions#D-014 — Usage is a first-class interaction axis|D-014]] transport-metadata strip performed by `Transport.normalize/1` at every nesting level, alongside `_unused_*`, `_csrf_token`, and `_target` (amending D-014's "later `_persistent_id`" wording in place with this link). The phase's example application is a repo-root `demo/` directory compiled in dev and test via `elixirc_paths`, not a separate examples project: one LiveView set (`FormentationDemo.PumpInspectionLive`, `FormentationDemo.NestedLive`) serves both the `Phoenix.LiveViewTest` suite and a browser, the latter via `mix demo [port]` (default 4000) on Bandit — so the tested and the browsed version can never drift apart. The end-to-end pump-inspection JSON Schema declaration is demo-owned (`FormentationDemo.PumpInspection`); the test fixture (`Formentation.Fixtures.PumpInspection`) delegates `json_schema/0` and `ui_hints/0` to it while keeping `map_source/0` test-only, because map-source definitions carry no validator — only the JSON Schema adapter can demonstrate live required/format errors ([[16-open-questions#Runtime and state|open question]]). [[18-decisions#D-018 — Reach is the architecture gate|Reach]] grows a `demo` layer permitted to call Phoenix and the library with server/io effects; the library's own layers still forbid depending on it.
+
+**Consequences.** The library's LiveView story stays documentation, not API surface: `validate/2`, `submit/2`, and the pluck-then-call pattern are what the Userguide teaches, nothing framework-shaped ships. The demo lives inside `mix ci`, so it cannot rot silently. Reality diverged from the spec's working belief on markers, corrected in a preceding commit: `Phoenix.LiveViewTest`'s `form/3` plus `render_change/1`/`render_submit/1` re-serialize the *entire* rendered form on every call and carry no `_unused_` markers on any event, change or submit alike — the marker convention is JS-client-only, applied by the browser's `LiveSocket` hook before requests ever reach the server, and `Phoenix.LiveViewTest` never runs that hook. The LiveView suite therefore pins marker-less semantics (every serialized field `:used`, blank required fields erroring from the very first change); a real-browser check independently confirmed the `_unused_` gating the spec had originally expected (an untouched blank required field shows no error until touched) — both are true, for different transports. The Task 11 browser check on `type="number"` failed raw-input preservation two ways at once: Chrome blocks non-numeric keystrokes outright, and a force-injected invalid value is sanitized away on the re-patched round trip — so the number widget shipped as `type="text" inputmode="numeric"` (commit "Fall back number inputs to text with numeric inputmode"), closing the [[16-open-questions#Rendering|open question]] with the fallback rather than leaving `type="number"` in place. Because `fields/1` renders the error summary at the top of its own block, an embedded payload form shows the summary mid-page when hand-written inputs precede it — observed in the step-7 browser check and acceptable without slots; repositioning belongs to the [[phase-3-extensibility|Phase 3]] theme contract ([[16-open-questions#Rendering|open question]]).
+
+## D-022 — Browser-real tests are an opt-in, demo-driven Playwright suite
+
+*2026-07-24*
+
+Adopted PhoenixTest + `phoenix_test_playwright` (Playwright 1.61.1, installed via the mise
+npm backend) to cover the truths `Phoenix.LiveViewTest` cannot observe — it never runs the
+LiveSocket JS hook. The suite drives `FormentationDemo.Endpoint` (Formentation has no HTTP
+surface of its own), is tagged `:browser` and excluded from `mix test`/`mix ci`, and runs via
+`mix test.browser`. Seed coverage: `_unused_` gating of pristine required errors (D-014),
+number-widget raw-text preservation (D-021), error-summary anchor focus, and a valid-submit
+smoke. The suite is tagged `browser: :chromium` (a bare `:browser` collides with
+phoenix_test_playwright's engine key) and excluded via `exclude: [:browser]`. Motivated by the
+step-7 gap and as a dry run for Phase 3 conformance suites.
+
+## D-023 — The demo keeps native validation, behind a toggle
+
+*2026-07-24*
+
+Native HTML5 constraint validation (`required`/`minlength`, emitted by the reference theme)
+blocks a real-browser submit of a blank/invalid form, so Formentation's server-side validation
+and its submit-gated error summary are unreachable by a click — a browser-only interaction
+`LiveViewTest` is blind to, found while writing the unused-gating browser test. Rather than drop
+native validation (kept as a genuine feature; already partly traded away by the number widget's
+`type="text"` fallback — D-021), the pump-inspection demo gained a checkbox toggling `novalidate`
+on the form. It doubles as an exploration aid (native bubbles vs Formentation's accessible
+summary) and is what the two submit-driven browser tests flip off to reach the server.
+
+## D-024 — Distribution, license, and CI
+
+Formentation is released under the MIT License (`LICENSE`, Vangelis Tsoumenis, 2026)
+and distributed initially as a git-URL dependency (`{:formentation, git:
+"https://github.com/kioopi/formentation.git", tag: "v0.1.0"}`), not yet on Hex; a
+minimal `package/0` block (`licenses`, `links`) prepares for a later Hex release. CI is
+GitHub Actions reusing the pinned `mise.toml` toolchain via `jdx/mise-action`: a
+blocking `check` job running the full `mix ci`, plus a non-blocking `browser` job
+running `mix test.browser` (isolated from merge gating while CI browser stability is
+unproven).
+
+## Related notes
+
+- [[16-open-questions|Open questions]]
+- [[13-roadmap|Roadmap]]
+- [[00-use-case|Motivating use case]]
+- [[Formentation|Back to the entry point]]

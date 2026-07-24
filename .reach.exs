@@ -1,0 +1,159 @@
+# Architecture policy for `mix reach.check --arch --smells` (part of `mix ci`).
+#
+# Layers mirror the package boundaries in Planning/04-architecture.md: a
+# source-independent core with adapters on both sides (declaration sources
+# in, Phoenix projection out). The core must not depend on Phoenix, and JSV
+# stays behind the D-008 swap point.
+[
+  layers: [
+    # Pure structural core: paths, nodes, definition, diagnostics, runtime
+    # form state, codecs, transport. Source-independent and framework-free.
+    core: [
+      "Formentation",
+      "Formentation.Codec",
+      "Formentation.Definition",
+      "Formentation.Diagnostic",
+      "Formentation.Form",
+      "Formentation.Form.*",
+      "Formentation.Info",
+      "Formentation.InstancePath",
+      "Formentation.Issue",
+      "Formentation.JSONPointer",
+      "Formentation.Node",
+      "Formentation.Node.*",
+      "Formentation.NodeId",
+      "Formentation.Params",
+      "Formentation.TemplatePath",
+      "Formentation.Transport",
+      "Formentation.Transport.*"
+    ],
+    # Declaration-source adapters. The map source is the in-core reference
+    # adapter (D-004); Source.Shared holds adapter-generic compile helpers.
+    source: ["Formentation.Source", "Formentation.Source.*"],
+    # JSON Schema adapter — the only namespace allowed to touch JSV (D-008).
+    json_schema: ["Formentation.JSONSchema", "Formentation.JSONSchema.*"],
+    # Phoenix projection layer (D-017). The FormData protocol impl is named
+    # Phoenix.HTML.FormData.Formentation.Form by defimpl, hence the second
+    # pattern. Formentation.Phoenix itself (the public component surface)
+    # has no trailing segment, so it needs its own literal entry alongside
+    # the wildcard for its submodules.
+    phoenix: [
+      "Formentation.Phoenix",
+      "Formentation.Phoenix.*",
+      "Phoenix.HTML.FormData.Formentation.*"
+    ],
+    # Step-7 demo application (spec 2026-07-24): the runnable example and
+    # its LiveViewTest fixture. Not library code — may call anything and
+    # do server-ish IO; kept as a layer so require_all_modules stays strict.
+    demo: [
+      "FormentationDemo",
+      "FormentationDemo.*",
+      "Mix.Tasks.Demo"
+    ]
+  ],
+  deps: [
+    forbidden: [
+      # Core is presentation-independent; nothing below the projection layer
+      # may reach it (04-architecture: "The core must not depend on Phoenix").
+      {:core, :phoenix},
+      {:source, :phoenix},
+      {:json_schema, :phoenix},
+      # Core never selects a source adapter; Formentation.compile/2 receives
+      # one via the :adapter option.
+      {:core, :source},
+      # The one sanctioned core->adapter edge: Form dispatches the opaque,
+      # adapter-owned validator slot (D-012) through the D-008 swap point.
+      {:core, :json_schema,
+       except_edges: [{"Formentation.Form", "Formentation.JSONSchema.Validator"}]},
+      # The source layer stays adapter-generic.
+      {:source, :json_schema},
+      # Projection reads compiled core state only, never adapters.
+      {:phoenix, :json_schema},
+      {:phoenix, :source},
+      # The library must never depend on the demo.
+      {:core, :demo},
+      {:source, :demo},
+      {:json_schema, :demo},
+      {:phoenix, :demo}
+    ]
+  ],
+  calls: [
+    forbidden: [
+      # The Phoenix boundary at the external-library level: only the
+      # projection layer may call Phoenix modules (Transport is explicitly
+      # "zero Phoenix dependency").
+      {"Formentation.*", ["Phoenix.*"], except: ["Formentation.Phoenix.*"]},
+      # JSV never leaks past its swap point (D-008).
+      {"Formentation.*", ["JSV.*"], except: ["Formentation.JSONSchema.Validator"]}
+    ]
+  ],
+  effects: [
+    # Reach classifies every IO.* call and Enum.each/2 as :io by convention.
+    # These modules only use the pure IO.iodata_to_binary/1 (JSON Pointer
+    # building) and Enum.each + raise (argument validation) — no real IO.
+    # Module overrides take precedence over by_layer.
+    allowed: [
+      {"Formentation.InstancePath", [:pure, :exception, :io, :unknown]},
+      {"Formentation.TemplatePath", [:pure, :exception, :io, :unknown]},
+      {"Formentation.JSONPointer", [:pure, :exception, :io, :unknown]},
+      {"Formentation.NodeId", [:pure, :exception, :io, :unknown]}
+    ],
+    # The whole library is pure data transformation; compilation is
+    # deterministic (04-architecture: remote I/O belongs behind an explicit
+    # resolver). No layer may acquire IO/write/send effects unnoticed.
+    by_layer: [
+      core: [:pure, :exception, :unknown],
+      source: [:pure, :exception, :unknown],
+      json_schema: [:pure, :exception, :unknown],
+      phoenix: [:pure, :exception, :unknown],
+      # Reach's full effect taxonomy (Reach.Effects.effect/0): :pure,
+      # :exception, and :unknown from the brief's list plus every real
+      # side-effect kind reach classifies (:read — e.g. File.read! for the
+      # JSON declaration — :write, :io, :send, :receive, :nif). The demo
+      # is not library code, so it is deliberately unconstrained here
+      # rather than enumerated effect-by-effect as the code grows in
+      # Task 5 (Known uncertainty 2: "don't constrain it").
+      demo: [:pure, :read, :write, :io, :send, :receive, :exception, :nif, :unknown]
+    ]
+  ],
+  boundaries: [
+    # Shared compile helpers are implementation detail of the adapters.
+    internal: ["Formentation.Source.Shared"],
+    internal_callers: [
+      {"Formentation.Source.Shared",
+       ["Formentation.Source.*", "Formentation.JSONSchema", "Formentation.JSONSchema.*"]}
+    ]
+  ],
+  smells: [
+    # Fail the gate on new smell findings, matching the strictness of the
+    # rest of mix ci (credo --strict, ex_dna --max-clones 0).
+    strict: true,
+    behaviour_candidate: [
+      # The fixtures implement the extracted Formentation.Fixture
+      # behaviour; reach's heuristic cannot see @behaviour declarations,
+      # so it would keep proposing the extraction it already got.
+      ignore: [modules: ["Formentation.Fixtures.*"]]
+    ]
+  ],
+  checks: [
+    # Known transitional finding: the D-008/D-012 validator seam makes core
+    # and json_schema mutually dependent (layer cycle). Resolved once the
+    # validator slot dispatches through a behaviour instead of a hard-coded
+    # module. Any NEW violation still fails --arch.
+    baseline: ".reach-baseline.json",
+    layer_coverage: [
+      require_all_modules: true,
+      forbid_multiple_matches: true,
+      ignore: ["Formentation.Fixture", "Formentation.Fixtures.*", "Formentation.HTMLAssertions"]
+    ]
+  ],
+  tests: [
+    hints: [
+      {"lib/formentation/phoenix/**", ["test/formentation/phoenix"]},
+      {"lib/formentation/json_schema/**", ["test/formentation/json_schema"]},
+      {"lib/formentation/source/**", ["test/formentation/source"]},
+      {"lib/formentation/form.ex",
+       ["test/formentation/form_test.exs", "test/formentation/form_property_test.exs"]}
+    ]
+  ]
+]

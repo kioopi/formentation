@@ -1,0 +1,9 @@
+[tools]
+elixir = "1.20.2-otp-29"
+erlang = "29.0.3"
+node = "24"
+"npm:playwright" = "1.61.1"
+
+[tasks.playwright-browsers]
+description = "Download the Chromium build matching the pinned Playwright (idempotent)"
+run = "playwright install chromium"

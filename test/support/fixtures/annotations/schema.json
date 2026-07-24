@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "title": "Inspection protocol",
+  "description": "Recorded at the end of each shift.",
+  "properties": {
+    "checklist_version": { "type": "string", "const": "2" },
+    "reviewed_by": {
+      "type": "string",
+      "description": "Full name of the reviewing engineer.",
+      "examples": ["J. Doe"],
+      "default": "unassigned"
+    },
+    "summary": { "type": "string", "description": "Short shift summary." }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "title": "Pump inspection",
+  "properties": {
+    "serial_number": { "type": "string", "title": "Serial number", "minLength": 4 },
+    "condition": { "type": "string", "title": "Condition", "enum": ["good", "worn", "defective"] },
+    "last_service": { "type": "string", "format": "date", "title": "Last service" },
+    "operating_hours": { "type": "integer", "title": "Operating hours", "minimum": 0 },
+    "voltage": { "type": "number", "title": "Voltage (V)" },
+    "insulation_ok": { "type": "boolean", "title": "Insulation test passed" },
+    "notes": { "type": "string", "title": "Notes" }
+  },
+  "required": ["serial_number", "condition"]
+}

@@ -1,0 +1,71 @@
+# The directory Mix will write compiled artifacts to.
+/_build/
+
+# If you run "mix test --cover", coverage assets end up here.
+/cover/
+
+# The directory Mix downloads your dependencies sources to.
+/deps/
+
+# Where third-party dependencies like ExDoc output generated docs.
+/doc/
+
+# Temporary files, for example, from tests.
+/tmp/
+
+# If the VM crashes, it generates a dump, let's ignore it too.
+erl_crash.dump
+
+# Also ignore archive artifacts (built via "mix archive.build").
+*.ez
+
+# Ignore package tarball (built via "mix hex.build").
+formentation-*.tar
+
+# https://mise.jdx.dev/configuration.html
+# https://mise.jdx.dev/configuration/environments.html
+.mise.*.local.toml
+.mise.local.toml
+mise.*.local.toml
+mise.local.toml
+.mise/*.local.toml
+mise/*.local.toml
+
+# MacOS General
+.DS_Store
+.localized
+__MACOSX/
+.AppleDouble
+.LSOverride
+Icon[]
+
+# Excel temporary files
+~*.xls*
+.~*.xls*
+
+# The current application UI state (DOM layout, recently-opened files, etc.) is
+# stored in these files (separate for desktop and mobile) so you can resume
+# your session seamlessly after a restart. If you want to track UI state, use
+# the Workspaces core plugin instead of relying on these files.
+**/.obsidian/graph.json
+**/.obsidian/workspace.json
+**/.obsidian/workspace-mobile.json
+
+# Obsidian plugins are stored under .obsidian/plugins/$plugin_name. They
+# contain metadata (manifest.json), application code (main.js), stylesheets
+# (styles.css), and user-configuration data (data.json).
+# We only want to track data.json, so we:
+# 1. exclude everything that the plugin folders contain,
+# 2. unignore data.json in the plugin folders
+**/.obsidian/plugins/*/**
+!**/.obsidian/plugins/*/data.json
+
+.superpowers/
+
+# If you run "mix test --cover", coverage assets end up here.
+/cover/
+.six/coverage.md
+
+# Local-only AI process docs (specs, plans, discussion) — not published
+/docs/superpowers/
+/docs/discussion/

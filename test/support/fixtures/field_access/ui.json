@@ -1,0 +1,6 @@
+{
+  "fields": {
+    "legacy_id": { "hidden": true },
+    "serial_number": { "read_only": true }
+  }
+}

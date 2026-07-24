@@ -1,0 +1,253 @@
+---
+title: End-to-end data flow
+aliases:
+  - End-to-end data flow
+  - Data flow
+tags:
+  - formentation
+  - techdocs
+  - architecture
+status: current
+---
+
+# End-to-end data flow
+
+> [!note] As of 2026-07-24 · step 7 complete
+> Follows one form through every layer that exists today, and stops
+> where the built system stops. Each layer has its own deep-dive note;
+> this one is about the **joins between them** — what crosses each
+> boundary, and what deliberately does not. The LiveView lifecycle
+> (step 7) closes steps 5–6 through
+> [[form-state-and-transitions#LiveView entry points|`Form.validate/2`/`Form.submit/2`]]
+> rather than adding a new join.
+
+Every other Techdocs note describes one layer. This one is the map: it
+follows the [[17-end-to-end-example|pump inspection example]] from a
+JSON document to rendered HTML and back to a decoded JSON instance, so
+the seams between layers are visible in one place.
+
+```mermaid
+flowchart TD
+    Decl["Declaration<br/>schema.json + ui.json"]
+    Def["Definition<br/>inert · cacheable · shared"]
+    State["Form<br/>per-request state"]
+    PForm["%Phoenix.HTML.Form{}"]
+    Plan["RenderPlan"]
+    HTML["HTML"]
+    Params["Browser params"]
+    Cand["candidate<br/>JSON instance"]
+
+    Decl -->|"compile/2"| Def
+    Def -->|"Form.new/3"| State
+    State -->|"to_form/2"| PForm
+    Def --> Plan
+    PForm -->|"Projector.project/2"| Plan
+    Plan -->|"reference theme"| HTML
+    HTML -.->|"POST"| Params
+    Params -->|"%Params{} · transition/2"| State
+    State -->|"candidate/1"| Cand
+
+    class Def,State,Plan internal-link
+```
+
+Two things about the shape of that graph are the whole architecture:
+
+- **The `Definition` is on the left of every arrow and the right of
+  none** (after compilation). Nothing downstream writes to it, which is
+  what lets one definition be compiled once and shared by every request
+  and every user.
+- **The loop closes through `Form`, not through HTML.** Params re-enter
+  the state layer directly; the render is a pure function of state, never
+  a source of it.
+
+## 1 · Declaration → `Definition`
+
+**Crosses the boundary:** a raw source document plus options. **Comes
+back:** `{:ok, %Definition{}, diagnostics}`.
+
+The [[compile-pipeline|compile pipeline]] walks the declaration through
+a [[source-adapters|source adapter]], stamping every node with a
+[[paths-and-identity|`TemplatePath`]], a derived `NodeId`, and
+[[diagnostics-and-origins|origins]] for each resolved value.
+
+For the example, the schema's seven properties become seven
+`Node.Field`s; the `ui.json` `order` reorders them; `groups` folds
+`voltage` and `insulation_ok` into a **presentational** group; and
+`fields.notes` overrides the widget and help. The result knows what the
+form *means* and nothing about what it will look like in a browser:
+
+```elixir
+Info.role(definition, ["last_service"])   #=> :date
+Info.required?(definition, ["condition"]) #=> true
+```
+
+**What does not cross:** values, params, errors, DOM ids. The
+`Definition` holds a `validator` for the JSON Schema source, but that
+validator is only *built* here — it is consumed two layers later.
+
+## 2 · `Definition` → `Form`
+
+**Crosses:** the definition plus the data the form opens on. **Comes
+back:** a `%Form{}` whose `candidate` is that data, already validated.
+
+`Form.new/3` is where a static description becomes a specific
+filling-in. It stores the data as `original`, optionally applies declared
+defaults, and runs an initial validation — so a form that opens on
+invalid data knows it immediately, even though nothing will be
+*displayed* until an action occurs.
+
+This is the first join where the layering earns its keep: the state
+layer imports `Definition` and knows nothing about Phoenix, so the entire
+interaction model is exercisable from IEx.
+
+## 3 · `Form` → `%Phoenix.HTML.Form{}`
+
+**Crosses:** the form state plus `:as` and `:id`. **Comes back:** an
+ordinary Phoenix form struct.
+
+[[phoenix-form-data|The `FormData` projection]] reads already-computed
+state and answers Phoenix's questions with it: `input_value` from
+`display_value`, `errors` from action-gated issues, `input_validations`
+from schema constraints. The private instance-path entry it puts in
+`options` is how one flat Phoenix form struct stays anchored in a tree.
+
+The example passes `as: "asset[payload]"`, and that single option is what
+makes the whole form compose under a parent namespace — every name below
+becomes `asset[payload][serial_number]` and every id
+`asset_payload_serial_number`, with no other layer aware it happened.
+
+## 4 · `%Phoenix.HTML.Form{}` → `RenderPlan`
+
+**Crosses:** the definition (for structure and semantics) *and* the
+Phoenix form (for values, errors, usage). **Comes back:** a
+`%RenderPlan{}`.
+
+[[rendering|The projector]] walks the definition in declaration order and
+pairs each node with the corresponding `Phoenix.HTML.FormField`,
+resolving a widget, a label, and — importantly — computing
+`show_errors?` **once, here**, so no theme ever has to reason about
+`_unused_` markers or the form action.
+
+This is the layer where the two inputs meet, and the reason the projector
+takes both: the definition knows `last_service` is a date; the form knows
+its current value is `"2026-06-30"`; only together do they make a
+`:date_input` render node.
+
+The projector reads the form **only through Phoenix conventions**, which
+is what makes it generic over any `FormData` implementation rather than
+coupled to `Formentation.Form`
+([[18-decisions#D-019 — Projection is Phoenix-generic|D-019]]). The one
+deliberate exception is the error summary's object-level entries, which
+degrade to field entries for other sources.
+
+## 5 · `RenderPlan` → HTML
+
+**Crosses:** render nodes. **Comes back:** markup.
+
+The reference theme is a set of per-widget function components, called
+directly — there is no theme parameter in Phase 1
+([[18-decisions#D-020 — The reference theme is a markup set, not a contract|D-020]]).
+By this point every decision has already been made upstream: the theme
+picks no widgets, resolves no labels, and inspects no state. It emits
+markup for a plan.
+
+The example's rendered output is pinned byte-for-byte as a reviewed
+snapshot at `test/support/fixtures/pump_inspection/static_render.html`,
+which makes this join the one layer boundary with a literal, readable
+artifact:
+
+```html
+<div class="ftn-field">
+  <label for="asset_payload_serial_number">Serial number</label>
+  <input type="text" id="asset_payload_serial_number"
+         name="asset[payload][serial_number]" value="PX-2044"
+         required minlength="4">
+</div>
+```
+
+Every attribute there is traceable back through the chain: the label to
+the schema's `title`, `required`/`minlength` to `input_validations`
+derived from `required` + `minLength`, the value to `display_value`, and
+the name and id to the `:as` option in step 3.
+
+## 6 · Browser params → `Form`
+
+**Crosses:** a raw params map, wrapped in a `%Params{}` envelope. **Comes
+back:** a new `%Form{}`.
+
+The return leg is [[form-state-and-transitions|a transition]]:
+normalize the transport, decode every declared field, rematerialize the
+candidate, revalidate. The envelope is explicit rather than a bare map
+because an absent key is ambiguous and only the caller knows whether it
+means "cleared" or "untouched"
+([[18-decisions#D-013 — Transitions take an explicit params envelope|D-013]]).
+
+Note what *re-enters* here: params only. The HTML is not parsed, the
+render plan is discarded, and the definition is untouched. The form is
+recomputed from `original` + operations every time, so there is no
+incremental state to drift.
+
+In a LiveView, `phx-change`/`phx-submit` reach this leg through
+[[form-state-and-transitions#LiveView entry points|`Form.validate/2`/`Form.submit/2`]],
+which build the envelope from the handler's own params subtree; a plain
+controller reaches the same leg through `transition/2` with a
+hand-built one. Either way it is the same code path, and the render plan
+from step 4 is discarded and rebuilt the same way in both.
+
+## 7 · `Form` → candidate
+
+**Crosses:** nothing new. **Comes back:** `{:ok, instance}` or `:none`.
+
+`Form.candidate/1` is the chain's output: the JSON instance this form
+would submit, assembled from the decode operations over the original
+data. It is `:none` while **any** field fails to decode
+([[18-decisions#D-012 — Schema validation defers while any decode fails|D-012]]),
+which is also why schema validation cannot run on half-decoded input.
+
+The candidate is what an application persists. It is a plain map — not a
+Formentation structure — so nothing downstream of the form inherits a
+dependency on this library.
+
+## What the flow shows that the layer notes cannot
+
+Three properties are only visible from here:
+
+**Each arrow is one-directional and one-typed.** No layer reaches back
+into its predecessor, and no layer receives two different shapes from the
+same neighbour. That is what makes each testable without the next, which
+[[test-and-verification-architecture|the test architecture]] then
+exploits: the compile layer is tested with no state, the state layer with
+no Phoenix, the projector with any `FormData`, and the theme against a
+hand-built plan.
+
+**The definition and the state are separately cacheable.** Compilation is
+per-form-type and could be done once at boot; state is per-request. The
+graph has no arrow that would force them into the same lifetime.
+
+**The Phoenix-shaped part is the last two steps and the projection.**
+Everything from the declaration to the candidate is plain Elixir data.
+That is the property [[phase-5-ash-integration|Phase 5]] depends on when
+`AshPhoenix.Form` becomes an alternative source for step 3, and
+[[phase-3-extensibility|Phase 3]] depends on when the theme in step 5
+becomes replaceable.
+
+## Boundaries — where this chain stops
+
+The chain closes the same way whether step 6 is a plain controller
+action or a LiveView `handle_event/3`: a raw params map re-enters
+through `%Params{}` either way.
+[[form-state-and-transitions#LiveView entry points|`Form.validate/2`/`Form.submit/2`]]
+are the `phx-change`/`phx-submit`-shaped sugar over `transition/2` that
+step 7 added, and `_persistent_id` now joins the metadata
+`Transport.normalize/1` strips at every nesting level, alongside
+`_unused_*`, `_csrf_token`, and `_target`. What the chain still does not
+have: collections would add a dimension to steps 1, 4, and 6 (indexed
+instance paths, item identity, add/remove) and arrive with Milestone B;
+a theme parameter for step 5 is [[phase-3-extensibility|Phase 3]].
+
+## Related notes
+
+- Layer by layer: [[compile-pipeline|Compile pipeline]] · [[form-state-and-transitions|Form state and transitions]] · [[phoenix-form-data|The FormData projection]] · [[rendering|Rendering]]
+- Cross-cutting: [[paths-and-identity|Paths and identity]] · [[diagnostics-and-origins|Diagnostics and origins]]
+- Design (Planning): [[17-end-to-end-example|End-to-end example]] · [[04-architecture|Architecture]]
+- [[Techdocs]] · [[Formentation|Vault entry note]]

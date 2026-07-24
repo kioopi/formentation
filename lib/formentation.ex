@@ -1,0 +1,36 @@
+defmodule Formentation do
+  @moduledoc """
+  Compile form declarations from pluggable sources into a static,
+  source-independent `Formentation.Definition`, and query it through
+  `Formentation.Info`.
+  """
+
+  alias Formentation.{Definition, Diagnostic}
+
+  @doc """
+  Compiles a declaration using the source adapter given as `adapter:`;
+  remaining options pass through to the adapter.
+
+  Returns `{:ok, definition, diagnostics}` — `diagnostics` carries
+  warnings that did not prevent compilation — or `{:error, diagnostics}`
+  when the declaration could not be compiled.
+
+      iex> declaration = %{
+      ...>   kind: :object,
+      ...>   properties: [
+      ...>     {"name", %{kind: :string}},
+      ...>     {"age", %{kind: :integer}}
+      ...>   ]
+      ...> }
+      iex> {:ok, definition, []} =
+      ...>   Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      iex> Formentation.Info.fields(definition) |> Enum.map(& &1.name)
+      ["name", "age"]
+  """
+  @spec compile(term(), keyword()) ::
+          {:ok, Definition.t(), [Diagnostic.t()]} | {:error, [Diagnostic.t()]}
+  def compile(source, opts) do
+    {adapter, opts} = Keyword.pop!(opts, :adapter)
+    adapter.compile(source, opts)
+  end
+end
