@@ -36,7 +36,8 @@ defmodule Formentation.Phoenix.Projector do
   """
   @spec project(Definition.t(), Phoenix.HTML.Form.t()) :: RenderPlan.t()
   def project(%Definition{} = definition, %Phoenix.HTML.Form{} = form) do
-    {root, diagnostics} = project_group(Info.root(definition), form)
+    ctx = context(definition, form, [])
+    {root, diagnostics} = project_group(Info.root(definition), form, ctx)
     %RenderPlan{root: root, summary: summary(root, form), diagnostics: diagnostics}
   end
 
@@ -70,9 +71,19 @@ defmodule Formentation.Phoenix.Projector do
         raise ArgumentError, "the node at #{inspect(segments)} is unsupported and cannot render"
 
       node ->
-        {render, _diagnostics} = project_node(node, descend(form, Enum.drop(segments, -1)))
+        parent = Enum.drop(segments, -1)
+        ctx = context(definition, form, parent)
+        {render, _diagnostics} = project_node(node, descend(form, parent), ctx)
         render
     end
+  end
+
+  # The projection cursor. `path` holds raw segments — an %InstancePath{}
+  # is built only where a path crosses into StateView — and `root_form`
+  # and `source` stay pinned to the form handed to project/2 or
+  # project_at/3, never a nested form built during traversal.
+  defp context(definition, form, path) do
+    %{definition: definition, root_form: form, source: form.source, path: path}
   end
 
   defp descend(form, segments) do
@@ -82,37 +93,38 @@ defmodule Formentation.Phoenix.Projector do
     end)
   end
 
-  defp project_group(%Node.Group{} = group, form) do
-    {children, diagnostics} = project_children(group.children, form)
+  defp project_group(%Node.Group{} = group, form, ctx) do
+    {children, diagnostics} = project_children(group.children, form, ctx)
     {%RenderNode.Group{legend: legend(group), children: children}, diagnostics}
   end
 
-  defp project_children(nodes, form) do
+  defp project_children(nodes, form, ctx) do
     {children, diagnostics} =
       Enum.map_reduce(nodes, [], fn node, acc ->
-        {child, diags} = project_node(node, form)
+        {child, diags} = project_node(node, form, ctx)
         {child, [diags | acc]}
       end)
 
     {Enum.reject(children, &is_nil/1), diagnostics |> Enum.reverse() |> List.flatten()}
   end
 
-  defp project_node(%Node.Field{hidden?: true, read_only?: true}, _form), do: {nil, []}
-  defp project_node(%Node.Field{} = node, form), do: project_field(node, form)
-  defp project_node(%Node.Unsupported{}, _form), do: {nil, []}
+  defp project_node(%Node.Field{hidden?: true, read_only?: true}, _form, _ctx), do: {nil, []}
+  defp project_node(%Node.Field{} = node, form, ctx), do: project_field(node, form, ctx)
+  defp project_node(%Node.Unsupported{}, _form, _ctx), do: {nil, []}
 
-  defp project_node(%Node.Group{nests_data?: false} = group, form) do
-    project_group(group, form)
+  defp project_node(%Node.Group{nests_data?: false} = group, form, ctx) do
+    project_group(group, form, ctx)
   end
 
-  defp project_node(%Node.Group{nests_data?: true} = group, form) do
+  defp project_node(%Node.Group{nests_data?: true} = group, form, ctx) do
     [nested] = Phoenix.HTML.FormData.to_form(form.source, form, group.name, [])
-    project_group(group, nested)
+    project_group(group, nested, %{ctx | path: ctx.path ++ [group.name]})
   end
 
-  defp project_field(%Node.Field{} = node, form) do
+  defp project_field(%Node.Field{} = node, form, ctx) do
     field = form[access_key(node.name)]
     {widget, diagnostics} = resolve_widget(node)
+    _path = ctx.path ++ [node.name]
 
     {%RenderNode.Field{
        widget: widget,

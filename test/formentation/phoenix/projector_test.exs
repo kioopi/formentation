@@ -354,4 +354,77 @@ defmodule Formentation.Phoenix.ProjectorTest do
       assert message =~ "required"
     end
   end
+
+  describe "absolute instance paths" do
+    defp nested_path_definition do
+      compile!(%{
+        kind: :object,
+        properties: [
+          {"title", %{kind: :string}},
+          {"address",
+           %{
+             kind: :object,
+             properties: [
+               {"street", %{kind: :string}},
+               {"geo", %{kind: :object, properties: [{"lat", %{kind: :number}}]}}
+             ]
+           }}
+        ]
+      })
+    end
+
+    test "a data-nesting group contributes its name to a child's path" do
+      definition = nested_path_definition()
+
+      form_state =
+        Form.transition(Form.new(definition), %Formentation.Params{
+          values: %{"title" => "t", "address" => %{"street" => "", "geo" => %{"lat" => "x"}}},
+          event: :submit
+        })
+
+      form = FormData.to_form(form_state, [])
+
+      # ["address", "geo", "lat"] is a decode failure; hiding exactly that
+      # path proves the projector reached it with its absolute segments.
+      plan = Projector.project(definition, form)
+      [_title, address] = plan.root.children
+      [_street, geo] = address.children
+      [lat] = geo.children
+
+      assert lat.field.name == "address[geo][lat]"
+      assert lat.errors != []
+      assert lat.show_errors?
+    end
+
+    test "a presentational group leaves the data path untouched" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [{"title", %{kind: :string, min_length: 4}}],
+          groups: [%{id: "panel", fields: ["title"]}]
+        })
+
+      form_state =
+        Form.transition(Form.new(definition), %Formentation.Params{
+          values: %{"title" => "ab"},
+          event: :submit
+        })
+
+      plan = Projector.project(definition, FormData.to_form(form_state, []))
+
+      # Whatever the group nesting looks like, the field's Phoenix name —
+      # which mirrors the data path — must not gain the group id.
+      names =
+        plan.root
+        |> flatten_fields()
+        |> Enum.map(& &1.field.name)
+
+      assert names == ["title"]
+    end
+
+    defp flatten_fields(%RenderNode.Group{children: children}),
+      do: Enum.flat_map(children, &flatten_fields/1)
+
+    defp flatten_fields(%RenderNode.Field{} = field), do: [field]
+  end
 end
