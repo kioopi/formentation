@@ -17,12 +17,7 @@ defmodule Mix.Tasks.Demo do
 
   @impl true
   def run(args) do
-    port =
-      case args do
-        [] -> 4000
-        [port] -> String.to_integer(port)
-        _ -> Mix.raise("usage: mix demo [port]")
-      end
+    port = parse_port(args)
 
     Application.put_env(:formentation, FormentationDemo.Endpoint,
       adapter: Bandit.PhoenixAdapter,
@@ -45,10 +40,40 @@ defmodule Mix.Tasks.Demo do
         strategy: :one_for_one
       )
 
-    Mix.shell().info(
-      "Formentation demo: http://localhost:#{port} (nested: http://localhost:#{port}/nested) — Ctrl-C stops"
-    )
+    Mix.shell().info(message(port))
 
     Process.sleep(:infinity)
+  end
+
+  @doc """
+  Resolves the HTTP port from the task arguments.
+
+  Defaults to `4000` when no argument is given and raises a `Mix.Error`
+  with a usage message when more than one argument is supplied.
+
+  ## Examples
+
+      iex> Mix.Tasks.Demo.parse_port([])
+      4000
+
+      iex> Mix.Tasks.Demo.parse_port(["8080"])
+      8080
+
+  """
+  def parse_port([]), do: 4000
+  def parse_port([port]), do: String.to_integer(port)
+  def parse_port(_), do: Mix.raise("usage: mix demo [port]")
+
+  @doc """
+  Builds the startup banner naming both example URLs for `port`.
+
+  ## Examples
+
+      iex> Mix.Tasks.Demo.message(4000)
+      "Formentation demo: http://localhost:4000 (nested: http://localhost:4000/nested) — Ctrl-C stops"
+
+  """
+  def message(port) do
+    "Formentation demo: http://localhost:#{port} (nested: http://localhost:#{port}/nested) — Ctrl-C stops"
   end
 end
