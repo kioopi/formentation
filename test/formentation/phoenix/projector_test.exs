@@ -355,6 +355,120 @@ defmodule Formentation.Phoenix.ProjectorTest do
     end
   end
 
+  describe "source-neutral submission and visibility" do
+    defp scalar_definition do
+      compile!(%{
+        kind: :object,
+        properties: [{"operating_hours", %{kind: :integer, title: "Operating hours"}}]
+      })
+    end
+
+    # An unused marker makes the Phoenix default answer "hidden", so the
+    # only thing that can reveal the error is semantic submission.
+    defp unused_params, do: %{"operating_hours" => "51o2", "_unused_operating_hours" => ""}
+
+    defp fixture_form(overrides) do
+      source =
+        struct!(
+          %Formentation.SourceFixture{
+            params: unused_params(),
+            errors: [operating_hours: {"is invalid", []}],
+            action: :commit
+          },
+          overrides
+        )
+
+      Phoenix.HTML.FormData.to_form(source, [])
+    end
+
+    test "a source whose semantic submit is :commit reveals an unused field's error" do
+      plan = Projector.project(scalar_definition(), fixture_form(submitted?: true))
+
+      assert [%RenderNode.Field{show_errors?: true}] = plan.root.children
+      assert [%{label: "Operating hours", message: "is invalid"}] = plan.summary
+    end
+
+    test "the generic fallback does not treat :commit as submitted" do
+      form = %{
+        Phoenix.HTML.FormData.to_form(unused_params(), [])
+        | action: :commit,
+          errors: [operating_hours: {"is invalid", []}]
+      }
+
+      plan = Projector.project(scalar_definition(), form)
+
+      assert [%RenderNode.Field{show_errors?: false}] = plan.root.children
+      assert plan.summary == []
+    end
+
+    test ":show reveals a field error the Phoenix default would hide" do
+      form = fixture_form(visibility: %{["operating_hours"] => :show})
+
+      plan = Projector.project(scalar_definition(), form)
+
+      assert [%RenderNode.Field{show_errors?: true}] = plan.root.children
+    end
+
+    test ":hide suppresses a field error semantic submission would reveal" do
+      form =
+        fixture_form(submitted?: true, visibility: %{["operating_hours"] => :hide})
+
+      plan = Projector.project(scalar_definition(), form)
+
+      assert [%RenderNode.Field{show_errors?: false}] = plan.root.children
+      assert plan.summary == []
+    end
+
+    test "a source with no issue enumeration still projects fields and scalar summaries" do
+      plan = Projector.project(scalar_definition(), fixture_form(submitted?: true))
+
+      assert [%RenderNode.Field{}] = plan.root.children
+      assert [_] = plan.summary
+    end
+  end
+
+  describe "nested paths reach the state view" do
+    test "a used, invalid nested field is visible on :change via the state view, not action" do
+      # Discriminates against a projector that computes the wrong path for
+      # a data-nesting group: Form.show_issues?/2 on :change only answers
+      # true when Info.node_at(definition, segments) resolves to the
+      # Node.Field AND its usage is :used. A path missing "address", in
+      # the wrong order, or omitting the group name entirely would miss
+      # the node and make this assertion fail.
+      #
+      # Uses the JSON Schema adapter, not Source.Map: the map adapter has
+      # no schema validator, so a minLength constraint would never fire —
+      # only decode failures surface issues there (see the file's earlier
+      # comment on `flat_definition`/`decode_error_form`).
+      schema = %{
+        "type" => "object",
+        "properties" => %{
+          "address" => %{
+            "type" => "object",
+            "properties" => %{"street" => %{"type" => "string", "minLength" => 4}}
+          }
+        }
+      }
+
+      {:ok, definition, []} = Formentation.compile(schema, adapter: Formentation.JSONSchema)
+
+      form_state =
+        Form.transition(Form.new(definition), %Formentation.Params{
+          values: %{"address" => %{"street" => "ab"}},
+          event: :change
+        })
+
+      form = FormData.to_form(form_state, [])
+      plan = Projector.project(definition, form)
+
+      [address] = plan.root.children
+      [street] = address.children
+
+      assert street.errors != []
+      assert street.show_errors? == true
+    end
+  end
+
   describe "absolute instance paths" do
     defp nested_path_definition do
       compile!(%{

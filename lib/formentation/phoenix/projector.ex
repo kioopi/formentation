@@ -9,17 +9,19 @@ defmodule Formentation.Phoenix.Projector do
   Spec: docs/superpowers/specs/2026-07-23-phase1-step6-projector-components-theme-design.md
   """
 
-  alias Formentation.{Definition, Diagnostic, Form, Info, Node}
-  alias Formentation.Phoenix.{RenderNode, RenderPlan}
+  alias Formentation.{Definition, Diagnostic, Form, Info, InstancePath, Node}
+  alias Formentation.Phoenix.{RenderNode, RenderPlan, StateView}
 
   @doc """
   Projects the whole definition against `form` into a render plan.
 
   The plan's root mirrors the compiled tree in declaration order; every
   field node arrives component-ready — resolved widget, Phoenix form
-  field, label, validations, and a `show_errors?` flag that already
-  folds usage and action (D-014). `plan.summary` is non-empty only after
-  a submit.
+  field, label, validations, and a `show_errors?` flag decided by the
+  source's `StateView` (D-014), falling back to the Phoenix
+  action/`used_input?` rule only when the source has no opinion.
+  `plan.summary` is non-empty only once the source's `StateView` reports
+  semantic submission.
 
   ## Example
 
@@ -38,7 +40,7 @@ defmodule Formentation.Phoenix.Projector do
   def project(%Definition{} = definition, %Phoenix.HTML.Form{} = form) do
     ctx = context(definition, form, [])
     {root, diagnostics} = project_group(Info.root(definition), form, ctx)
-    %RenderPlan{root: root, summary: summary(root, form), diagnostics: diagnostics}
+    %RenderPlan{root: root, summary: summary(root, ctx), diagnostics: diagnostics}
   end
 
   @doc """
@@ -124,7 +126,7 @@ defmodule Formentation.Phoenix.Projector do
   defp project_field(%Node.Field{} = node, form, ctx) do
     field = form[access_key(node.name)]
     {widget, diagnostics} = resolve_widget(node)
-    _path = ctx.path ++ [node.name]
+    path = ctx.path ++ [node.name]
 
     {%RenderNode.Field{
        widget: widget,
@@ -134,7 +136,7 @@ defmodule Formentation.Phoenix.Projector do
        options: node.options,
        validations: Phoenix.HTML.Form.input_validations(form, field.field),
        errors: field.errors,
-       show_errors?: show_errors?(field, form),
+       show_errors?: show_errors?(field, ctx, path),
        read_only?: node.read_only?
      }, diagnostics}
   end
@@ -201,18 +203,31 @@ defmodule Formentation.Phoenix.Projector do
     name |> String.replace("_", " ") |> String.capitalize()
   end
 
-  # D-014: an issue renders when the form's action is submit or the
-  # field's usage is :used — computed here, once, the Phoenix way, so
-  # any FormData source gets the same rule and themes never see markers.
-  defp show_errors?(field, form) do
-    field.errors != [] and (form.action == :submit or Phoenix.Component.used_input?(field))
+  # D-014, now source-owned: the state view decides, and only falls back
+  # to the Phoenix-compatible default when it answers :default. Computed
+  # here, once, so themes never see markers or actions.
+  defp show_errors?(field, ctx, path) do
+    field.errors != [] and
+      visible?(ctx, path, fn -> submitted?(ctx) or Phoenix.Component.used_input?(field) end)
   end
 
-  defp summary(root, %Phoenix.HTML.Form{action: :submit} = form) do
-    field_entries(root) ++ object_entries(form.source)
+  defp visible?(ctx, path, default_fun) do
+    case StateView.issue_visibility(ctx.source, ctx.root_form, InstancePath.new!(path)) do
+      :show -> true
+      :hide -> false
+      :default -> default_fun.()
+    end
   end
 
-  defp summary(_root, _form), do: []
+  defp submitted?(ctx), do: StateView.submitted?(ctx.source, ctx.root_form)
+
+  defp summary(root, ctx) do
+    if submitted?(ctx) do
+      field_entries(root) ++ object_entries(ctx.source)
+    else
+      []
+    end
+  end
 
   defp field_entries(%RenderNode.Group{children: children}) do
     Enum.flat_map(children, &field_entries/1)
