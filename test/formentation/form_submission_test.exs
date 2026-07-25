@@ -403,4 +403,48 @@ defmodule Formentation.FormSubmissionTest do
       assert path == InstancePath.new!(["profile", "legacy_tags"])
     end
   end
+
+  describe "trust boundary (D-009) with blockers present" do
+    test "invalid preserved data survives transitions while producing a blocker" do
+      definition = tags_schema(tags_required: false)
+
+      form =
+        definition
+        |> Form.new(%{"tags" => ["x"], "title" => "keep"})
+        |> Form.submit(%{"title" => "changed", "tags" => "ignored"})
+
+      # original invalid unsupported value survives byte-for-byte...
+      assert {:ok, %{"tags" => ["x"], "title" => "changed"}} = Form.candidate(form)
+      # ...and is reported as a blocker, not silently accepted
+      assert [%SubmissionBlocker{code: :unsupported_invalid}] = Form.submission_blockers(form)
+    end
+
+    test "validation receives the preserved candidate, not raw submitted opaque data" do
+      # If submitted "ignored" had reached validation, an integer-array schema
+      # would flag a different (string) issue; instead the preserved ["x"] is
+      # what gets validated, so the blocker owns an item-level issue.
+      form =
+        tags_schema(tags_required: false)
+        |> Form.new(%{"tags" => ["x"]})
+        |> Form.submit(%{"tags" => "ignored"})
+
+      assert {:ok, %{"tags" => ["x"]}} = Form.candidate(form)
+
+      assert [
+               %SubmissionBlocker{
+                 code: :unsupported_invalid,
+                 path: path,
+                 issues: [_ | _] = issues
+               }
+             ] =
+               Form.submission_blockers(form)
+
+      # every owned issue is at or below the blocker's path and came from
+      # validation of the preserved ["x"], not the submitted "ignored" string
+      assert Enum.all?(issues, fn issue ->
+               issue.source == :validation and
+                 InstancePath.ancestor_or_self?(path, issue.path)
+             end)
+    end
+  end
 end
