@@ -216,10 +216,10 @@ form = Formentation.Form.transition(form, %Params{values: %{"age" => "10"}, even
 
 Formentation.Form.issues(form)
 #=> [%Issue{path: %InstancePath{segments: ["age"]}, code: :minimum,
-#=>         message: "value 10 is lower than minimum 18", source: :schema}]
+#=>         message: "value 10 is lower than minimum 18", source: :validation}]
 ```
 
-Issues carry `source: :schema` for constraint violations and
+Issues carry `source: :validation` for constraint violations and
 `source: :decode` for values that could not be parsed into their type.
 Missing required properties are reported **at the missing field's own
 path**, so the field shows its own error instead of the parent object

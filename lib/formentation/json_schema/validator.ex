@@ -5,7 +5,10 @@ defmodule Formentation.JSONSchema.Validator do
   offline, via JSV's embedded metaschemas — and translates structured
   validator output into diagnostics. The single swap point if the
   validator choice is ever revisited.
+  Implements `Formentation.Validation` for runtime instance checking.
   """
+
+  @behaviour Formentation.Validation
 
   alias Formentation.{Diagnostic, InstancePath, Issue, TemplatePath}
 
@@ -105,9 +108,10 @@ defmodule Formentation.JSONSchema.Validator do
   because JSV kinds are library compile-time literals, never derived
   from input.
   """
-  @spec validate_instance(term(), map()) :: [Issue.t()]
-  def validate_instance(validator, instance) do
-    case JSV.validate(instance, validator, cast: false) do
+  @impl Formentation.Validation
+  @spec validate(term(), map()) :: [Issue.t()]
+  def validate(artifact, instance) do
+    case JSV.validate(instance, artifact, cast: false) do
       {:ok, _} -> []
       {:error, %JSV.ValidationError{errors: errors}} -> Enum.flat_map(errors, &to_issues/1)
     end
@@ -125,7 +129,7 @@ defmodule Formentation.JSONSchema.Validator do
         path: InstancePath.new!(object_path ++ [name]),
         code: :required,
         message: error.formatter.format_error(:required, %{required: [name]}, error.data),
-        source: :schema
+        source: :validation
       }
     end
   end
@@ -136,7 +140,7 @@ defmodule Formentation.JSONSchema.Validator do
         path: InstancePath.new!(Enum.reverse(error.data_path)),
         code: error.kind,
         message: error.formatter.format_error(error.kind, Map.new(error.args), error.data),
-        source: :schema
+        source: :validation
       }
     ]
   end

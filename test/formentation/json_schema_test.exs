@@ -889,7 +889,13 @@ defmodule Formentation.JSONSchemaTest do
         adapter: Formentation.JSONSchema
       )
 
-    refute from_json.validator == nil
+    assert %Formentation.ValidationPlan{
+             module: Formentation.JSONSchema.Validator,
+             artifact: artifact
+           } =
+             from_json.validation
+
+    assert Formentation.JSONSchema.Validator.validate(artifact, %{"name" => "ok"}) == []
 
     {:ok, from_map, []} =
       Formentation.compile(
@@ -897,7 +903,7 @@ defmodule Formentation.JSONSchemaTest do
         adapter: Formentation.Source.Map
       )
 
-    assert from_map.validator == nil
+    assert from_map.validation == nil
   end
 
   describe "when the instance validator cannot build" do
@@ -914,7 +920,7 @@ defmodule Formentation.JSONSchemaTest do
       assert {:ok, definition, diagnostics} =
                Formentation.compile(dangling_ref_schema(), adapter: Formentation.JSONSchema)
 
-      assert definition.validator == nil
+      assert definition.validation == nil
 
       codes = Enum.map(diagnostics, & &1.code)
       assert :validator_unavailable in codes
@@ -936,7 +942,7 @@ defmodule Formentation.JSONSchemaTest do
       assert {:ok, definition, diagnostics} =
                Formentation.compile(schema, adapter: Formentation.JSONSchema)
 
-      assert definition.validator == nil
+      assert definition.validation == nil
       assert Enum.any?(diagnostics, &(&1.code == :validator_unavailable))
     end
   end

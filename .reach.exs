@@ -25,7 +25,9 @@
       "Formentation.Params",
       "Formentation.TemplatePath",
       "Formentation.Transport",
-      "Formentation.Transport.*"
+      "Formentation.Transport.*",
+      "Formentation.Validation",
+      "Formentation.ValidationPlan"
     ],
     # Declaration-source adapters. The map source is the in-core reference
     # adapter (D-004); Source.Shared holds adapter-generic compile helpers.
@@ -61,10 +63,10 @@
       # Core never selects a source adapter; Formentation.compile/2 receives
       # one via the :adapter option.
       {:core, :source},
-      # The one sanctioned core->adapter edge: Form dispatches the opaque,
-      # adapter-owned validator slot (D-012) through the D-008 swap point.
-      {:core, :json_schema,
-       except_edges: [{"Formentation.Form", "Formentation.JSONSchema.Validator"}]},
+      # Core never names an adapter: instance validation dispatches through
+      # the Formentation.Validation behaviour (D-025), so there is no
+      # sanctioned core->json_schema edge.
+      {:core, :json_schema},
       # The source layer stays adapter-generic.
       {:source, :json_schema},
       # Projection reads compiled core state only, never adapters.
@@ -136,11 +138,6 @@
     ]
   ],
   checks: [
-    # Known transitional finding: the D-008/D-012 validator seam makes core
-    # and json_schema mutually dependent (layer cycle). Resolved once the
-    # validator slot dispatches through a behaviour instead of a hard-coded
-    # module. Any NEW violation still fails --arch.
-    baseline: ".reach-baseline.json",
     layer_coverage: [
       require_all_modules: true,
       forbid_multiple_matches: true,

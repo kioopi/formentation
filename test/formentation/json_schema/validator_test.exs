@@ -62,7 +62,7 @@ defmodule Formentation.JSONSchema.ValidatorTest do
     assert Enum.any?(pointers, &String.contains?(&1, "/properties/b"))
   end
 
-  describe "validate_instance/2" do
+  describe "validate/2" do
     setup do
       schema = %{
         "type" => "object",
@@ -83,7 +83,7 @@ defmodule Formentation.JSONSchema.ValidatorTest do
     end
 
     test "a valid instance yields no issues", %{validator: validator} do
-      assert Validator.validate_instance(validator, %{
+      assert Validator.validate(validator, %{
                "serial_number" => "PX-2044",
                "condition" => "good"
              }) == []
@@ -91,7 +91,7 @@ defmodule Formentation.JSONSchema.ValidatorTest do
 
     test "keyword violations carry the schema keyword and instance path", %{validator: validator} do
       issues =
-        Validator.validate_instance(validator, %{
+        Validator.validate(validator, %{
           "serial_number" => "PX",
           "condition" => "good",
           "operating_hours" => -2
@@ -99,7 +99,7 @@ defmodule Formentation.JSONSchema.ValidatorTest do
 
       assert %Issue{
                code: :minLength,
-               source: :schema,
+               source: :validation,
                path: %InstancePath{segments: ["serial_number"]}
              } =
                Enum.find(issues, &(&1.code == :minLength))
@@ -111,7 +111,7 @@ defmodule Formentation.JSONSchema.ValidatorTest do
     test "required lands one issue per missing property, at the property's path", %{
       validator: validator
     } do
-      issues = Validator.validate_instance(validator, %{})
+      issues = Validator.validate(validator, %{})
       required = Enum.filter(issues, &(&1.code == :required))
 
       assert Enum.map(required, & &1.path.segments) |> Enum.sort() ==
@@ -124,7 +124,7 @@ defmodule Formentation.JSONSchema.ValidatorTest do
       validator: validator
     } do
       issues =
-        Validator.validate_instance(validator, %{
+        Validator.validate(validator, %{
           "serial_number" => "PX-2044",
           "condition" => "good",
           "nested" => %{"inner" => "x"}
@@ -138,7 +138,7 @@ defmodule Formentation.JSONSchema.ValidatorTest do
       validator: validator
     } do
       issues =
-        Validator.validate_instance(validator, %{
+        Validator.validate(validator, %{
           "serial_number" => "PX-2044",
           "condition" => "good",
           "nested" => %{}

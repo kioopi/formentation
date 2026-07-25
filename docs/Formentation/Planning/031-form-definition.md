@@ -316,9 +316,10 @@ The implemented outer shape today is deliberately smaller — `root` holds the n
 
 ```elixir
 %Formentation.Definition{
-  format_version: 1,
+  format_version: 2,
   root: %Formentation.Node.Group{...},
-  diagnostics: [%Formentation.Diagnostic{...}]
+  diagnostics: [%Formentation.Diagnostic{...}],
+  validation: %Formentation.ValidationPlan{} | nil
 }
 ```
 

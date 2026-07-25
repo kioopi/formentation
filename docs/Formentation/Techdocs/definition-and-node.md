@@ -10,7 +10,7 @@ status: current
 
 # Definition and Node
 
-*As of 2026-07-23 (step 6 complete).*
+*As of 2026-07-25 (source-neutral validation dispatch).*
 
 `Formentation.Definition` is the compiler's product and the system's
 common language: an immutable, source-independent tree of semantic
@@ -23,17 +23,18 @@ produced.
 
 ```elixir
 %Formentation.Definition{
-  format_version: 1,
+  format_version: 2,
   root: %Formentation.Node.Group{...},
   diagnostics: [%Formentation.Diagnostic{...}],
-  validator: term() | nil
+  validation: %Formentation.ValidationPlan{} | nil
 }
 ```
 
 `root` holds the node tree directly (no indexes yet — `Formentation.Info`
-walks the tree). `validator` is an opaque instance-validation artifact
-owned by the source adapter; `nil` when the source provides none (the
-map source, currently).
+walks the tree). `validation` is an optional `Formentation.ValidationPlan`
+— an executable module (implementing `Formentation.Validation`) paired
+with the opaque artifact that module owns; `nil` when the source provides
+no authoritative instance validation (the map source, currently).
 
 ## One struct per node kind (D-015)
 

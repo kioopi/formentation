@@ -1,1 +1,0 @@
-{"version":1,"tool":"reach","findings":[{"source":"arch","kind":"layer_cycle","fingerprint":"sha256:ddc3a63c638462ca03b37957998fee3ab062ee7ed4a0f511e72fbcdb413b23a7","message":"layer cycle: core -> json_schema -> source -> core","file":null,"line":null}]}

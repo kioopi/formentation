@@ -451,7 +451,7 @@ defmodule Formentation.FormTest do
 
       codes = form |> Form.issues() |> Enum.map(& &1.code)
       assert :required in codes
-      assert [%Issue{code: :required, source: :schema}] = Form.issues(form, ["serial_number"])
+      assert [%Issue{code: :required, source: :validation}] = Form.issues(form, ["serial_number"])
     end
 
     test "map-source forms have no schema validation (validator is nil)" do
@@ -468,7 +468,7 @@ defmodule Formentation.FormTest do
         Formentation.compile(schema, adapter: Formentation.JSONSchema)
 
       assert Enum.any?(diagnostics, &(&1.code == :validator_unavailable))
-      assert definition.validator == nil
+      assert definition.validation == nil
       assert Form.issues(Form.new(definition, %{})) == []
     end
 
@@ -476,7 +476,8 @@ defmodule Formentation.FormTest do
       values = %{"serial_number" => "PX", "condition" => "good"}
       form = Form.transition(Form.new(json_pump_definition()), %Params{values: values})
 
-      assert [%Issue{code: :minLength, source: :schema}] = Form.issues(form, ["serial_number"])
+      assert [%Issue{code: :minLength, source: :validation}] =
+               Form.issues(form, ["serial_number"])
     end
 
     test "the 51o2 walkthrough: any decode failure defers all schema validation (D-012)" do
@@ -501,7 +502,10 @@ defmodule Formentation.FormTest do
         })
 
       assert {:ok, %{"operating_hours" => 5102}} = Form.candidate(fixed)
-      assert [%Issue{code: :minLength, source: :schema}] = Form.issues(fixed, ["serial_number"])
+
+      assert [%Issue{code: :minLength, source: :validation}] =
+               Form.issues(fixed, ["serial_number"])
+
       assert Form.issues(fixed, ["operating_hours"]) == []
     end
   end
@@ -741,7 +745,7 @@ defmodule Formentation.FormTest do
       form = Form.new(definition, %{})
       form = Form.transition(form, %Params{values: %{}, event: :submit})
 
-      assert [%Issue{code: :required, source: :schema}] = Form.issues(form, ["serial_number"])
+      assert [%Issue{code: :required, source: :validation}] = Form.issues(form, ["serial_number"])
       assert Form.show_issues?(form, ["serial_number"])
     end
 

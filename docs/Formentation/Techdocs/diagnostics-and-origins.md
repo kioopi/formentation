@@ -11,7 +11,7 @@ status: current
 
 # Diagnostics and origins
 
-> [!note] As of 2026-07-23 · step 6 complete
+> [!note] As of 2026-07-25 · source-neutral validation dispatch
 > Describes the explainability model as built: the `Diagnostic` struct,
 > the origin tags nodes carry, the guards, and the one *projection*-time
 > diagnostic that now exists. The full `Decision` / `Info.explain/3`
@@ -39,7 +39,7 @@ audiences.
 | Addressed by | `template_path` — a structural position | `path` — an `InstancePath` in real data |
 | Audience | whoever wrote the schema or hints | whoever is filling in the form |
 | Severity | `:error` \| `:warning` | — (all issues are problems) |
-| Discriminator | `code` | `code` plus `source` (`:decode` \| `:schema`) |
+| Discriminator | `code` | `code` plus `source` (`:decode` \| `:validation`) |
 | Lives on | `Definition.diagnostics` · `RenderPlan.diagnostics` | `Form.issues`, keyed by path |
 
 Conflating them is the mistake the split prevents: a schema author's
@@ -123,7 +123,7 @@ that a bad hint is *ignored*, loudly — presentation intent is never
 allowed to fail a compile, because the form still has a defensible
 default rendering without it. `:validator_unavailable` is the same
 posture applied to the instance validator: a dangling local `$ref` or any
-remote `$ref` (fetching is disabled) yields `validator: nil` and a
+remote `$ref` (fetching is disabled) yields `validation: nil` and a
 warning rather than an exception.
 
 **5. Source-independent policy advisories** — `:reserved_property_name`,
