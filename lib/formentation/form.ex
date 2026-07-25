@@ -386,6 +386,21 @@ defmodule Formentation.Form do
     |> Map.merge(declared_result)
   end
 
+  # Content-derived presence (D-026): a data-nesting object is emitted only
+  # when recursive materialization leaves at least one declared or preserved
+  # key. `required?` is a validation constraint and never manufactures an
+  # object; presence is decided only after declared-child materialization and
+  # original unknown/unsupported-data preservation have run. The explicit
+  # `:absent | {:present, map()}` result is the extension point for future
+  # collections, branches, and group-level presence transport — do not
+  # collapse it into an `if value == %{}` at the call site.
+  defp materialize_nested_object(group, original, reversed_prefix, operations) do
+    case materialize_object(group, original, reversed_prefix, operations) do
+      map when map_size(map) == 0 -> :absent
+      map -> {:present, map}
+    end
+  end
+
   defp materialize_children(%Node.Group{} = node, original, reversed_prefix, operations) do
     Enum.reduce(node.children, {%{}, MapSet.new()}, fn child, {acc, declared} ->
       materialize_child(child, original, reversed_prefix, operations, acc, declared)
@@ -430,15 +445,20 @@ defmodule Formentation.Form do
          acc,
          declared
        ) do
-    value =
-      materialize_object(
-        group,
-        Map.get(original, name, %{}),
-        [name | reversed_prefix],
-        operations
-      )
+    # Claim the name even when the object is absent, so an originally
+    # present group is not accidentally restored by unknown-key
+    # preservation in `materialize_object/4` (D-026).
+    declared = MapSet.put(declared, name)
 
-    {Map.put(acc, name, value), MapSet.put(declared, name)}
+    case materialize_nested_object(
+           group,
+           Map.get(original, name, %{}),
+           [name | reversed_prefix],
+           operations
+         ) do
+      {:present, value} -> {Map.put(acc, name, value), declared}
+      :absent -> {acc, declared}
+    end
   end
 
   defp materialize_child(

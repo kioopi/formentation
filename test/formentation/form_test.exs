@@ -377,9 +377,9 @@ defmodule Formentation.FormTest do
       assert Form.field(form, ["dimensions", "height"]).operation == :unset
     end
 
-    test "data-nesting groups materialize even when all children are absent" do
+    test "data-nesting groups with no surviving child are absent (D-026)" do
       form = Form.transition(Form.new(nested_definition()), %Params{values: %{}})
-      assert Form.candidate(form) == {:ok, %{"dimensions" => %{}}}
+      assert Form.candidate(form) == {:ok, %{}}
     end
 
     test "keys the definition does not describe are preserved from the original" do
@@ -389,7 +389,7 @@ defmodule Formentation.FormTest do
           %Params{values: %{}}
         )
 
-      assert Form.candidate(form) == {:ok, %{"legacy" => true, "dimensions" => %{}}}
+      assert Form.candidate(form) == {:ok, %{"legacy" => true}}
     end
 
     test "unsupported nodes keep their original values and never decode" do
