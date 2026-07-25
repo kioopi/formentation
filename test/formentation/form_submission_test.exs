@@ -261,4 +261,146 @@ defmodule Formentation.FormSubmissionTest do
       assert Form.submission_blockers(form) == []
     end
   end
+
+  # ---- Map source: no ValidationPlan, so blockers come only from the
+  # source-neutral missing-required fallback (issues: []).
+  defp compile_map(declaration) do
+    {:ok, definition, _diagnostics} =
+      Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
+    definition
+  end
+
+  describe "validation-less source (map): missing-required fallback" do
+    test "optional unsupported absent -> :ready" do
+      definition = compile_map(%{kind: :object, properties: [{"attachment", %{kind: :file}}]})
+      form = definition |> Form.new(%{}) |> Form.submit(%{})
+      assert Form.submission_status(form) == :ready
+    end
+
+    test "required unsupported absent at root -> :unsupported_required with issues: []" do
+      definition =
+        compile_map(%{
+          kind: :object,
+          required: ["attachment"],
+          properties: [{"attachment", %{kind: :file}}]
+        })
+
+      form = definition |> Form.new(%{}) |> Form.submit(%{})
+
+      assert [%SubmissionBlocker{code: :unsupported_required, issues: []}] =
+               Form.submission_blockers(form)
+    end
+
+    test "required unsupported present -> no blocker, present value never labelled invalid" do
+      definition =
+        compile_map(%{
+          kind: :object,
+          required: ["attachment"],
+          properties: [{"attachment", %{kind: :file}}]
+        })
+
+      form = definition |> Form.new(%{"attachment" => ["a.png"]}) |> Form.submit(%{})
+      assert Form.submission_blockers(form) == []
+      assert Form.submission_status(form) == :ready
+    end
+
+    test "submitted params cannot supply or replace the value" do
+      definition =
+        compile_map(%{
+          kind: :object,
+          required: ["attachment"],
+          properties: [{"attachment", %{kind: :file}}]
+        })
+
+      form = definition |> Form.new(%{}) |> Form.submit(%{"attachment" => "sneaky"})
+      assert {:ok, candidate} = Form.candidate(form)
+      refute Map.has_key?(candidate, "attachment")
+      assert [%SubmissionBlocker{code: :unsupported_required}] = Form.submission_blockers(form)
+    end
+  end
+
+  # profile.{nickname:string (editable), legacy_tags:file (unsupported, required)}
+  defp profile_definition do
+    compile_map(%{
+      kind: :object,
+      properties: [
+        {"profile",
+         %{
+           kind: :object,
+           required: ["legacy_tags"],
+           properties: [
+             {"nickname", %{kind: :string}},
+             {"legacy_tags", %{kind: :file}}
+           ]
+         }}
+      ]
+    })
+  end
+
+  describe "nested presence integration with #1 (map source)" do
+    test "an absent optional parent deactivates its required unsupported child (no blocker)" do
+      form = profile_definition() |> Form.new(%{}) |> Form.submit(%{})
+      assert {:ok, %{}} = Form.candidate(form)
+      assert Form.submission_blockers(form) == []
+      assert Form.submission_status(form) == :ready
+    end
+
+    test "a surviving editable sibling keeps the parent, activating the required child (blocker)" do
+      form =
+        profile_definition()
+        |> Form.new(%{})
+        |> Form.submit(%{"profile" => %{"nickname" => "vt"}})
+
+      assert {:ok, %{"profile" => %{"nickname" => "vt"}}} = Form.candidate(form)
+
+      assert [%SubmissionBlocker{code: :unsupported_required, path: path}] =
+               Form.submission_blockers(form)
+
+      assert path == InstancePath.new!(["profile", "legacy_tags"])
+    end
+
+    test "a preserved valid child keeps the parent and creates no blocker" do
+      form =
+        profile_definition()
+        |> Form.new(%{"profile" => %{"legacy_tags" => ["a.png"]}})
+        |> Form.submit(%{"profile" => %{"nickname" => "vt"}})
+
+      assert {:ok, %{"profile" => %{"nickname" => "vt", "legacy_tags" => ["a.png"]}}} =
+               Form.candidate(form)
+
+      assert Form.submission_blockers(form) == []
+    end
+
+    test "omitting the last editable child removes the parent under #1 and deactivates the child" do
+      # Replace semantics: an omitted child decodes to :unset, so the object
+      # empties and #1 (D-026) drops it; the required unsupported child then
+      # has no active parent and produces no blocker.
+      form =
+        profile_definition()
+        |> Form.new(%{"profile" => %{"nickname" => "vt"}})
+        |> Form.submit(%{"profile" => %{}})
+
+      assert {:ok, candidate} = Form.candidate(form)
+      refute Map.has_key?(candidate, "profile")
+      assert Form.submission_blockers(form) == []
+    end
+
+    test "a blank string child survives (D-010), keeps the parent, and keeps the required child blocked" do
+      # D-010: "" decodes to {:set, ""} for a string field — a surviving value —
+      # so the parent object stays present and its required unsupported child
+      # stays active. Removal needs omission (the test above), not a blank string.
+      form =
+        profile_definition()
+        |> Form.new(%{"profile" => %{"nickname" => "vt"}})
+        |> Form.submit(%{"profile" => %{"nickname" => ""}})
+
+      assert {:ok, %{"profile" => %{"nickname" => ""}}} = Form.candidate(form)
+
+      assert [%SubmissionBlocker{code: :unsupported_required, path: path}] =
+               Form.submission_blockers(form)
+
+      assert path == InstancePath.new!(["profile", "legacy_tags"])
+    end
+  end
 end
