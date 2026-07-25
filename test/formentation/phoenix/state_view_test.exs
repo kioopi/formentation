@@ -3,6 +3,7 @@ defmodule Formentation.Phoenix.StateViewTest do
 
   doctest Formentation.Phoenix.StateView
 
+  alias Formentation.{Form, Params}
   alias Formentation.InstancePath
   alias Formentation.Phoenix.StateView
 
@@ -39,6 +40,151 @@ defmodule Formentation.Phoenix.StateViewTest do
     test "reports issue enumeration as unavailable rather than guessing" do
       form = generic_form(:submit)
       assert StateView.issues(form.source, form) == :unavailable
+    end
+  end
+
+  describe "Formentation.Form state view" do
+    defp address_definition do
+      schema = %{
+        "type" => "object",
+        "required" => ["address"],
+        "properties" => %{
+          "title" => %{"type" => "string"},
+          "address" => %{
+            "type" => "object",
+            "required" => ["street"],
+            "properties" => %{"street" => %{"type" => "string"}}
+          }
+        }
+      }
+
+      {:ok, definition, _diagnostics} =
+        Formentation.compile(schema, adapter: Formentation.JSONSchema)
+
+      definition
+    end
+
+    defp form_pair(form_state) do
+      {form_state, Phoenix.HTML.FormData.to_form(form_state, [])}
+    end
+
+    test "reports submitted only after a submit transition" do
+      definition = address_definition()
+
+      {pristine, pristine_form} = form_pair(Form.new(definition))
+      {changed, changed_form} = form_pair(Form.validate(Form.new(definition), %{"title" => "t"}))
+
+      {submitted, submitted_form} =
+        form_pair(Form.submit(Form.new(definition), %{"title" => "t"}))
+
+      refute StateView.submitted?(pristine, pristine_form)
+      refute StateView.submitted?(changed, changed_form)
+      assert StateView.submitted?(submitted, submitted_form)
+    end
+
+    test "visibility agrees with Form.show_issues?/2 for scalar, group and root paths" do
+      definition = address_definition()
+
+      states = [
+        Form.new(definition),
+        Form.transition(Form.new(definition), %Params{
+          values: %{"title" => "t", "_unused_title" => ""},
+          event: :change
+        }),
+        Form.transition(Form.new(definition), %Params{
+          values: %{"title" => "t"},
+          event: :change
+        }),
+        Form.submit(Form.new(definition), %{"title" => "t"})
+      ]
+
+      paths = [[], ["title"], ["address"], ["address", "street"]]
+
+      for state <- states, segments <- paths do
+        {form_state, form} = form_pair(state)
+        expected = if Form.show_issues?(form_state, segments), do: :show, else: :hide
+
+        assert StateView.issue_visibility(
+                 form_state,
+                 form,
+                 InstancePath.new!(segments)
+               ) == expected,
+               "disagreed at #{inspect(segments)} for action #{inspect(form_state.action)}"
+      end
+    end
+
+    test "never answers :default" do
+      {form_state, form} = form_pair(Form.submit(Form.new(address_definition()), %{}))
+
+      for segments <- [[], ["title"], ["address"]] do
+        refute StateView.issue_visibility(form_state, form, InstancePath.new!(segments)) ==
+                 :default
+      end
+    end
+
+    test "normalizes every issue with its absolute path and message" do
+      {form_state, form} = form_pair(Form.submit(Form.new(address_definition()), %{}))
+
+      assert {:ok, issues} = StateView.issues(form_state, form)
+      assert [%StateView.Issue{} | _] = issues
+
+      paths = Enum.map(issues, & &1.path.segments)
+      assert ["address"] in paths
+
+      for %StateView.Issue{message: message} <- issues do
+        assert is_binary(message) and message != ""
+      end
+    end
+
+    test "orders normalized issues deterministically by path" do
+      {form_state, form} = form_pair(Form.submit(Form.new(address_definition()), %{}))
+
+      assert {:ok, issues} = StateView.issues(form_state, form)
+      paths = Enum.map(issues, & &1.path.segments)
+
+      assert paths == Enum.sort(paths)
+      assert {:ok, ^issues} = StateView.issues(form_state, form)
+    end
+
+    defp code_definition do
+      schema = %{
+        "type" => "object",
+        "properties" => %{
+          "code" => %{"type" => "string", "minLength" => 5, "pattern" => "^[A-Z]+$"}
+        }
+      }
+
+      {:ok, definition, _diagnostics} =
+        Formentation.compile(schema, adapter: Formentation.JSONSchema)
+
+      definition
+    end
+
+    test "preserves relative order of multiple issues sharing one path" do
+      {form_state, form} =
+        form_pair(Form.submit(Form.new(code_definition()), %{"code" => "ab"}))
+
+      # Derive the expected order from Form.issues/1 directly, rather than
+      # hardcoding JSV's current emission order, so this pins normalization's
+      # stability guarantee and not an incidental validator detail.
+      raw_messages_at_path =
+        form_state
+        |> Form.issues()
+        |> Enum.filter(&(&1.path.segments == ["code"]))
+        |> Enum.map(& &1.message)
+
+      # Guard the fixture: this test only discriminates a stable vs. unstable
+      # sort if there are at least two issues sharing the path.
+      assert length(raw_messages_at_path) == 2
+
+      assert {:ok, issues} = StateView.issues(form_state, form)
+
+      normalized_messages_at_path =
+        issues
+        |> Enum.filter(&(&1.path.segments == ["code"]))
+        |> Enum.map(& &1.message)
+
+      assert normalized_messages_at_path == raw_messages_at_path
     end
   end
 end

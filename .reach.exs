@@ -134,7 +134,20 @@
       # The fixtures implement the extracted Formentation.Fixture
       # behaviour; reach's heuristic cannot see @behaviour declarations,
       # so it would keep proposing the extraction it already got.
-      ignore: [modules: ["Formentation.Fixtures.*"]]
+      #
+      # Formentation.Phoenix.StateView (D-027) is a defprotocol with
+      # multiple defimpl blocks (Any, Formentation.Form) sharing its
+      # callbacks by design — that is what a protocol is. Reach's
+      # macro-fact detection only recognizes @behaviour declarations,
+      # not defprotocol/defimpl, so it proposes an extraction the
+      # dispatch mechanism already provides.
+      ignore: [
+        modules: [
+          "Formentation.Fixtures.*",
+          "Formentation.Phoenix.StateView",
+          "Formentation.Phoenix.StateView.*"
+        ]
+      ]
     ]
   ],
   checks: [
