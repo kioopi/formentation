@@ -1,9 +1,13 @@
 defmodule Formentation.Issue do
   @moduledoc """
   A problem with a submitted instance: a value that failed decoding
-  (`source: :decode`) or a schema violation (`source: :schema`). Distinct
-  from a compile-time `Formentation.Diagnostic`, which concerns
-  declaration processing.
+  (`source: :decode`) or an authoritative-validation failure
+  (`source: :validation`). `source` distinguishes transport/decode
+  failures from candidate-validation failures; the integration that
+  produced a validation issue (e.g. JSON Schema) is identified by its
+  `code`/`message`, never by the core vocabulary. Distinct from a
+  compile-time `Formentation.Diagnostic`, which concerns declaration
+  processing.
   """
 
   alias Formentation.InstancePath
@@ -15,6 +19,6 @@ defmodule Formentation.Issue do
           path: InstancePath.t(),
           code: atom(),
           message: String.t(),
-          source: :decode | :schema
+          source: :decode | :validation
         }
 end

@@ -12,7 +12,7 @@ status: current
 
 # Form state and transitions
 
-> [!note] As of 2026-07-24 · step 7 complete
+> [!note] As of 2026-07-25 · source-neutral validation dispatch
 > Describes the runtime state layer as built: `Formentation.Form`,
 > `Formentation.Transport`, and `Formentation.Codec` — now including the
 > `validate/2`/`submit/2` LiveView entry points. This layer has **no
@@ -169,8 +169,8 @@ flowchart TD
    are never decoded; `Node.Unsupported` never decodes.
 3. **Materialize the candidate** — the JSON instance this form would
    submit.
-4. **Validate** the candidate against the definition's validator, if it
-   has one.
+4. **Validate** the candidate by dispatching `plan.module.validate(plan.artifact, instance)`,
+   if the definition carries a `ValidationPlan` (`Definition.validation`).
 
 Usage is **merged** across transitions rather than replaced, so a field
 the user touched stays touched. Everything else — transports,
@@ -190,12 +190,12 @@ The candidate is rebuilt from the operations, not patched:
 - If **any** operation is `{:invalid, _}`, the candidate is `:none`
   ([[18-decisions#D-012 — Schema validation defers while any decode fails|D-012]]).
 
-That last rule is why decode failures and schema violations never
-compete. Raw undecoded text can never reach the validator, so a user who
-types `"4x"` into an age field sees *one* error about the integer — not
-that plus a cascade of type violations from a validator handed a string
-it was never meant to see. Schema validation resumes the moment every
-field decodes.
+That last rule is why decode failures and validation issues never
+compete. Raw undecoded text can never reach the `ValidationPlan`, so a
+user who types `"4x"` into an age field sees *one* error about the
+integer — not that plus a cascade of type violations from a validator
+handed a string it was never meant to see. Instance validation resumes
+the moment every field decodes.
 
 ### Defaults
 
@@ -241,7 +241,7 @@ the canonical callers, exercised by `test/formentation_demo/`.
 
 `Issue` is the runtime counterpart to a compile-time `Diagnostic`
 ([[diagnostics-and-origins|Diagnostics and origins]]): a problem with a
-*submitted instance*, carrying `source: :decode` or `source: :schema`.
+*submitted instance*, carrying `source: :decode` or `source: :validation`.
 
 Storage and visibility are strictly independent
 ([[18-decisions#D-014 — Usage is a first-class interaction axis|D-014]]):
@@ -275,10 +275,11 @@ explicitly unset one. `candidate/1`, `issues/1,2`, `usage/2`, and
 No `:patch` transitions and no scoped (sub-tree) transitions — both are
 reserved envelope shapes that raise. No collections, so every
 `InstancePath` segment is currently a string, never an index. Map-source
-forms carry `validator: nil` and therefore skip instance validation
-entirely; only the JSON Schema adapter attaches one, which is recorded
-as an [[16-open-questions|open question]] rather than designed away. No
-codec registry or per-field codec override — the four typed codecs are
+forms carry `validation: nil` and therefore skip instance validation
+entirely; only the JSON Schema adapter attaches a `ValidationPlan`, which
+is recorded as an [[16-open-questions|open question]] rather than
+designed away. No codec registry or per-field codec override — the four
+typed codecs are
 global defaults, and extensibility is [[phase-3-extensibility|Phase 3]].
 
 ## Code map

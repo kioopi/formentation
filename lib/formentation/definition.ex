@@ -4,22 +4,24 @@ defmodule Formentation.Definition do
 
   Safe to cache and inspect; never contains runtime params, field errors,
   or DOM identifiers. `format_version` names the layout of this struct so
-  cached definitions can be invalidated across releases. `validator` is
-  an opaque instance-validation artifact owned by the source adapter's
-  validator module; `nil` when the source provides none.
+  cached definitions can be invalidated across releases. `validation` is
+  an optional `Formentation.ValidationPlan` — an executable module paired
+  with the opaque artifact that module owns and interprets; `nil` when the
+  source supplies no authoritative instance validation (the map source,
+  currently).
   """
 
-  alias Formentation.{Diagnostic, Node}
+  alias Formentation.{Diagnostic, Node, ValidationPlan}
 
-  @format_version 1
+  @format_version 2
 
   @enforce_keys [:root]
-  defstruct [:root, :validator, format_version: @format_version, diagnostics: []]
+  defstruct [:root, :validation, format_version: @format_version, diagnostics: []]
 
   @type t :: %__MODULE__{
           format_version: pos_integer(),
           root: Node.t(),
           diagnostics: [Diagnostic.t()],
-          validator: term() | nil
+          validation: ValidationPlan.t() | nil
         }
 end

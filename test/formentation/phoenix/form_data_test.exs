@@ -182,7 +182,7 @@ defmodule Formentation.Phoenix.FormDataTest do
       assert [{message, opts}] = form[:serial_number].errors
       assert is_binary(message)
       assert opts[:code] == :required
-      assert opts[:source] == :schema
+      assert opts[:source] == :validation
     end
 
     test "decode issues surface at :change with deterministic ordering" do

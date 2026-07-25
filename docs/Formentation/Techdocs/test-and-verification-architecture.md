@@ -206,12 +206,14 @@ what may *not* depend on what:
   runnable example under `demo/formentation_demo/` — may call anything
   and do server-ish IO, since it is an application, not library code.
 
-Two entries in that file are worth knowing because they encode decisions
-rather than rules. The **one sanctioned core→adapter edge** is
-`Formentation.Form` → `JSONSchema.Validator`, the D-012 validator
-dispatch; it is written as a named exception so it stays visible. And a
-**baseline file** records the resulting core/`json_schema` layer cycle as
-a known transitional finding — any *new* violation still fails.
+One entry there encodes a decision rather than a rule: `core` is
+forbidden from depending on `json_schema` **outright, with no exception**.
+Instance validation used to be the one sanctioned core→adapter edge
+(`Formentation.Form` → `JSONSchema.Validator`), which forced a baselined
+core/`json_schema` layer cycle; that dispatch now goes through the
+core-owned `Formentation.Validation` behaviour, so the edge, its named
+exception, and the baseline file are all gone ([[18-decisions#D-025 — Instance validation dispatches through a source-neutral behaviour|D-025]]).
+There is no longer a grandfathered violation — any cross-layer edge fails.
 
 **The Phoenix boundary is checked twice, differently.** `reach` checks it
 by module pattern; `boundary_test.exs` walks the AST of every file
@@ -263,7 +265,7 @@ pinned against accidental renaming by any registry.
 | Accessibility helpers | `test/support/html_assertions.ex` |
 | Reviewed snapshot | `test/support/fixtures/pump_inspection/static_render.html` |
 | Phoenix boundary (AST) | `test/formentation/phoenix/boundary_test.exs` |
-| Architecture policy | `.reach.exs`, `.reach-baseline.json` |
+| Architecture policy | `.reach.exs` |
 | CI pipeline | `mix.exs` — the `ci` alias |
 | LiveView demo suite | `test/formentation_demo/`, `demo/formentation_demo/` |
 | Browser-real suite | `test/browser/`, `mix test.browser` alias in `mix.exs` |

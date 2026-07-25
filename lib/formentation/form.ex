@@ -25,9 +25,19 @@ defmodule Formentation.Form do
       "42"
   """
 
-  alias Formentation.{Codec, Definition, Info, InstancePath, Issue, Node, Params, Transport}
+  alias Formentation.{
+    Codec,
+    Definition,
+    Info,
+    InstancePath,
+    Issue,
+    Node,
+    Params,
+    Transport,
+    ValidationPlan
+  }
+
   alias Formentation.Form.FieldState
-  alias Formentation.JSONSchema.Validator
 
   @enforce_keys [:definition, :original]
   defstruct [
@@ -57,7 +67,7 @@ defmodule Formentation.Form do
   @doc """
   A pristine form over `data`. No transports, operations, or usage yet;
   the candidate is the (possibly defaulted) original data, already
-  schema-validated when the definition carries a validator.
+  validated when the definition carries a validation plan.
   `defaults: :apply` fills declared defaults into absent keys — defaults
   never overwrite provided values and never apply again on transitions.
   """
@@ -99,7 +109,7 @@ defmodule Formentation.Form do
   def candidate(%__MODULE__{candidate: candidate}), do: candidate
 
   @doc """
-  Every issue on the form, decode and schema alike, regardless of
+  Every issue on the form, decode and validation alike, regardless of
   visibility — pair with `show_issues?/2` before rendering.
   """
   @spec issues(t()) :: [Issue.t()]
@@ -225,20 +235,24 @@ defmodule Formentation.Form do
     raise ArgumentError, "envelope values must be a map, got: #{inspect(other)}"
   end
 
-  # D-012: raw undecoded text never reaches the validator; while any
-  # decode fails there is no candidate and schema validation defers
-  # entirely. The validator slot is opaque and adapter-owned; nil means
-  # the source provides no instance validation (map source, for now).
+  # D-012: raw undecoded text never reaches validation; while any decode
+  # fails there is no candidate and validation defers entirely. The
+  # validation slot is an opaque, module-owned ValidationPlan; nil means
+  # the source provides no authoritative instance validation (map source,
+  # for now).
   defp revalidate(%__MODULE__{} = form) do
-    %{form | issues: Map.merge(form.issues, schema_issues(form))}
+    %{form | issues: Map.merge(form.issues, validation_issues(form))}
   end
 
-  defp schema_issues(%__MODULE__{candidate: :none}), do: %{}
-  defp schema_issues(%__MODULE__{definition: %Definition{validator: nil}}), do: %{}
+  defp validation_issues(%__MODULE__{candidate: :none}), do: %{}
+  defp validation_issues(%__MODULE__{definition: %Definition{validation: nil}}), do: %{}
 
-  defp schema_issues(%__MODULE__{candidate: {:ok, instance}, definition: definition}) do
-    definition.validator
-    |> Validator.validate_instance(instance)
+  defp validation_issues(%__MODULE__{
+         candidate: {:ok, instance},
+         definition: %Definition{validation: %ValidationPlan{module: module, artifact: artifact}}
+       }) do
+    artifact
+    |> module.validate(instance)
     |> Enum.group_by(& &1.path)
   end
 

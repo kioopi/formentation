@@ -90,7 +90,7 @@ defmodule Formentation.Phoenix.ThemeTest do
       doc =
         render_field(
           help: "Some help.",
-          errors: [{"is too short", code: :min_length, source: :schema}],
+          errors: [{"is too short", code: :min_length, source: :validation}],
           show_errors?: true
         )
 
@@ -104,7 +104,7 @@ defmodule Formentation.Phoenix.ThemeTest do
     test "stored-but-hidden errors render nothing" do
       doc =
         render_field(
-          errors: [{"is too short", code: :min_length, source: :schema}],
+          errors: [{"is too short", code: :min_length, source: :validation}],
           show_errors?: false
         )
 

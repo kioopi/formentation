@@ -10,7 +10,7 @@ status: current
 
 # Source adapters
 
-> [!note] As of 2026-07-22 · non-submitting-fields mini-slice
+> [!note] As of 2026-07-25 · source-neutral validation dispatch
 > Describes the two adapters as built. Node shapes are deferred to
 > [[definition-and-node|Definition and Node]], the origin model to
 > [[diagnostics-and-origins|Diagnostics and origins]], and the addressing
@@ -112,7 +112,7 @@ build every node through these, so node shape never diverges by source.
 | Type detection | `:kind` atom | `"type"`, refined by `const`/`enum`/`format` |
 | Presentation hints | inline (`:widget`, `:help`, `:hidden`, `:read_only`, `:groups`, `:title`) | separate `:ui` map, applied post-walk |
 | Dependencies | none — lives in core | JSV |
-| Instance validator | none (`validator: nil`) | built from the schema ([[18-decisions#D-008 — JSV is the JSON Schema validator|D-008]]) |
+| Instance validator | none (`validation: nil`) | built from the schema, wrapped in a `ValidationPlan` ([[18-decisions#D-008 — JSV is the JSON Schema validator|D-008]]) |
 
 **`Source.Map`** is the reference adapter and the cheapest fixture format:
 plain Elixir, zero dependencies. Because properties are an ordered list of
@@ -144,15 +144,17 @@ two distinct gates, both offline against JSV's embedded metaschemas:
    [[diagnostics-and-origins|diagnostics]] pointing at the offending
    pointer.
 2. **Build the *instance* validator** — after the walk, `build_instance_validator/1`
-   compiles the opaque validator stored on `Definition.validator`. This
-   degrades gracefully: a dangling local `$ref` or any remote `$ref`
-   (fetching is disabled) yields `validator: nil` plus a
+   compiles the opaque validator artifact wrapped in a
+   `Formentation.ValidationPlan` and stored on `Definition.validation`.
+   This degrades gracefully: a dangling local `$ref` or any remote `$ref`
+   (fetching is disabled) yields `validation: nil` plus a
    `:validator_unavailable` warning instead of raising.
 
 > [!note] Boundary
 > The validator is *built* here but *consumed* at runtime —
-> `validate_instance/2` checks a submitted instance and belongs to the
-> runtime layer, not the compile pipeline. This note stops at construction.
+> `validate/2` (the `Formentation.Validation` callback) checks a submitted
+> instance and belongs to the runtime layer, not the compile pipeline.
+> This note stops at construction.
 
 ## UI hints
 

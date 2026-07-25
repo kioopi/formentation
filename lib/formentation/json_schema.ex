@@ -11,7 +11,16 @@ defmodule Formentation.JSONSchema do
 
   @behaviour Formentation.Source
 
-  alias Formentation.{Definition, Diagnostic, JSONPointer, Node, NodeId, TemplatePath}
+  alias Formentation.{
+    Definition,
+    Diagnostic,
+    JSONPointer,
+    Node,
+    NodeId,
+    TemplatePath,
+    ValidationPlan
+  }
+
   alias Formentation.JSONSchema.Validator
   alias Formentation.Source.Shared
 
@@ -60,7 +69,7 @@ defmodule Formentation.JSONSchema do
          :ok <- check_dialect(schema),
          :ok <- Validator.validate_schema(schema),
          {:ok, definition, _diagnostics} <- walk(schema, opts) do
-      definition |> apply_hints(ui) |> with_validator(schema)
+      definition |> apply_hints(ui) |> with_validation(schema)
     end
   end
 
@@ -68,14 +77,15 @@ defmodule Formentation.JSONSchema do
   # check_hints/1 earlier in the `with` chain above), so this has a
   # single clause — a catch-all error clause here is unreachable and
   # trips `--warnings-as-errors`.
-  defp with_validator({:ok, definition, diagnostics}, schema) do
+  defp with_validation({:ok, definition, diagnostics}, schema) do
     case Validator.build_instance_validator(schema) do
-      {:ok, validator} ->
-        {:ok, %{definition | validator: validator}, diagnostics}
+      {:ok, artifact} ->
+        plan = %ValidationPlan{module: Validator, artifact: artifact}
+        {:ok, %{definition | validation: plan}, diagnostics}
 
       {:error, message} ->
         diagnostics = diagnostics ++ [validator_unavailable_diagnostic(message)]
-        {:ok, %{definition | validator: nil, diagnostics: diagnostics}, diagnostics}
+        {:ok, %{definition | validation: nil, diagnostics: diagnostics}, diagnostics}
     end
   end
 
@@ -83,7 +93,8 @@ defmodule Formentation.JSONSchema do
     %Diagnostic{
       severity: :warning,
       code: :validator_unavailable,
-      message: "instance validation unavailable (#{message}); schema validation will be skipped",
+      message:
+        "instance validation unavailable (#{message}); submitted values are not validated at runtime",
       origin: {:json_schema, ""},
       template_path: %TemplatePath{segments: []}
     }
