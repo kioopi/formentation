@@ -175,7 +175,7 @@ defmodule Formentation.Phoenix.StateViewTest do
 
       # Guard the fixture: this test only discriminates a stable vs. unstable
       # sort if there are at least two issues sharing the path.
-      assert length(raw_messages_at_path) == 2
+      assert match?([_, _], raw_messages_at_path)
 
       assert {:ok, issues} = StateView.issues(form_state, form)
 
@@ -185,6 +185,56 @@ defmodule Formentation.Phoenix.StateViewTest do
         |> Enum.map(& &1.message)
 
       assert normalized_messages_at_path == raw_messages_at_path
+    end
+  end
+
+  describe "a non-Formentation source" do
+    test "answers the contract with its own action semantics" do
+      source = %Formentation.SourceFixture{
+        params: %{"a" => "1"},
+        action: :commit,
+        submitted?: true,
+        visibility: %{["a"] => :hide},
+        issues: {:ok, [%StateView.Issue{path: InstancePath.new!([]), message: "root problem"}]}
+      }
+
+      form = Phoenix.HTML.FormData.to_form(source, as: "payload")
+
+      assert form.action == :commit
+      assert StateView.submitted?(source, form)
+      assert StateView.issue_visibility(source, form, InstancePath.new!(["a"])) == :hide
+      assert StateView.issue_visibility(source, form, InstancePath.new!(["b"])) == :default
+      assert {:ok, [%StateView.Issue{message: "root problem"}]} = StateView.issues(source, form)
+    end
+
+    test "defaults to an unavailable, unsubmitted, policy-free view" do
+      source = %Formentation.SourceFixture{}
+      form = Phoenix.HTML.FormData.to_form(source, as: "payload")
+
+      refute StateView.submitted?(source, form)
+      assert StateView.issue_visibility(source, form, InstancePath.new!([])) == :default
+      assert StateView.issues(source, form) == :unavailable
+    end
+
+    test "exposes scalar values and errors through Phoenix" do
+      source = %Formentation.SourceFixture{
+        params: %{"a" => "typed"},
+        errors: [a: {"is invalid", []}]
+      }
+
+      form = Phoenix.HTML.FormData.to_form(source, as: "payload")
+
+      assert form[:a].value == "typed"
+      assert form[:a].errors == [{"is invalid", []}]
+    end
+
+    test "refuses nested access, which it does not model" do
+      source = %Formentation.SourceFixture{}
+      form = Phoenix.HTML.FormData.to_form(source, as: "payload")
+
+      assert_raise ArgumentError, ~r/declares no nested objects/, fn ->
+        Phoenix.HTML.FormData.to_form(source, form, :address, [])
+      end
     end
   end
 end

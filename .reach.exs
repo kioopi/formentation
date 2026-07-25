@@ -154,7 +154,18 @@
     layer_coverage: [
       require_all_modules: true,
       forbid_multiple_matches: true,
-      ignore: ["Formentation.Fixture", "Formentation.Fixtures.*", "Formentation.HTMLAssertions"]
+      # test/support modules: on elixirc_paths(:test), so reach sees them
+      # when `mix ci` runs, but they are not library code and belong to no
+      # layer. Formentation.SourceFixture is the D-027 state-view contract
+      # proof; its two defimpl-generated modules need no entry, being
+      # covered already by the phoenix layer's FormData and
+      # Formentation.Phoenix.* patterns.
+      ignore: [
+        "Formentation.Fixture",
+        "Formentation.Fixtures.*",
+        "Formentation.HTMLAssertions",
+        "Formentation.SourceFixture"
+      ]
     ]
   ],
   tests: [
