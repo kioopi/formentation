@@ -270,6 +270,16 @@ unproven).
 
 **Consequences.** Core carries zero adapter references; a fake validator outside the JSON Schema namespace proves JSV-free dispatch; future Ash/Ecto-like/custom sources can supply validation without touching `Form`; a future composite validator can itself implement `Formentation.Validation` holding child plans, while core continues to carry exactly zero or one plan.
 
+## D-026 — Content-derived presence for nested objects
+
+*2026-07-25*
+
+**Context.** Replace transitions materialized every data-nesting group into the candidate, so an absent optional object became `%{}` after an unrelated edit — the object-level counterpart of [[#D-012 — Schema validation defers while any decode fails|D-012]]'s scalar `:unset` vs `{:invalid, issue}` distinction. With a required child, the fabricated `%{}` activated a `required` issue the user never triggered; with a required object, it moved the issue from the group path to a child path. Resolves [GitHub issue #1](https://github.com/kioopi/formentation/issues/1); the approved detailed specification is [the issue comment](https://github.com/kioopi/formentation/issues/1#issuecomment-5075536504).
+
+**Decision.** Nested data-nesting objects use content-derived presence during replace transitions. The object is emitted only when recursive materialization leaves at least one declared or preserved key; presence is decided after declared-child materialization and original unknown/unsupported preservation have run. Requiredness affects validation only and never manufactures instance data. Survivors: `{:set, v}` children, `:keep`'d originals, original unknown keys, original `Node.Unsupported` values, and `{:set, ""}` strings ([[#D-010 — Empty-string, null, and absent-key decode policies|D-010]]). Non-survivors: `required?`, the compiled group node, a raw nested params map, and submitted (not original) unknown keys. `Form` gains an internal `:absent | {:present, map()}` materialization result; the root is always a map. Phase 1 does not represent intentional empty-object presence; originally-present non-object values (`nil`, `"invalid"`) at a group path are dropped when no child survives. The JSON Schema validator is unchanged. Links: [[#D-009 — Form state separates transport from operation|D-009]], [[#D-012 — Schema validation defers while any decode fails|D-012]], [[#D-014 — Usage is a first-class interaction axis|D-014]], [[#D-016 — Participation is definition-driven, not transport-driven|D-016]].
+
+**Consequences.** Presence is semantic state, not an artifact of the compiled tree. The internal presence result is the extension point that future collections, branches, and group-level presence transport must preserve or deliberately supersede — an empty object cannot be represented until such a signal exists. A required-but-absent object now reports `required` at its own path (hidden until submit under [[#D-014 — Usage is a first-class interaction axis|D-014]]) instead of leaking a child-level requirement.
+
 ## Related notes
 
 - [[16-open-questions|Open questions]]

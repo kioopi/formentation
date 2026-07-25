@@ -12,7 +12,7 @@ status: current
 
 # Form state and transitions
 
-> [!note] As of 2026-07-25 · source-neutral validation dispatch
+> [!note] As of 2026-07-25 · content-derived nested-object presence (D-026)
 > Describes the runtime state layer as built: `Formentation.Form`,
 > `Formentation.Transport`, and `Formentation.Codec` — now including the
 > `validate/2`/`submit/2` LiveView entry points. This layer has **no
@@ -196,6 +196,24 @@ user who types `"4x"` into an age field sees *one* error about the
 integer — not that plus a cascade of type violations from a validator
 handed a string it was never meant to see. Instance validation resumes
 the moment every field decodes.
+
+**Nested-object presence** is content-derived
+([[18-decisions#D-026 — Content-derived presence for nested objects|D-026]]): a
+data-nesting object is written to the candidate only when recursive
+materialization leaves at least one declared or preserved key. `required?` is a
+validation constraint and never manufactures an object — a required-but-absent
+object stays absent and the validator reports `required` at the object's own
+path, not at a fabricated child. Original unknown keys and non-editable
+(read-only, unsupported) values keep an object present; a blank string is a real
+value (`{:set, ""}`) and keeps it, while a blank typed control unsets and can
+empty it. A surviving descendant recursively recreates every missing ancestor;
+no surviving descendant creates no empty ancestor. Phase 1 has no group-level
+presence signal, so an intentional empty object cannot be represented — an
+originally present `%{}`, or a non-object value such as `nil`/`"invalid"` at a
+group path, is dropped on the next replace transition when no child survives.
+Invalid decoding still defers the whole candidate to `:none` before presence is
+decided. Internally the materializer returns `:absent | {:present, map()}` per
+data-nesting group; the root is always a map.
 
 ### Defaults
 
