@@ -12,7 +12,7 @@ status: current
 
 # What isn't supported yet
 
-*Accurate as of 2026-07-24. Formentation is pre-release; this page is the
+*Accurate as of 2026-07-26. Formentation is pre-release; this page is the
 one to re-read after every upgrade.*
 
 Formentation is being built as a walking skeleton — a thin slice through
@@ -36,6 +36,33 @@ Formentation cannot do the job today.
 The value at an array key is **preserved** through transitions rather
 than deleted, so a form over a document containing arrays will not
 destroy them — it simply cannot edit them.
+
+That compile-time warning is a **static capability** fact, not a
+verdict on any concrete instance: it means "this form can never decode,
+replace, or render this property," and says nothing about whether the
+data currently at that key happens to be fine. Two runtime functions
+turn the static fact into a concrete answer:
+
+- `Formentation.Info.unsupported_nodes/1` lists every such property in a
+  *definition*, before any instance exists — useful for an application
+  that wants to reject a schema needing full edit capability (an array
+  users must be able to add rows to) up front, instead of discovering
+  the gap when a form for it ships.
+- `Formentation.Form.submission_status/1` (and `submission_blockers/1`)
+  answer the *instance*-level question: can this particular form,
+  loaded with this particular data, actually submit right now? A
+  `required` array that is currently missing, or preserved array data
+  that currently fails your JSON Schema validator, makes the form
+  concretely non-submittable (`{:blocked, [...]}`) — there is no way for
+  the form to fix either case. A form whose array data is present and
+  valid submits normally, indefinitely; carrying an unsupported node
+  does not by itself make a form permanently unsubmittable.
+
+There is no `unsupported: :error` (or similar) compile option to reject
+a definition outright for containing unsupported nodes. That policy
+decision is left to the application, built on `Info.unsupported_nodes/1`
+as the extension point —
+[[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]].
 
 ### LiveView is wrappers, not a framework
 

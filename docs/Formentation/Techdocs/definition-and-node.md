@@ -10,7 +10,7 @@ status: current
 
 # Definition and Node
 
-*As of 2026-07-25 (source-neutral validation dispatch).*
+*As of 2026-07-26 (source-neutral validation dispatch; unsupported-node capability query, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]).*
 
 `Formentation.Definition` is the compiler's product and the system's
 common language: an immutable, source-independent tree of semantic
@@ -52,6 +52,26 @@ Shared by all kinds: `id`, `name`, `template_path`, `required?`,
 `origins`. `Formentation.Node` itself is a vocabulary module: the
 `t()` union and the `origin()` provenance tag type
 ([[diagnostics-and-origins|Diagnostics and origins]]).
+
+## Unsupported nodes are a preserve-only capability
+
+`Node.Unsupported` records a declared construct the compiler cannot
+interpret — an array, a `$ref`, an unrecognised map-source `:kind` —
+without discarding it: the node keeps its place in the tree, and its
+value survives materialization untouched (D-009). The struct carries
+nothing beyond the shared fields, because there is nothing more to say
+about it at compile time; no struct field and no `format_version` bump
+were needed to add runtime blocking, only a query.
+
+`Formentation.Info.unsupported_nodes/1` enumerates every unsupported
+node in a definition, in declaration order, descending through
+presentation and data-nesting groups alike — the *static*, definition-
+level capability question ("which declared constructs can this form
+never edit?"), answerable before any instance exists and independent of
+whether any concrete instance currently has trouble at that node.
+Whether a *given* candidate is concretely blocked by one of these nodes
+is a separate, runtime-derived question — see
+[[form-state-and-transitions#Submission status is derived, not stored|Form state and transitions]].
 
 ## Participation flags (D-016)
 
