@@ -9,7 +9,7 @@ defmodule Formentation.Phoenix.Projector do
   Spec: docs/superpowers/specs/2026-07-23-phase1-step6-projector-components-theme-design.md
   """
 
-  alias Formentation.{Definition, Diagnostic, Form, Info, InstancePath, Node}
+  alias Formentation.{Definition, Diagnostic, Info, InstancePath, Node}
   alias Formentation.Phoenix.{RenderNode, RenderPlan, StateView}
 
   @doc """
@@ -30,7 +30,7 @@ defmodule Formentation.Phoenix.Projector do
       ...>     %{kind: :object, properties: [{"email", %{kind: :string, role: :email}}]},
       ...>     adapter: Formentation.Source.Map
       ...>   )
-      iex> form = Phoenix.HTML.FormData.to_form(Formentation.Form.new(definition), as: "payload")
+      iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
       iex> plan = Formentation.Phoenix.Projector.project(definition, form)
       iex> [field] = plan.root.children
       iex> {field.widget, field.label, field.field.name}
@@ -56,7 +56,7 @@ defmodule Formentation.Phoenix.Projector do
       ...>     %{kind: :object, properties: [{"email", %{kind: :string, role: :email}}]},
       ...>     adapter: Formentation.Source.Map
       ...>   )
-      iex> form = Phoenix.HTML.FormData.to_form(Formentation.Form.new(definition), [])
+      iex> form = Phoenix.HTML.FormData.to_form(%{}, [])
       iex> node = Formentation.Phoenix.Projector.project_at(definition, form, ["email"])
       iex> {node.widget, node.field.name}
       {:email_input, "email"}
@@ -223,7 +223,7 @@ defmodule Formentation.Phoenix.Projector do
 
   defp summary(root, ctx) do
     if submitted?(ctx) do
-      field_entries(root) ++ object_entries(ctx.source)
+      field_entries(root) ++ non_field_entries(ctx)
     else
       []
     end
@@ -235,26 +235,47 @@ defmodule Formentation.Phoenix.Projector do
 
   defp field_entries(%RenderNode.Field{show_errors?: true} = node) do
     for {message, _opts} <- node.errors do
-      %{id: node.field.id, label: node.label, message: message}
+      summary_entry(node.field.id, node.label, message)
     end
   end
 
   defp field_entries(%RenderNode.Field{}), do: []
 
-  # Root and object-level issues never enter Phoenix's per-field errors
-  # (step-5 spec decision 7). When the source is a Formentation.Form we
-  # can reach them for the summary; other FormData sources degrade to
-  # the per-field entries above.
-  defp object_entries(%Form{} = form_state) do
-    form_state.issues
-    |> Enum.reject(fn {path, _issues} ->
-      match?(%Node.Field{}, Info.node_at(form_state.definition, path.segments))
-    end)
-    |> Enum.sort_by(fn {path, _issues} -> path.segments end)
-    |> Enum.flat_map(fn {_path, issues} ->
-      for issue <- issues, do: %{id: nil, label: nil, message: issue.message}
-    end)
+  # Root, group and unsupported-node issues never enter Phoenix's per-field
+  # error convention (step-5 spec decision 7), so they arrive normalized
+  # from the state view instead. Adapter order is authoritative — the
+  # projector filters but never reorders. A source with no enumeration
+  # capability degrades to the scalar entries above rather than guessing.
+  defp non_field_entries(ctx) do
+    case StateView.issues(ctx.source, ctx.root_form) do
+      :unavailable ->
+        []
+
+      {:ok, issues} ->
+        issues
+        |> Enum.filter(&non_field_visible?(ctx, &1))
+        |> Enum.map(&summary_entry(nil, summary_label(ctx, &1.path), &1.message))
+    end
   end
 
-  defp object_entries(_source), do: []
+  defp non_field_visible?(ctx, %StateView.Issue{path: path}) do
+    not field_path?(ctx, path) and
+      StateView.issue_visibility(ctx.source, ctx.root_form, path) != :hide
+  end
+
+  defp field_path?(ctx, %InstancePath{segments: segments}) do
+    match?(%Node.Field{}, Info.node_at(ctx.definition, segments))
+  end
+
+  # An unsupported node carries a name a reader can recognize, so its
+  # entry is worth labelling; root and group issues stay unlabelled, as
+  # they were before D-027.
+  defp summary_label(ctx, %InstancePath{segments: segments}) do
+    case Info.node_at(ctx.definition, segments) do
+      %Node.Unsupported{} -> humanize(List.last(segments))
+      _root_group_or_unknown -> nil
+    end
+  end
+
+  defp summary_entry(id, label, message), do: %{id: id, label: label, message: message}
 end

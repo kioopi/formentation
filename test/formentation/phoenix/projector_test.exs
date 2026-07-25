@@ -314,41 +314,32 @@ defmodule Formentation.Phoenix.ProjectorTest do
     end
 
     test "object-level schema issues enrich the submit summary unlinked" do
-      # `address` is deliberately modeled with `oneOf` (unsupported by the
-      # JSON Schema adapter) rather than a plain `"type": "object"`: a
-      # supported nested object's children are always materialized present,
-      # so a `required` issue can never land on the group's own path. An
-      # Unsupported node is the one shape that can genuinely be missing —
-      # JSV files the `:required` issue at ["address"], and since that path
-      # doesn't resolve to a Node.Field, object_entries/1 folds it into the
-      # summary unlinked (no id, no label). Mirrors
-      # form_data_test.exs:234-269.
+      # `address` is a plain supported `"type": "object"`. Under D-026
+      # (issue #1) a required nested object with no content stays genuinely
+      # absent from the candidate, so JSV files the `:required` issue at the
+      # group's own path, ["address"]. That path resolves to a Group, not a
+      # Node.Field and not a Node.Unsupported, so the state view's
+      # normalized issue folds into the summary unlinked and unlabelled.
       schema = %{
         "type" => "object",
         "required" => ["address"],
         "properties" => %{
           "title" => %{"type" => "string"},
           "address" => %{
-            "oneOf" => [
-              %{"type" => "object", "properties" => %{"street" => %{"type" => "string"}}}
-            ]
+            "type" => "object",
+            "required" => ["street"],
+            # minLength 1 keeps the compile diagnostic-free: without it the
+            # compiler warns :required_permits_empty, and this test asserts
+            # a clean compile to prove no *unsupported* keyword is involved.
+            "properties" => %{"street" => %{"type" => "string", "minLength" => 1}}
           }
         }
       }
 
-      {:ok, definition, [diagnostic]} =
-        Formentation.compile(schema, adapter: Formentation.JSONSchema)
+      {:ok, definition, []} = Formentation.compile(schema, adapter: Formentation.JSONSchema)
 
-      assert diagnostic.code == :unsupported_keyword
-
-      form_state =
-        Form.transition(Form.new(definition), %Formentation.Params{
-          values: %{"title" => "t"},
-          event: :submit
-        })
-
-      form = FormData.to_form(form_state, [])
-      plan = Projector.project(definition, form)
+      form_state = Form.submit(Form.new(definition), %{"title" => "t"})
+      plan = Projector.project(definition, FormData.to_form(form_state, []))
 
       assert [%{id: nil, label: nil, message: message}] = plan.summary
       assert message =~ "required"
@@ -424,6 +415,155 @@ defmodule Formentation.Phoenix.ProjectorTest do
 
       assert [%RenderNode.Field{}] = plan.root.children
       assert [_] = plan.summary
+    end
+  end
+
+  describe "normalized non-field issues in the summary" do
+    alias Formentation.Phoenix.StateView
+
+    defp issue(segments, message) do
+      %StateView.Issue{
+        path: Formentation.InstancePath.new!(segments),
+        message: message
+      }
+    end
+
+    defp summary_form(issues, overrides \\ []) do
+      source =
+        struct!(
+          %Formentation.SourceFixture{
+            params: %{"operating_hours" => "1"},
+            action: :commit,
+            submitted?: true,
+            issues: {:ok, issues}
+          },
+          overrides
+        )
+
+      Phoenix.HTML.FormData.to_form(source, [])
+    end
+
+    test "a root issue appears once, unlinked, and never enters a field's errors" do
+      plan =
+        Projector.project(
+          scalar_definition(),
+          summary_form([issue([], "the whole form is wrong")])
+        )
+
+      assert [%{id: nil, label: nil, message: "the whole form is wrong"}] = plan.summary
+      assert [%RenderNode.Field{errors: []}] = plan.root.children
+    end
+
+    # D-027: an unsupported node carries a name a reader can recognize, so
+    # its normalized issue is labelled from it (unlike the root/group case
+    # covered above, which stays unlabelled).
+    test "an unsupported node's issue is labelled with its humanized name" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [{"gadget", %{kind: :carousel}}, {"name", %{kind: :string}}]
+        })
+
+      plan =
+        Projector.project(
+          definition,
+          summary_form([issue(["gadget"], "cannot be repaired here")])
+        )
+
+      assert [%{id: nil, label: "Gadget", message: "cannot be repaired here"}] = plan.summary
+    end
+
+    test "an issue whose path resolves to a scalar field is not duplicated beside field.errors" do
+      form =
+        summary_form([issue(["operating_hours"], "is invalid")],
+          errors: [operating_hours: {"is invalid", []}]
+        )
+
+      plan = Projector.project(scalar_definition(), form)
+
+      assert [%RenderNode.Field{show_errors?: true, errors: [{"is invalid", []}]}] =
+               plan.root.children
+
+      assert [%{label: "Operating hours", message: "is invalid"}] = plan.summary
+    end
+
+    test "adapter order is preserved and multiple issues at one path stay distinct" do
+      issues = [issue(["b"], "second"), issue([], "first"), issue([], "third")]
+
+      plan = Projector.project(scalar_definition(), summary_form(issues))
+
+      assert Enum.map(plan.summary, & &1.message) == ["second", "first", "third"]
+    end
+
+    test "scalar entries precede normalized non-field entries" do
+      form =
+        summary_form([issue([], "root problem")],
+          errors: [operating_hours: {"is invalid", []}]
+        )
+
+      plan = Projector.project(scalar_definition(), form)
+
+      assert [
+               %{label: "Operating hours", message: "is invalid"},
+               %{id: nil, label: nil, message: "root problem"}
+             ] = plan.summary
+    end
+
+    test "a :hide answer omits a non-field issue from a submitted summary" do
+      form =
+        summary_form([issue(["b"], "hidden problem")], visibility: %{["b"] => :hide})
+
+      plan = Projector.project(scalar_definition(), form)
+
+      assert plan.summary == []
+    end
+
+    test "an unavailable enumeration yields scalar entries only" do
+      form =
+        summary_form([], issues: :unavailable, errors: [operating_hours: {"is invalid", []}])
+
+      plan = Projector.project(scalar_definition(), form)
+
+      assert [%{label: "Operating hours", message: "is invalid"}] = plan.summary
+    end
+
+    # Spec §7.2: the whole point of the contract — two sources sharing no
+    # internals, and disagreeing about which atom means "submitted", must
+    # produce identical projector-owned decisions once their state-view
+    # answers agree. Root/object issue association is covered separately:
+    # by the root-issue test above for the fixture, and by the D-026
+    # regression in projector_test for %Formentation.Form{}.
+    test "equivalent state-view answers produce equivalent projector decisions" do
+      definition = scalar_definition()
+
+      formentation_plan =
+        definition
+        |> Form.new()
+        |> Form.transition(%Formentation.Params{
+          values: %{"operating_hours" => "51o2"},
+          event: :submit
+        })
+        |> then(&Projector.project(definition, FormData.to_form(&1, [])))
+
+      # Whatever decode message Formentation produced, hand the same one to
+      # a source that calls its submit state :commit and enumerates nothing.
+      [%{message: decode_message}] = formentation_plan.summary
+
+      mirrored_plan =
+        Projector.project(
+          definition,
+          summary_form([], errors: [operating_hours: {decode_message, []}])
+        )
+
+      assert decisions(mirrored_plan) == decisions(formentation_plan)
+      assert decisions(formentation_plan).show_errors? == [true]
+    end
+
+    defp decisions(%RenderPlan{root: root, summary: summary}) do
+      %{
+        show_errors?: root |> flatten_fields() |> Enum.map(& &1.show_errors?),
+        summary: Enum.map(summary, &{&1.label, &1.message})
+      }
     end
   end
 
