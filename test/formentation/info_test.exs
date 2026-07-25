@@ -30,12 +30,19 @@ defmodule Formentation.InfoTest do
       template_path: %TemplatePath{segments: ["electrical", "voltage"]}
     }
 
+    legacy = %Node.Unsupported{
+      id: "/electrical/legacy",
+      name: "legacy",
+      required?: true,
+      template_path: %TemplatePath{segments: ["electrical", "legacy"]}
+    }
+
     fieldset = %Node.Group{
       id: "/electrical#power",
       nests_data?: false,
       label: "Power",
       template_path: %TemplatePath{segments: ["electrical"]},
-      children: [voltage]
+      children: [voltage, legacy]
     }
 
     electrical = %Node.Group{
@@ -90,5 +97,41 @@ defmodule Formentation.InfoTest do
     assert Info.role(definition(), ["electrical"]) == nil
     assert Info.role(definition(), ["missing"]) == nil
     assert Info.origins(definition(), ["missing"]) == []
+  end
+
+  test "unsupported_nodes/1 returns unsupported nodes in declaration order" do
+    assert ["gadget", "legacy"] ==
+             definition() |> Info.unsupported_nodes() |> Enum.map(& &1.name) |> Enum.sort()
+
+    # order is tree/declaration order: electrical (with nested legacy) precedes gadget
+    assert ["legacy", "gadget"] ==
+             definition() |> Info.unsupported_nodes() |> Enum.map(& &1.name)
+  end
+
+  test "unsupported_nodes/1 preserves node identity fields" do
+    [legacy, _gadget] = Info.unsupported_nodes(definition())
+    assert %Node.Unsupported{id: "/electrical/legacy", required?: true} = legacy
+  end
+
+  test "unsupported_nodes/1 is empty when there are none" do
+    root = %Node.Group{
+      id: "/",
+      nests_data?: true,
+      template_path: %TemplatePath{segments: []},
+      children: []
+    }
+
+    assert Info.unsupported_nodes(%Definition{root: root}) == []
+  end
+
+  test "unsupported_nodes_with_paths/1 pairs nodes with instance paths through both group flavors" do
+    paths =
+      definition()
+      |> Info.unsupported_nodes_with_paths()
+      |> Enum.map(fn {path, node} -> {path.segments, node.name} end)
+
+    # legacy lives inside data-nesting `electrical` and presentation `fieldset`:
+    # the data group contributes "electrical", the presentation group nothing.
+    assert paths == [{["electrical", "legacy"], "legacy"}, {["gadget"], "gadget"}]
   end
 end
