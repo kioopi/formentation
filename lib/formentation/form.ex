@@ -154,6 +154,24 @@ defmodule Formentation.Form do
   end
 
   @doc """
+  Whether the source considers this form submitted, in the semantic
+  sense projection needs — not "the Phoenix action equals a particular
+  atom". True exactly when the last transition carried `event: :submit`.
+
+      iex> {:ok, definition, []} =
+      ...>   Formentation.compile(
+      ...>     %{kind: :object, properties: [{"a", %{kind: :string}}]},
+      ...>     adapter: Formentation.Source.Map
+      ...>   )
+      iex> form = Formentation.Form.new(definition)
+      iex> {Formentation.Form.submitted?(form),
+      ...>  Formentation.Form.submitted?(Formentation.Form.submit(form, %{"a" => "x"}))}
+      {false, true}
+  """
+  @spec submitted?(t()) :: boolean()
+  def submitted?(%__MODULE__{action: action}), do: action == :submit
+
+  @doc """
   Applies a full-form replace transition (D-013): normalizes the
   envelope's values, decodes every declared field, merges usage,
   rematerializes the candidate, and revalidates. Raises `ArgumentError`

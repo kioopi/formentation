@@ -582,6 +582,31 @@ defmodule Formentation.FormTest do
     end
   end
 
+  describe "submitted?/1" do
+    test "is false for a pristine form and after a :change transition" do
+      definition = pump_definition()
+
+      refute Form.submitted?(Form.new(definition))
+      refute Form.submitted?(Form.validate(Form.new(definition), %{"serial_number" => "PX"}))
+    end
+
+    test "is true after submit/2" do
+      definition = pump_definition()
+
+      assert Form.submitted?(Form.submit(Form.new(definition), %{"serial_number" => "PX"}))
+    end
+
+    test "is true after an explicit :submit transition envelope" do
+      form =
+        Form.transition(Form.new(pump_definition()), %Formentation.Params{
+          values: %{"serial_number" => "PX"},
+          event: :submit
+        })
+
+      assert Form.submitted?(form)
+    end
+  end
+
   describe "per-kind node trees" do
     defp per_kind_definition do
       priority = %Node.Field{
