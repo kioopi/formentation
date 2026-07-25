@@ -103,4 +103,216 @@ defmodule Formentation.FormNestedPresenceTest do
       assert Form.issues(form, ["address"]) == []
     end
   end
+
+  # dimensions.{width:int, label:string}; optional at root.
+  defp box_definition do
+    compile_map(%{
+      kind: :object,
+      properties: [
+        {"title", %{kind: :string}},
+        {"dimensions",
+         %{
+           kind: :object,
+           properties: [
+             {"width", %{kind: :integer}},
+             {"label", %{kind: :string}}
+           ]
+         }}
+      ]
+    })
+  end
+
+  # dimensions.{width:int (editable), sku:string (read_only), attachment:file (unsupported)}
+  defp preserving_box_definition do
+    compile_map(%{
+      kind: :object,
+      properties: [
+        {"dimensions",
+         %{
+           kind: :object,
+           properties: [
+             {"width", %{kind: :integer}},
+             {"sku", %{kind: :string, read_only: true}},
+             {"attachment", %{kind: :file}}
+           ]
+         }}
+      ]
+    })
+  end
+
+  # contact.address.width — three data-nesting levels.
+  defp deep_definition do
+    compile_map(%{
+      kind: :object,
+      properties: [
+        {"contact",
+         %{
+           kind: :object,
+           properties: [
+             {"address", %{kind: :object, properties: [{"width", %{kind: :integer}}]}}
+           ]
+         }}
+      ]
+    })
+  end
+
+  # dimensions.width with a default, for the defaults test.
+  defp defaulted_box_definition do
+    compile_map(%{
+      kind: :object,
+      properties: [
+        {"dimensions", %{kind: :object, properties: [{"width", %{kind: :integer, default: 7}}]}}
+      ]
+    })
+  end
+
+  defp compile_map(declaration) do
+    {:ok, definition, _diagnostics} =
+      Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
+    definition
+  end
+
+  describe "candidate shape (map source)" do
+    test "a submitted typed child creates the object with decoded values" do
+      form =
+        box_definition()
+        |> Form.new()
+        |> Form.submit(%{"title" => "New", "dimensions" => %{"width" => "4"}})
+
+      assert Form.candidate(form) == {:ok, %{"title" => "New", "dimensions" => %{"width" => 4}}}
+    end
+
+    test "an empty string is a surviving value and keeps its object (D-010)" do
+      form =
+        box_definition()
+        |> Form.new()
+        |> Form.submit(%{"dimensions" => %{"label" => "", "width" => ""}})
+
+      assert {:ok, candidate} = Form.candidate(form)
+      assert candidate["dimensions"] == %{"label" => ""}
+    end
+
+    test "clearing every typed child by explicit blank removes an optional object" do
+      form =
+        box_definition()
+        |> Form.new(%{"dimensions" => %{"width" => 4}})
+        |> Form.submit(%{"dimensions" => %{"width" => ""}})
+
+      assert {:ok, candidate} = Form.candidate(form)
+      refute Map.has_key?(candidate, "dimensions")
+    end
+
+    test "omitting an originally present child from the params removes its object" do
+      # The other removal route: :not_provided -> :unset, rather than
+      # {:provided, ""} -> :unset. The child is present in the original but
+      # absent from the submitted params, so the group empties and drops.
+      form =
+        box_definition()
+        |> Form.new(%{"dimensions" => %{"width" => 4}})
+        |> Form.submit(%{})
+
+      assert {:ok, candidate} = Form.candidate(form)
+      refute Map.has_key?(candidate, "dimensions")
+    end
+
+    test "original unknown keys keep the object; submitted unknown keys do not create one" do
+      kept =
+        box_definition()
+        |> Form.new(%{"dimensions" => %{"width" => 4, "legacy_identifier" => "A-17"}})
+        |> Form.submit(%{"dimensions" => %{"width" => ""}})
+
+      assert {:ok, candidate} = Form.candidate(kept)
+      assert candidate["dimensions"] == %{"legacy_identifier" => "A-17"}
+
+      ignored =
+        box_definition()
+        |> Form.new()
+        |> Form.submit(%{"dimensions" => %{"unknown" => "x"}})
+
+      assert Form.candidate(ignored) == {:ok, %{}}
+    end
+
+    test "read-only and unsupported descendants keep the object when editable children clear" do
+      form =
+        preserving_box_definition()
+        |> Form.new(%{
+          "dimensions" => %{"width" => 4, "sku" => "RO-1", "attachment" => ["a.png"]}
+        })
+        |> Form.submit(%{"dimensions" => %{"width" => ""}})
+
+      assert {:ok, candidate} = Form.candidate(form)
+      assert candidate["dimensions"] == %{"sku" => "RO-1", "attachment" => ["a.png"]}
+    end
+
+    test "invalid child input defers materialization without fabricating an object" do
+      form =
+        box_definition()
+        |> Form.new()
+        |> Form.submit(%{"dimensions" => %{"width" => "x"}})
+
+      assert Form.candidate(form) == :none
+
+      assert [%Issue{code: :invalid_integer, source: :decode}] =
+               Form.issues(form, ["dimensions", "width"])
+
+      assert Form.issues(form, ["dimensions"]) == []
+    end
+
+    test "presence is recursive: a surviving descendant creates every missing ancestor" do
+      created =
+        deep_definition()
+        |> Form.new()
+        |> Form.submit(%{"contact" => %{"address" => %{"width" => "4"}}})
+
+      assert Form.candidate(created) ==
+               {:ok, %{"contact" => %{"address" => %{"width" => 4}}}}
+
+      neither =
+        deep_definition()
+        |> Form.new()
+        |> Form.submit(%{})
+
+      assert Form.candidate(neither) == {:ok, %{}}
+
+      cleared =
+        deep_definition()
+        |> Form.new(%{"contact" => %{"address" => %{"width" => 4}}})
+        |> Form.submit(%{"contact" => %{"address" => %{"width" => ""}}})
+
+      assert Form.candidate(cleared) == {:ok, %{}}
+    end
+
+    test "defaults do not reappear on transitions or force object presence" do
+      form =
+        defaulted_box_definition()
+        |> Form.new(%{}, defaults: :apply)
+        |> Form.submit(%{})
+
+      assert {:ok, candidate} = Form.candidate(form)
+      refute Map.has_key?(candidate, "dimensions")
+    end
+
+    test "removes an empty nested object because Phase 1 has no group presence signal" do
+      form =
+        box_definition()
+        |> Form.new(%{"dimensions" => %{}})
+        |> Form.submit(%{})
+
+      assert {:ok, candidate} = Form.candidate(form)
+      refute Map.has_key?(candidate, "dimensions")
+    end
+
+    test "drops an originally-present non-object group value when no child survives (D-026)" do
+      for original <- [%{"dimensions" => nil}, %{"dimensions" => "invalid"}] do
+        form =
+          box_definition()
+          |> Form.new(original)
+          |> Form.submit(%{})
+
+        assert {:ok, candidate} = Form.candidate(form)
+        refute Map.has_key?(candidate, "dimensions")
+      end
+    end
+  end
 end
