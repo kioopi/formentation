@@ -73,13 +73,15 @@ defmodule Formentation.MixProject do
       ci: [
         "compile --warnings-as-errors",
         "format --check-formatted",
+        &check_vault_links/1,
         "test",
         "credo --strict",
         "dialyzer",
         "ex_dna --max-clones 0",
         "reach.check --arch --smells"
       ],
-      "test.browser": [&test_browser/1]
+      "test.browser": [&test_browser/1],
+      "vault.links": [&check_vault_links/1]
     ]
   end
 
@@ -91,6 +93,64 @@ defmodule Formentation.MixProject do
     System.put_env("PLAYWRIGHT_E2E", "1")
     Mix.Task.run("test", ["--only", "browser" | args])
   end
+
+  @vault "docs/Formentation"
+
+  # Obsidian does not parse a `[[wikilink]]` containing a line break: a
+  # hard-wrapped link silently renders as literal text, so the note loses a
+  # link without anything failing. Reflowing a paragraph is enough to
+  # introduce one, which makes it a lint rather than a review habit.
+  defp check_vault_links(_args) do
+    case Enum.flat_map(Path.wildcard("#{@vault}/**/*.md"), &split_wikilinks/1) do
+      [] ->
+        Mix.shell().info("Vault wikilinks OK")
+
+      offenders ->
+        Mix.raise(
+          "Wikilinks split across a line break (Obsidian renders these as literal text):\n" <>
+            Enum.map_join(offenders, "\n", fn {file, line, text} ->
+              "  #{file}:#{line}: #{text}"
+            end)
+        )
+    end
+  end
+
+  # A line that opens more links than it closes continues one onto the next
+  # line. Fenced blocks and inline code spans are ignored so that code and
+  # prose *about* wikilink syntax are not mistaken for links.
+  defp split_wikilinks(file) do
+    file
+    |> File.read!()
+    |> String.split("\n")
+    |> Enum.with_index(1)
+    |> Enum.reduce({[], false}, &scan_line/2)
+    |> elem(0)
+    |> Enum.reverse()
+    |> Enum.map(fn {line, text} -> {file, line, text} end)
+  end
+
+  defp scan_line({text, line}, {found, fenced?}) do
+    cond do
+      String.starts_with?(String.trim_leading(text), "```") ->
+        {found, not fenced?}
+
+      fenced? ->
+        {found, fenced?}
+
+      opens_a_link?(text) ->
+        {[{line, String.trim(text)} | found], fenced?}
+
+      true ->
+        {found, fenced?}
+    end
+  end
+
+  defp opens_a_link?(text) do
+    prose = String.replace(text, ~r/`[^`]*`/, "")
+    occurrences(prose, "[[") > occurrences(prose, "]]")
+  end
+
+  defp occurrences(text, pattern), do: length(String.split(text, pattern)) - 1
 
   defp package do
     [

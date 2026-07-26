@@ -12,7 +12,7 @@ status: current
 
 # Test and verification architecture
 
-> [!note] As of 2026-07-24 · step 7 + browser-testing suite complete
+> [!note] As of 2026-07-26 · step 7 + browser-testing suite + vault link gate
 > Describes the verification setup as built: the kinds of test in the
 > suite, what each one pins, and the static gates in `mix ci` — including
 > the demo's `Phoenix.LiveViewTest` suite and, now, the opt-in browser-real
@@ -177,9 +177,19 @@ real `.json` files rather than inline heredocs — they are also what
 ## Static gates — `mix ci`
 
 Tests are only half the verification. `mix ci` runs, in order:
-`compile --warnings-as-errors`, `format --check-formatted`, `test`,
-`credo --strict`, `dialyzer`, `ex_dna --max-clones 0`, and
-`reach.check --arch --smells`. Two of those deserve explanation.
+`compile --warnings-as-errors`, `format --check-formatted`, a vault
+wikilink check, `test`, `credo --strict`, `dialyzer`,
+`ex_dna --max-clones 0`, and `reach.check --arch --smells`. Three of those
+deserve explanation.
+
+**The vault wikilink check** (also runnable as `mix vault.links`) fails on
+any `[[wikilink]]` that contains a line break. Obsidian does not parse
+those, so a hard-wrapped link renders as literal text and the note loses a
+link with nothing failing. Reflowing a paragraph is enough to introduce
+one, which is why it is a gate rather than a review habit. It scans
+`docs/Formentation/**/*.md` and skips fenced code, so Elixir snippets
+containing `[[` are not mistaken for prose. Its implementation is a private
+function in `mix.exs`, so nothing extra ships in the package.
 
 **`ex_dna --max-clones 0`** fails on *any* duplicated code block. In a
 project with two adapters translating different vocabularies into the
