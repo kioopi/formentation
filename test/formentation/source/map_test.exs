@@ -289,11 +289,24 @@ defmodule Formentation.Source.MapTest do
       assert Info.node_at(definition, ["voltage"]).id == "/voltage"
     end
 
-    test "fields/1 keeps declaration order across the group boundary" do
-      definition = compile!(grouped_declaration())
+    test "fields/1 keeps declaration order across reordered group boundaries" do
+      declaration = %{
+        kind: :object,
+        properties: [
+          {"a", %{kind: :string}},
+          {"b", %{kind: :string}},
+          {"c", %{kind: :string}},
+          {"d", %{kind: :string}}
+        ],
+        groups: [%{id: "g", fields: ["c", "a"]}]
+      }
 
-      assert Enum.map(Info.fields(definition), & &1.name) ==
-               ["serial_number", "voltage", "insulation_ok", "notes"]
+      definition = compile!(declaration)
+
+      assert %Node.Group{children: children} = Info.node(definition, "/#g")
+      assert Enum.map(children, & &1.name) == ["c", "a"]
+
+      assert Enum.map(Info.fields(definition), & &1.name) == ["a", "b", "c", "d"]
     end
 
     test "a group naming an unknown field emits a warning diagnostic" do
@@ -360,7 +373,7 @@ defmodule Formentation.Source.MapTest do
       definition = compile!(declaration)
 
       assert Enum.map(Info.fields(definition), & &1.name) ==
-               ["a", "voltage", "insulation_ok", "b", "c"]
+               ["a", "voltage", "b", "insulation_ok", "c"]
     end
 
     test "a group without a title has a nil label and no label origin" do
@@ -445,6 +458,44 @@ defmodule Formentation.Source.MapTest do
       assert Info.diagnostics(definition) == []
       assert %Node.Field{group: "electrical"} = Info.node_at(definition, ["voltage"])
       assert %Node.Group{nests_data?: true} = Info.node_at(definition, ["dimensions"])
+    end
+
+    test "semantic order is independent at root and nested object boundaries" do
+      declaration = %{
+        kind: :object,
+        properties: [
+          {"title", %{kind: :string}},
+          {"dimensions",
+           %{
+             kind: :object,
+             properties: [
+               {"width", %{kind: :integer}},
+               {"depth", %{kind: :integer}},
+               {"height", %{kind: :integer}}
+             ],
+             groups: [%{id: "size", fields: ["height", "width"]}]
+           }},
+          {"notes", %{kind: :string}}
+        ],
+        groups: [%{id: "main", fields: ["dimensions", "title"]}]
+      }
+
+      definition = compile!(declaration)
+
+      assert %Node.Group{children: root_group_children} = Info.node(definition, "/#main")
+      assert Enum.map(root_group_children, & &1.name) == ["dimensions", "title"]
+
+      assert %Node.Group{children: nested_group_children} =
+               Info.node(definition, "/dimensions#size")
+
+      assert Enum.map(nested_group_children, & &1.name) == ["height", "width"]
+
+      assert Enum.map(Info.fields(definition), & &1.name) ==
+               ["title", "width", "depth", "height", "notes"]
+
+      assert %Node.Field{} = Info.node_at(definition, ["dimensions", "width"])
+      assert Info.node_at(definition, ["main", "dimensions", "width"]) == nil
+      assert Info.node_at(definition, ["dimensions", "size", "width"]) == nil
     end
   end
 

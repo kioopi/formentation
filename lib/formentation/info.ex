@@ -4,6 +4,12 @@ defmodule Formentation.Info do
   tests, and applications ask questions here instead of pattern matching
   definition internals.
 
+  Semantic queries such as `fields/1`, `node_at/2`, `required?/2`, and
+  unsupported-node enumeration are transparent to presentation-only groups
+  and use semantic declaration order, which can differ from layout order.
+  `root/1` and `node/2` remain compatibility access to the current mixed
+  tree until the definition storage split lands.
+
   ## Example
 
       iex> {:ok, definition, []} =
@@ -17,24 +23,22 @@ defmodule Formentation.Info do
       false
   """
 
-  alias Formentation.{Definition, Diagnostic, InstancePath, Node}
+  alias Formentation.{Definition, Diagnostic, InstancePath, Node, Semantic}
 
   @doc "The root group of the definition tree."
   @spec root(Definition.t()) :: Node.t()
   def root(%Definition{root: root}), do: root
 
-  @doc "Every scalar field in the tree, in declaration order."
+  @doc "Every scalar field, in semantic declaration order independent of presentation layout."
   @spec fields(Definition.t()) :: [Node.Field.t()]
-  def fields(%Definition{root: root}) do
-    root |> walk() |> Enum.filter(&field?/1)
+  def fields(%Definition{} = definition) do
+    definition |> Semantic.fields() |> Enum.map(& &1.node)
   end
-
-  defp field?(%Node.Field{}), do: true
-  defp field?(_node), do: false
 
   @doc """
   Every unsupported (preserve-only) node in the tree, in declaration
-  order, descending through presentation and data-nesting groups alike.
+  order, descending through data-nesting groups and looking through
+  presentation-only groups.
   `[]` when none exist. Each node is preserve-only; `required?: true`
   flags a likely creation-form risk but does not prove any instance is
   blocked — the runtime submission-status functions on `Formentation.Form`
@@ -55,8 +59,10 @@ defmodule Formentation.Info do
 
   @doc false
   @spec unsupported_nodes_with_paths(Definition.t()) :: [{InstancePath.t(), Node.Unsupported.t()}]
-  def unsupported_nodes_with_paths(%Definition{root: root}) do
-    collect_unsupported(root, [])
+  def unsupported_nodes_with_paths(%Definition{} = definition) do
+    definition
+    |> Semantic.unsupported()
+    |> Enum.map(fn entry -> {entry.instance_path, entry.node} end)
   end
 
   @doc """
@@ -76,7 +82,11 @@ defmodule Formentation.Info do
   @spec node_at(Definition.t(), [InstancePath.segment()]) :: Node.t() | nil
   def node_at(%Definition{root: root}, segments) when is_list(segments) do
     %InstancePath{segments: segments} = InstancePath.new!(segments)
-    find_at(root, segments)
+
+    case Semantic.find(%Definition{root: root}, segments) do
+      nil -> nil
+      entry -> entry.node
+    end
   end
 
   @doc "The compile-time diagnostics recorded on the definition."
@@ -118,43 +128,4 @@ defmodule Formentation.Info do
   end
 
   defp walk(leaf), do: [leaf]
-
-  defp find_at(node, []), do: node
-
-  defp find_at(node, [segment | rest]) do
-    case node |> data_children() |> Enum.find(&(&1.name == segment)) do
-      nil -> nil
-      child -> find_at(child, rest)
-    end
-  end
-
-  defp data_children(%Node.Group{children: children}) do
-    Enum.flat_map(children, fn
-      %Node.Group{nests_data?: false} = group -> data_children(group)
-      child -> [child]
-    end)
-  end
-
-  defp data_children(_leaf), do: []
-
-  # Mirrors Form.field_entries/3: iterate children, add a segment only for
-  # data-nesting groups, look through presentation groups. `reversed_prefix`
-  # is nearest-first; the path is reversed once at the leaf.
-  defp collect_unsupported(%Node.Group{children: children}, reversed_prefix) do
-    Enum.flat_map(children, fn
-      %Node.Unsupported{name: name} = child ->
-        [{InstancePath.new!(Enum.reverse([name | reversed_prefix])), child}]
-
-      %Node.Group{nests_data?: false} = child ->
-        collect_unsupported(child, reversed_prefix)
-
-      %Node.Group{nests_data?: true, name: name} = child ->
-        collect_unsupported(child, [name | reversed_prefix])
-
-      %Node.Field{} ->
-        []
-    end)
-  end
-
-  defp collect_unsupported(_leaf, _reversed_prefix), do: []
 end

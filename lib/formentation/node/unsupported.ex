@@ -24,12 +24,13 @@ defmodule Formentation.Node.Unsupported do
   alias Formentation.{Node, TemplatePath}
 
   @enforce_keys [:id, :name, :template_path]
-  defstruct [:id, :name, :template_path, required?: false, origins: []]
+  defstruct [:id, :name, :template_path, :declaration_order, required?: false, origins: []]
 
   @type t :: %__MODULE__{
           id: String.t(),
           name: String.t(),
           template_path: TemplatePath.t(),
+          declaration_order: non_neg_integer() | nil,
           required?: boolean(),
           origins: [{atom(), Node.origin()}]
         }

@@ -32,6 +32,16 @@ defmodule Formentation.Source.Shared do
     }
   end
 
+  # Temporary compatibility evidence for Issue #16: presentation grouping
+  # can move siblings, so semantic declaration order is stamped before
+  # grouping. The split storage planned in Issue #18 should make this
+  # field unnecessary.
+  def stamp_declaration_order(children) do
+    children
+    |> Enum.with_index()
+    |> Enum.map(fn {child, index} -> %{child | declaration_order: index} end)
+  end
+
   @doc """
   Stamps members with the group id and inserts a presentation-group node
   at the first member's position. Members follow the group's `fields`

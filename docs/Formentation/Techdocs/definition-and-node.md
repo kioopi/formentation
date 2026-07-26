@@ -30,8 +30,10 @@ produced.
 }
 ```
 
-`root` holds the node tree directly (no indexes yet — `Formentation.Info`
-walks the tree). `validation` is an optional `Formentation.ValidationPlan`
+`root` holds the current mixed node tree directly. `Formentation.Info`
+keeps compatibility access to that tree through `root/1` and `node/2`,
+but its semantic queries use a layout-transparent semantic traversal.
+`validation` is an optional `Formentation.ValidationPlan`
 — an executable module (implementing `Formentation.Validation`) paired
 with the opaque artifact that module owns; `nil` when the source provides
 no authoritative instance validation (the map source, currently).
@@ -53,6 +55,12 @@ Shared by all kinds: `id`, `name`, `template_path`, `required?`,
 `t()` union and the `origin()` provenance tag type
 ([[diagnostics-and-origins|Diagnostics and origins]]).
 
+The node structs also carry temporary, internal `declaration_order`
+evidence assigned before presentation grouping. It preserves semantic
+declaration order while the mixed tree can still move children beneath
+layout groups. It is not a stable representation contract; the split
+Definition storage work owns its removal.
+
 ## Unsupported nodes are a preserve-only capability
 
 `Node.Unsupported` records a declared construct the compiler cannot
@@ -65,9 +73,9 @@ were needed to add runtime blocking, only a query.
 
 `Formentation.Info.unsupported_nodes/1` enumerates every unsupported
 node in a definition, in declaration order, descending through
-presentation and data-nesting groups alike — the *static*, definition-
-level capability question ("which declared constructs can this form
-never edit?"), answerable before any instance exists and independent of
+data-nesting groups and looking through presentation-only groups — the
+*static*, definition-level capability question ("which declared constructs
+can this form never edit?"), answerable before any instance exists and independent of
 whether any concrete instance currently has trouble at that node.
 Whether a *given* candidate is concretely blocked by one of these nodes
 is a separate, runtime-derived question — see

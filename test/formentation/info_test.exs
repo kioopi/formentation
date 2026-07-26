@@ -1,7 +1,7 @@
 defmodule Formentation.InfoTest do
   use ExUnit.Case, async: true
 
-  alias Formentation.{Definition, Info, Node, TemplatePath}
+  alias Formentation.{Definition, Info, Node, Semantic, TemplatePath}
 
   doctest Formentation.Info
 
@@ -133,5 +133,107 @@ defmodule Formentation.InfoTest do
     # legacy lives inside data-nesting `electrical` and presentation `fieldset`:
     # the data group contributes "electrical", the presentation group nothing.
     assert paths == [{["electrical", "legacy"], "legacy"}, {["gadget"], "gadget"}]
+  end
+
+  test "semantic fallback order preserves unstamped mixed-tree order" do
+    a = %Node.Field{
+      id: "/a",
+      name: "a",
+      value_type: :string,
+      template_path: %TemplatePath{segments: ["a"]}
+    }
+
+    legacy = %Node.Unsupported{
+      id: "/legacy",
+      name: "legacy",
+      template_path: %TemplatePath{segments: ["legacy"]}
+    }
+
+    group = %Node.Group{
+      id: "/#grouped",
+      nests_data?: false,
+      template_path: %TemplatePath{segments: []},
+      children: [a, legacy]
+    }
+
+    b = %Node.Field{
+      id: "/b",
+      name: "b",
+      value_type: :string,
+      template_path: %TemplatePath{segments: ["b"]}
+    }
+
+    gadget = %Node.Unsupported{
+      id: "/gadget",
+      name: "gadget",
+      template_path: %TemplatePath{segments: ["gadget"]}
+    }
+
+    root = %Node.Group{
+      id: "/",
+      nests_data?: true,
+      template_path: %TemplatePath{segments: []},
+      children: [group, b, gadget]
+    }
+
+    definition = %Definition{root: root}
+
+    assert ["a", "b"] == definition |> Info.fields() |> Enum.map(& &1.name)
+    assert ["legacy", "gadget"] == definition |> Info.unsupported_nodes() |> Enum.map(& &1.name)
+  end
+
+  test "semantic entries expose object boundaries and computed paths" do
+    {:ok, definition, [_unsupported_warning]} =
+      Formentation.compile(
+        %{
+          kind: :object,
+          properties: [
+            {"title", %{kind: :string}},
+            {"dimensions",
+             %{
+               kind: :object,
+               properties: [
+                 {"width", %{kind: :integer}},
+                 {"depth", %{kind: :integer}},
+                 {"height", %{kind: :integer}}
+               ],
+               groups: [%{id: "size", fields: ["height", "width"]}]
+             }},
+            {"legacy", %{kind: :file}}
+          ],
+          groups: [%{id: "main", fields: ["legacy", "title"]}]
+        },
+        adapter: Formentation.Source.Map
+      )
+
+    root = Semantic.root(definition)
+    assert %Semantic.Entry{kind: :object, name: nil, instance_path: %{segments: []}} = root
+
+    assert [
+             %Semantic.Entry{kind: :field, name: "title", instance_path: %{segments: ["title"]}},
+             %Semantic.Entry{
+               kind: :object,
+               name: "dimensions",
+               instance_path: %{segments: ["dimensions"]}
+             },
+             %Semantic.Entry{
+               kind: :unsupported,
+               name: "legacy",
+               instance_path: %{segments: ["legacy"]}
+             }
+           ] = Semantic.direct_children(root)
+
+    dimensions = Semantic.find(definition, ["dimensions"])
+
+    assert Enum.map(Semantic.direct_children(dimensions), fn entry ->
+             {entry.kind, entry.name, entry.instance_path.segments, entry.template_path.segments}
+           end) == [
+             {:field, "width", ["dimensions", "width"], ["dimensions", "width"]},
+             {:field, "depth", ["dimensions", "depth"], ["dimensions", "depth"]},
+             {:field, "height", ["dimensions", "height"], ["dimensions", "height"]}
+           ]
+
+    assert Semantic.find(definition, ["main", "legacy"]) == nil
+    assert Semantic.find(definition, ["dimensions", "size", "width"]) == nil
   end
 end

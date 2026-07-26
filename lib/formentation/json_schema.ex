@@ -190,6 +190,7 @@ defmodule Formentation.JSONSchema do
       properties = Map.get(schema, "properties", %{})
 
       with {:ok, children, ctx} <- compile_properties(properties, required, ctx) do
+        children = Shared.stamp_declaration_order(children)
         {label, label_origin} = resolve_label(schema, name, ctx.source_path)
         {help, help_origin} = resolve_help(schema, ctx.source_path)
 

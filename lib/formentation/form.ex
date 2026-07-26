@@ -6,6 +6,10 @@ defmodule Formentation.Form do
   later projects this state through `Phoenix.HTML.FormData` (step 5) and
   never owns decoding.
 
+  Runtime structure comes from `Formentation.Semantic` queries. `Form`
+  decodes, defaults, materializes, and classifies blockers by semantic
+  object boundaries and paths, not by presentation groups or layout order.
+
   ## Example
 
       iex> {:ok, definition, []} =
@@ -33,6 +37,7 @@ defmodule Formentation.Form do
     Issue,
     Node,
     Params,
+    Semantic,
     SubmissionBlocker,
     Transport,
     ValidationPlan
@@ -209,9 +214,9 @@ defmodule Formentation.Form do
   end
 
   defp field_used?(form, segments) do
-    case Info.node_at(form.definition, segments) do
-      %Node.Field{} -> usage(form, segments) == :used
-      _group_root_or_unknown -> false
+    case Semantic.find(form.definition, segments) do
+      %Semantic.Entry{kind: :field} -> usage(form, segments) == :used
+      _object_unsupported_or_missing -> false
     end
   end
 
@@ -336,42 +341,44 @@ defmodule Formentation.Form do
     |> Enum.group_by(& &1.path)
   end
 
-  defp initial_data(definition, data, :apply), do: apply_defaults(Info.root(definition), data)
+  defp initial_data(definition, data, :apply), do: apply_defaults(Semantic.root(definition), data)
   defp initial_data(_definition, data, _other), do: data
 
   # Defaults apply only at explicit initialization and never overwrite
   # provided keys; nested objects are created only when a default lands
   # inside them. Transitions never call this — a cleared field stays
   # cleared (the phase's "default never mutates data" caution).
-  defp apply_defaults(%Node.Group{} = node, data) do
-    Enum.reduce(node.children, data, fn child, acc -> apply_default(child, acc) end)
+  defp apply_defaults(%Semantic.Entry{kind: :object} = entry, data) do
+    entry
+    |> Semantic.direct_children()
+    |> Enum.reduce(data, fn child, acc -> apply_default(child, acc) end)
   end
 
-  defp apply_default(%Node.Field{name: name, default: default}, acc)
+  defp apply_default(
+         %Semantic.Entry{kind: :field, name: name, node: %Node.Field{default: default}},
+         acc
+       )
        when not is_nil(default) do
     Map.put_new(acc, name, default)
-  end
-
-  defp apply_default(%Node.Group{nests_data?: false} = group, acc) do
-    apply_defaults(group, acc)
   end
 
   # A present value at a nesting key is descended into only when it is
   # already a map; any other present value (including an explicit `nil`,
   # which legitimately occurs in original data) is left completely
   # untouched — provided keys are never overwritten.
-  defp apply_default(%Node.Group{nests_data?: true, name: name} = group, acc) do
+  defp apply_default(%Semantic.Entry{kind: :object, name: name} = entry, acc)
+       when is_binary(name) do
     case Map.fetch(acc, name) do
-      {:ok, value} when is_map(value) -> Map.put(acc, name, apply_defaults(group, value))
+      {:ok, value} when is_map(value) -> Map.put(acc, name, apply_defaults(entry, value))
       {:ok, _non_map} -> acc
-      :error -> put_created_defaults(group, acc, name)
+      :error -> put_created_defaults(entry, acc, name)
     end
   end
 
-  defp apply_default(_node, acc), do: acc
+  defp apply_default(_entry, acc), do: acc
 
-  defp put_created_defaults(group, acc, name) do
-    child = apply_defaults(group, %{})
+  defp put_created_defaults(entry, acc, name) do
+    child = apply_defaults(entry, %{})
 
     if child == %{} do
       acc
@@ -382,11 +389,11 @@ defmodule Formentation.Form do
 
   defp decode(definition, domain_params) do
     definition
-    |> Info.root()
-    |> field_entries([], domain_params)
-    |> Enum.reduce({%{}, %{}, %{}}, fn {path, node, transport},
-                                       {transports, operations, issues} ->
-      operation = operation_for(node, transport, path)
+    |> Semantic.fields()
+    |> Enum.reduce({%{}, %{}, %{}}, fn entry, {transports, operations, issues} ->
+      path = entry.instance_path
+      transport = transport_at(domain_params, path)
+      operation = operation_for(entry.node, transport, path)
 
       issues =
         case operation do
@@ -404,26 +411,13 @@ defmodule Formentation.Form do
   defp operation_for(_node, :not_provided, _path), do: :unset
   defp operation_for(node, {:provided, raw}, path), do: Codec.decode(node.value_type, raw, path)
 
-  # [{path, node, transport}] for every scalar field, walking through
-  # presentation groups without a path segment and into data-nesting
-  # groups with one. Unsupported nodes never decode. `reversed_prefix`
-  # carries path segments nearest-first (prepended, O(1) per level); the
-  # real path is only materialized at the leaf, where it's reversed once.
-  defp field_entries(%Node.Group{} = node, reversed_prefix, params) do
-    Enum.flat_map(node.children, fn
-      %Node.Field{name: name} = child ->
-        path = InstancePath.new!(Enum.reverse([name | reversed_prefix]))
-        [{path, child, fetch_transport(params, name)}]
+  defp transport_at(params, %InstancePath{segments: segments}) do
+    {parent_segments, [name]} = Enum.split(segments, -1)
 
-      %Node.Group{nests_data?: false} = child ->
-        field_entries(child, reversed_prefix, params)
-
-      %Node.Group{nests_data?: true, name: name} = child ->
-        field_entries(child, [name | reversed_prefix], child_params(params, name))
-
-      %Node.Unsupported{} ->
-        []
-    end)
+    case params_at(params, parent_segments) do
+      {:ok, parent} -> fetch_transport(parent, name)
+      :error -> :not_provided
+    end
   end
 
   defp fetch_transport(params, name) when is_map(params) do
@@ -435,8 +429,16 @@ defmodule Formentation.Form do
 
   defp fetch_transport(_params, _name), do: :not_provided
 
-  defp child_params(params, name) when is_map(params), do: Map.get(params, name, %{})
-  defp child_params(_params, _name), do: %{}
+  defp params_at(params, []), do: {:ok, params}
+
+  defp params_at(params, [segment | rest]) when is_map(params) do
+    case Map.fetch(params, segment) do
+      {:ok, child} -> params_at(child, rest)
+      :error -> :error
+    end
+  end
+
+  defp params_at(_params, _segments), do: :error
 
   defp materialize(form, operations) do
     invalid? =
@@ -445,21 +447,19 @@ defmodule Formentation.Form do
     if invalid? do
       :none
     else
-      root = Info.root(form.definition)
+      root = Semantic.root(form.definition)
       {:ok, materialize_object(root, form.original, [], operations)}
     end
   end
 
   # Declared children rebuild from operations; keys the definition does
   # not describe are preserved from the original data, as are unsupported
-  # nodes' values (preserve inactive data — D-009). `reversed_prefix`
-  # carries path segments nearest-first (prepended, O(1) per level); the
-  # real path is only materialized at the leaf, where it's reversed once.
-  defp materialize_object(%Node.Group{} = node, original, reversed_prefix, operations) do
+  # nodes' values (preserve inactive data — D-009).
+  defp materialize_object(%Semantic.Entry{kind: :object} = entry, original, _prefix, operations) do
     original = if is_map(original), do: original, else: %{}
 
     {declared_result, declared_names} =
-      materialize_children(node, original, reversed_prefix, operations)
+      materialize_children(entry, original, operations)
 
     original
     |> Map.drop(MapSet.to_list(declared_names))
@@ -474,29 +474,29 @@ defmodule Formentation.Form do
   # `:absent | {:present, map()}` result is the extension point for future
   # collections, branches, and group-level presence transport — do not
   # collapse it into an `if value == %{}` at the call site.
-  defp materialize_nested_object(group, original, reversed_prefix, operations) do
-    case materialize_object(group, original, reversed_prefix, operations) do
+  defp materialize_nested_object(entry, original, operations) do
+    case materialize_object(entry, original, [], operations) do
       map when map_size(map) == 0 -> :absent
       map -> {:present, map}
     end
   end
 
-  defp materialize_children(%Node.Group{} = node, original, reversed_prefix, operations) do
-    Enum.reduce(node.children, {%{}, MapSet.new()}, fn child, {acc, declared} ->
-      materialize_child(child, original, reversed_prefix, operations, acc, declared)
+  defp materialize_children(%Semantic.Entry{kind: :object} = entry, original, operations) do
+    entry
+    |> Semantic.direct_children()
+    |> Enum.reduce({%{}, MapSet.new()}, fn child, {acc, declared} ->
+      materialize_child(child, original, operations, acc, declared)
     end)
   end
 
   defp materialize_child(
-         %Node.Field{name: name},
+         %Semantic.Entry{kind: :field, name: name, instance_path: path},
          original,
-         reversed_prefix,
          operations,
          acc,
          declared
        ) do
     declared = MapSet.put(declared, name)
-    path = InstancePath.new!(Enum.reverse([name | reversed_prefix]))
 
     case Map.get(operations, path, :keep) do
       {:set, value} -> {Map.put(acc, name, value), declared}
@@ -506,21 +506,8 @@ defmodule Formentation.Form do
   end
 
   defp materialize_child(
-         %Node.Group{nests_data?: false} = group,
+         %Semantic.Entry{kind: :object, name: name} = entry,
          original,
-         reversed_prefix,
-         operations,
-         acc,
-         declared
-       ) do
-    {sub, sub_declared} = materialize_children(group, original, reversed_prefix, operations)
-    {Map.merge(acc, sub), MapSet.union(declared, sub_declared)}
-  end
-
-  defp materialize_child(
-         %Node.Group{nests_data?: true, name: name} = group,
-         original,
-         reversed_prefix,
          operations,
          acc,
          declared
@@ -530,21 +517,15 @@ defmodule Formentation.Form do
     # preservation in `materialize_object/4` (D-026).
     declared = MapSet.put(declared, name)
 
-    case materialize_nested_object(
-           group,
-           Map.get(original, name, %{}),
-           [name | reversed_prefix],
-           operations
-         ) do
+    case materialize_nested_object(entry, Map.get(original, name, %{}), operations) do
       {:present, value} -> {Map.put(acc, name, value), declared}
       :absent -> {acc, declared}
     end
   end
 
   defp materialize_child(
-         %Node.Unsupported{name: name},
+         %Semantic.Entry{kind: :unsupported, name: name},
          original,
-         _prefix,
          _operations,
          acc,
          declared
