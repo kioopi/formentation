@@ -180,7 +180,10 @@
         "Formentation.Fixture",
         "Formentation.Fixtures.*",
         "Formentation.HTMLAssertions",
-        "Formentation.SourceFixture"
+        "Formentation.SourceFixture",
+        # Documentation lint run by `mix ci`; build tooling, not library
+        # code, so it participates in no layer.
+        "Mix.Tasks.Vault.Links"
       ]
     ]
   ],

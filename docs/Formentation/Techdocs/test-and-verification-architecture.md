@@ -177,19 +177,28 @@ real `.json` files rather than inline heredocs — they are also what
 ## Static gates — `mix ci`
 
 Tests are only half the verification. `mix ci` runs, in order:
-`compile --warnings-as-errors`, `format --check-formatted`, a vault
-wikilink check, `test`, `credo --strict`, `dialyzer`,
-`ex_dna --max-clones 0`, and `reach.check --arch --smells`. Three of those
-deserve explanation.
+`compile --warnings-as-errors`, `format --check-formatted`, `vault.links`,
+`test`, `credo --strict`, `dialyzer`, `ex_dna --max-clones 0`, and
+`reach.check --arch --smells`. Three of those deserve explanation.
 
-**The vault wikilink check** (also runnable as `mix vault.links`) fails on
-any `[[wikilink]]` that contains a line break. Obsidian does not parse
-those, so a hard-wrapped link renders as literal text and the note loses a
-link with nothing failing. Reflowing a paragraph is enough to introduce
-one, which is why it is a gate rather than a review habit. It scans
-`docs/Formentation/**/*.md` and skips fenced code, so Elixir snippets
-containing `[[` are not mistaken for prose. Its implementation is a private
-function in `mix.exs`, so nothing extra ships in the package.
+**`mix vault.links`** fails on any `[[wikilink]]` that contains a line
+break. Obsidian does not parse those, so a hard-wrapped link renders as
+literal text and the note loses a link with nothing failing. Reflowing a
+paragraph is enough to introduce one, which is why it is a gate rather
+than a review habit. It scans `docs/Formentation/**/*.md` — only the
+tracked vault, since `docs/discussion/` and `docs/superpowers/` are
+untracked working notes — and skips fenced blocks and inline code spans,
+so code samples and prose *about* wikilink syntax are not mistaken for
+links.
+
+`Mix.Tasks.Vault.Links` lives in `test/support/mix/tasks/` rather than
+`lib/`: it compiles on `elixirc_paths(:test)`, so it never ships in the
+package, and a `preferred_envs` entry runs it in `MIX_ENV=test`. It takes
+an optional path argument, which is what lets
+`test/mix/tasks/vault_links_test.exs` drive it over a `tmp_dir` fixture;
+the line-scanning itself is a pure `split_links/1` covered by unit tests
+and doctests. Being outside a layer, it carries a `layer_coverage.ignore`
+entry in `.reach.exs` alongside the other `test/support` modules.
 
 **`ex_dna --max-clones 0`** fails on *any* duplicated code block. In a
 project with two adapters translating different vocabularies into the
