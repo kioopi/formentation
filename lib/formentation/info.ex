@@ -24,6 +24,7 @@ defmodule Formentation.Info do
   """
 
   alias Formentation.{Definition, Diagnostic, InstancePath, Node, Semantic}
+  alias Formentation.Info.Presentation
 
   @doc "The root group of the definition tree."
   @spec root(Definition.t()) :: Node.t()
@@ -87,6 +88,76 @@ defmodule Formentation.Info do
       nil -> nil
       entry -> entry.node
     end
+  end
+
+  @doc """
+  Classifies the semantic occurrence at an instance path.
+
+  Returns `nil` when the path names no semantic occurrence. Presentation
+  group identifiers are never semantic path segments and therefore return
+  `nil`. Returns `:object`, `:field`, or `:unsupported` for known semantic
+  occurrences. Raises when a malformed hand-built definition makes the path
+  ambiguous.
+  """
+  @spec semantic_kind(Definition.t(), [InstancePath.segment()]) ::
+          :object | :field | :unsupported | nil
+  def semantic_kind(%Definition{} = definition, segments) when is_list(segments) do
+    %InstancePath{segments: segments} = InstancePath.new!(segments)
+
+    case Semantic.find_unique(definition, segments) do
+      :not_found -> nil
+      {:ok, %Semantic.Entry{kind: kind}} -> kind
+      {:ambiguous, count} -> raise_ambiguous_semantic_path!(segments, count)
+    end
+  end
+
+  @doc false
+  @spec semantic_node_index(Definition.t()) :: %{InstancePath.t() => Node.t()}
+  def semantic_node_index(%Definition{} = definition) do
+    definition
+    |> Semantic.root()
+    |> semantic_entries()
+    |> Enum.group_by(& &1.instance_path)
+    |> Map.new(fn
+      {path, [entry]} ->
+        {path, entry.node}
+
+      {path, matches} ->
+        raise_ambiguous_semantic_path!(path.segments, length(matches))
+    end)
+  end
+
+  defp semantic_entries(%Semantic.Entry{} = entry) do
+    [entry | Enum.flat_map(Semantic.direct_children(entry), &semantic_entries/1)]
+  end
+
+  defp raise_ambiguous_semantic_path!(segments, count) do
+    raise ArgumentError,
+          "ambiguous semantic path #{inspect(segments)}: found #{count} occurrences"
+  end
+
+  @doc """
+  The deterministic presentation layout for the definition root.
+
+  Presentation traversal is layout ordered and may differ from semantic
+  declaration order. Field and object descriptors reference semantic
+  occurrences by `Formentation.InstancePath`; presentation groups carry
+  layout identity only.
+  """
+  @spec presentation_root(Definition.t()) :: Presentation.Object.t()
+  def presentation_root(%Definition{} = definition), do: Presentation.root(definition)
+
+  @doc """
+  Looks up the presentation descriptor for a semantic instance path.
+
+  Returns `:not_found` when no semantic occurrence exists and
+  `:unsupported` when the path names a preserve-only node that has no
+  renderable presentation descriptor.
+  """
+  @spec presentation_at(Definition.t(), [InstancePath.segment()]) ::
+          Presentation.lookup_result()
+  def presentation_at(%Definition{} = definition, segments) do
+    Presentation.at(definition, segments)
   end
 
   @doc "The compile-time diagnostics recorded on the definition."

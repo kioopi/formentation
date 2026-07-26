@@ -599,6 +599,48 @@ defmodule Formentation.Source.MapTest do
                Formentation.compile(declaration, adapter: Formentation.Source.Map)
     end
 
+    test "duplicate property names are a duplicate_property error" do
+      declaration = %{
+        kind: :object,
+        properties: [{"x", %{kind: :string}}, {"x", %{kind: :integer}}]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  severity: :error,
+                  code: :duplicate_property,
+                  message: ~s(duplicate property "x"),
+                  origin: {:map_source, [:properties, "x"]},
+                  template_path: %{segments: ["x"]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "nested duplicate property names report the nested path" do
+      declaration = %{
+        kind: :object,
+        properties: [
+          {"outer",
+           %{
+             kind: :object,
+             properties: [{"x", %{kind: :string}}, {"x", %{kind: :integer}}]
+           }}
+        ]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  severity: :error,
+                  code: :duplicate_property,
+                  message: ~s(duplicate property "x"),
+                  origin: {:map_source, [:properties, "outer", :properties, "x"]},
+                  template_path: %{segments: ["outer", "x"]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
     test "a non-list required value is an invalid_declaration error" do
       declaration = %{
         kind: :object,

@@ -21,6 +21,7 @@ defmodule Formentation.Semantic do
   end
 
   @type entry :: Entry.t()
+  @type unique_result :: {:ok, entry()} | :not_found | {:ambiguous, non_neg_integer()}
 
   @spec root(Definition.t()) :: entry()
   def root(%Definition{root: %Node.Group{} = root}) do
@@ -56,12 +57,28 @@ defmodule Formentation.Semantic do
     find_entry(root(definition), segments)
   end
 
+  @spec find_unique(Definition.t(), [InstancePath.segment()]) :: unique_result()
+  def find_unique(%Definition{} = definition, segments) when is_list(segments) do
+    %InstancePath{segments: segments} = InstancePath.new!(segments)
+    find_unique_entry(root(definition), segments)
+  end
+
   defp find_entry(entry, []), do: entry
 
   defp find_entry(%Entry{} = entry, [segment | rest]) do
     case Enum.find(direct_children(entry), &(&1.name == segment)) do
       nil -> nil
       child -> find_entry(child, rest)
+    end
+  end
+
+  defp find_unique_entry(entry, []), do: {:ok, entry}
+
+  defp find_unique_entry(%Entry{} = entry, [segment | rest]) do
+    case Enum.filter(direct_children(entry), &(&1.name == segment)) do
+      [] -> :not_found
+      [child] -> find_unique_entry(child, rest)
+      matches -> {:ambiguous, length(matches)}
     end
   end
 

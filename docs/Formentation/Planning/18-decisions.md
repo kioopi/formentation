@@ -517,6 +517,58 @@ consumer concurrently with the contract, publish the round-trip conformance
 suite, define capability-failure developer experience, and establish resource
 limits/performance evidence before exposing a stable prepared view.
 
+## D-031 — Phoenix preparation consumes presentation descriptors
+
+*2026-07-26*
+
+**Context.** [[#D-029 — Definition and Form are the ordinary public model|D-029]]
+requires semantic structure and presentation layout to become separate
+contracts before the stored `Definition` representation is split. After the
+semantic query work, `Formentation.Phoenix.Projector` was still interpreting
+the current mixed tree directly: it started from `Info.root/1`, matched raw
+node structs for layout, and used the `nests_data?` storage flag to decide
+whether a group was a fieldset or a nested Phoenix form. Resolves
+[GitHub issue #17](https://github.com/kioopi/formentation/issues/17).
+
+**Decision.** Add a temporary presentation query seam under
+`Formentation.Info`: `presentation_root/1` returns the root layout descriptor
+and `presentation_at/2` returns `{:ok, descriptor}`, `:not_found`, or
+`:unsupported` for a semantic instance path. The descriptor vocabulary lives
+under `Formentation.Info.Presentation` and is deliberately small:
+`Object` for root/nested semantic-object layout boundaries, `Field` for scalar
+field references, and `Group` for presentation-only grouping. Object and field
+descriptors carry normalized `Formentation.InstancePath`s; group descriptors
+carry layout identity only. The compatibility implementation derives these
+descriptors by walking the current mixed tree on demand, with an explicit
+semantic-path cursor. It skips unsupported nodes in renderable traversal but
+keeps unsupported semantic paths distinguishable through lookup.
+
+`Formentation.Phoenix.Projector` now dispatches on those descriptors and
+resolves semantic facts through `Info` at each descriptor's path. Presentation
+facts used by projection are label/help, widget hint, hidden-control intent,
+layout identity, and child order. Semantic facts such as value type, role,
+fixed options, read-only participation, validation attributes, unsupported
+classification, and diagnostic template path still come from semantic queries
+or Phoenix FormData. Nested Phoenix descent is triggered by an object
+descriptor being exactly one segment below the current object context, never by
+parsing a group id. The `Phoenix.HTML.FormData` implementation for
+`Formentation.Form` now verifies nested-object targets with
+`Info.semantic_kind/2` instead of `nests_data?`.
+
+**Consequences.** The public rendering surface is unchanged:
+`Projector.project/2`, `project_at/3`, `RenderPlan`, `RenderNode`, component
+assigns, reference-theme markup, names, IDs, visibility, summaries,
+diagnostics, hidden/read-only omission, and unsupported omission keep their
+existing behaviour. Presentation order is now independently test-pinned from
+semantic declaration order: a definition can enumerate fields semantically as
+`["a", "c"]` while Phoenix renders the layout order `["c", "a"]`. No second
+stored tree, format-version bump, UI registry, or Phase 3 contract was added.
+The one intentional adapter behavior change is that `Source.Map` now rejects
+duplicate property names with `:duplicate_property`, because duplicate semantic
+references cannot satisfy the descriptor invariant. The later split-storage
+work replaces the compatibility query implementation without another projector
+rewrite.
+
 ## Related notes
 
 - [[19-north-star-architecture|North-star architecture]]
