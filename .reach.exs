@@ -23,6 +23,8 @@
       "Formentation.Node.*",
       "Formentation.NodeId",
       "Formentation.Params",
+      "Formentation.Semantic",
+      "Formentation.Semantic.*",
       "Formentation.SubmissionBlocker",
       "Formentation.TemplatePath",
       "Formentation.Transport",

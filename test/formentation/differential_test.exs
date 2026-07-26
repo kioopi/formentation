@@ -49,9 +49,11 @@ defmodule Formentation.DifferentialTest do
         assert Info.diagnostics(ctx.from_json) == []
       end
 
-      test "fields agree in name and order with the canonical fixture order", ctx do
+      test "fields use each source's semantic order", ctx do
         assert Enum.map(Info.fields(ctx.from_map), & &1.name) == @fixture.field_names()
-        assert Enum.map(Info.fields(ctx.from_json), & &1.name) == @fixture.field_names()
+
+        assert Enum.map(Info.fields(ctx.from_json), & &1.name) ==
+                 Enum.sort(@fixture.field_names())
       end
 
       test "every node fact matches apart from origins", ctx do

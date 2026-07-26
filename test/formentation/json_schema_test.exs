@@ -502,6 +502,29 @@ defmodule Formentation.JSONSchemaTest do
       assert Enum.map(Info.fields(definition), & &1.name) == ["a"]
     end
 
+    test "semantic field order ignores reordered group and order hints" do
+      schema = %{
+        "type" => "object",
+        "properties" => %{
+          "a" => %{"type" => "string"},
+          "b" => %{"type" => "string"},
+          "c" => %{"type" => "string"}
+        }
+      }
+
+      hints = %{
+        "groups" => [%{"id" => "g", "fields" => ["c", "a"]}],
+        "order" => ["g", "b"]
+      }
+
+      definition = compile!(schema, ui: hints)
+
+      assert %Node.Group{children: children} = Info.node(definition, "/#g")
+      assert Enum.map(children, & &1.name) == ["c", "a"]
+      assert Enum.map(Info.root(definition).children, & &1.id) == ["/#g", "/b"]
+      assert Enum.map(Info.fields(definition), & &1.name) == ["a", "b", "c"]
+    end
+
     test "an unknown widget string warns and is ignored" do
       hints = %{"fields" => %{"notes" => %{"widget" => "carousel"}}}
 

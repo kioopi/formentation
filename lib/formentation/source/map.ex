@@ -39,6 +39,7 @@ defmodule Formentation.Source.Map do
          {:ok, required} <- fetch_list(declaration, :required, ctx),
          {:ok, children, ctx} <- compile_children(declaration, required, ctx),
          {:ok, groups} <- fetch_groups(declaration, ctx) do
+      children = Shared.stamp_declaration_order(children)
       {children, ctx} = attach_groups(children, groups, ctx)
       {label, label_origin} = resolve_label(declaration, name, ctx.source_path)
 

@@ -191,6 +191,11 @@ The candidate is rebuilt from the operations, not patched:
 - If **any** operation is `{:invalid, _}`, the candidate is `:none`
   ([[18-decisions#D-012 — Schema validation defers while any decode fails|D-012]]).
 
+`Form` obtains declared fields, unsupported nodes, object boundaries, and
+instance paths from the semantic query layer. Presentation groups, group
+IDs, labels, help text, widgets, and layout order do not participate in
+decode, defaulting, materialization, preservation, presence, or blockers.
+
 That last rule is why decode failures and validation issues never
 compete. Raw undecoded text can never reach the `ValidationPlan`, so a
 user who types `"4x"` into an age field sees *one* error about the
@@ -306,7 +311,8 @@ fresh on every call; nothing new lives on the `%Form{}` struct
 A `Formentation.SubmissionBlocker` relates one unsupported node to a
 concrete, observed problem. `submission_blockers/1` walks every
 unsupported node from `Info.unsupported_nodes_with_paths/1` and
-classifies each against the materialized candidate and `form.issues`:
+classifies each, in semantic declaration order, against the materialized
+candidate and `form.issues`:
 
 - **`:unsupported_required`** — the node is `required?: true` and its
   name is absent from its own (present) parent object in the candidate.
