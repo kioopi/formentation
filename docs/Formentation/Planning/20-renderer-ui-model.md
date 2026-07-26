@@ -873,9 +873,18 @@ CI should additionally inspect the module graph, using `mix xref`, Reach, or
 both, and reject UI dependencies on:
 
 - `Formentation.Node.*` and private `Definition` representation;
+- private semantic traversal and query helpers such as
+  `Formentation.Semantic.*`, which are the most tempting substitute for a
+  prepared view;
 - JSON Schema, map-source, Ash, or native-state adapter internals;
 - private projector/render-plan/render-node structs;
 - implementation modules not explicitly classified as public UI contracts.
+
+The repository's existing `.reach.exs` architecture policy describes layers
+among modules compiled *here*, so it cannot observe a UI package that compiles
+separately. The boundary check therefore belongs to the UI package itself, or
+to a cross-project run that loads both applications. Either way it must fail
+CI rather than emit advisory output.
 
 Keeping the prototype in-tree with unrestricted module access would make “the
 second UI proved the boundary” difficult to falsify. Independent compilation

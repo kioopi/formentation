@@ -489,8 +489,10 @@ note:
   browser-state widgets use a separate advanced tier.
 - A public prepared-view/UI contract must be earned by the built-in UI and a
   substantially different editable UI that compiles in a separate Mix project.
-  Executable module-graph checks forbid source adapters, private definition
-  representation, and private preparation structs.
+  Executable module-graph checks, owned by the UI package because this
+  repository's policy cannot see separately compiled code, forbid source
+  adapters, private definition representation, private semantic query helpers,
+  and private preparation structs.
 - Read-only review/confirmation rendering is an additional proof consumer,
   especially for display formatting and container mapping, but does not replace
   the second editable UI.

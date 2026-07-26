@@ -176,8 +176,13 @@ references to:
 
 - source adapters and source-specific modules;
 - `Formentation.Node.*` or private `Definition` representation;
+- private semantic traversal/query helpers such as `Formentation.Semantic.*`;
 - private projector/render-plan/render-node modules;
 - implementation modules not explicitly classified as supported UI API.
+
+That check runs in the UI package, not in this repository: `.reach.exs` layers
+only constrain modules compiled here and cannot see a separately compiled
+dependent package.
 
 The prototype must cover:
 
@@ -581,7 +586,9 @@ Keep a small but meaningful matrix:
 
 - the second UI compiles as a separate Mix project;
 - `mix xref`, Reach, or both reject dependencies on forbidden internal/source
-  modules;
+  modules, including private semantic query helpers;
+- that check runs where the UI compiles, since this repository's policy cannot
+  see it;
 - the public API inventory is explicit and versioned;
 - no test-only access to private render nodes is required by the second UI.
 
