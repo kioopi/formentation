@@ -13,7 +13,12 @@ The form definition is the conceptual heart of Formentation.
 
 > A `Formentation.Definition` is an immutable, compiled, source-independent description of every form state that may be presented, before it is combined with a particular user’s values, parameters, errors, or UI renderer.
 
-It is Formentation’s semantic intermediate representation: the stable boundary between declarations such as JSON Schema or Ash metadata and consumers such as Phoenix renderers, documentation generators, compatibility checkers, and runtime projectors. The surrounding concepts are defined in [[03-conceptual-model|the conceptual model]]; this note examines the definition itself in depth.
+It is Formentation’s source-neutral intermediate representation: the stable
+boundary between declarations such as JSON Schema or Ash metadata and consumers
+such as `Form`, Phoenix render preparation, documentation generators, and
+compatibility checkers. It contains separate semantic structure and
+presentation layout as decided by
+[[19-north-star-architecture|the north-star architecture]].
 
 > [!note] Implementation status
 > Slice 1 of [[phase-1-walking-skeleton|Phase 1]] implements the core of this note: `Formentation.Definition`, per-kind node structs — `Formentation.Node.Field`, `.Group`, `.Unsupported` ([[18-decisions#D-015 — One struct per node kind|D-015]]), compact origin tags ([[18-decisions#D-003 — Simplified provenance first|D-003]]), `Formentation.Diagnostic`, and the first `Formentation.Info` queries. The rest — decisions with superseded candidates, conditions, capability requirements, indexes, fingerprints — is the target model, and is marked as such below.
@@ -25,21 +30,21 @@ flowchart TD
     A["JSON Schema, Ash, DSL"] --> B["Compiler"]
     B --> C["Form Definition"]
     C --> D["Info and tooling"]
-    C --> E["Runtime projector"]
-    F["Values, params, errors"] --> E
-    E --> G["RenderPlan"]
-    G --> H["Phoenix renderer"]
+    C --> E["Form"]
+    E --> F["Phoenix preparation"]
+    F --> G["Prepared view"]
+    G --> H["UI integration"]
 ```
 
 The compiler answers:
 
 > What form is described by these declarations?
 
-The projector answers:
+Renderer preparation answers:
 
 > What part of that form should be presented for this particular runtime state?
 
-The renderer answers:
+The UI answers:
 
 > How should that concrete plan become HTML and components?
 
@@ -158,7 +163,8 @@ Examples include:
 * collection item templates;
 * ordering;
 * read-only or disabled semantics;
-* abstract [[03-conceptual-model#Renderer, theme, and widget|widget key]] preference — never a concrete component;
+* abstract [[20-renderer-ui-model#Widget resolution|widget key]] preference —
+  never a concrete component;
 * codec identity;
 * constraints useful to interaction;
 * choice alternatives;
@@ -241,7 +247,7 @@ The full origin model may additionally identify:
 * an Elixir module, file, and line;
 * a named inference rule;
 * an extension;
-* a theme default;
+* a source-neutral presentation or UI default, with its owning phase recorded;
 * a call-site override.
 
 Origins can then form derivation chains ([[phase-2-compiler-diagnostics|Phase 2]]):
@@ -250,7 +256,7 @@ Origins can then form derivation chains ([[phase-2-compiler-diagnostics|Phase 2]
 JSON Schema format "date"
     → inference rule :date_format
     → semantic role :date
-    → theme rule :default_date_widget
+    → UI rule :default_date_widget
     → widget :date_input
 ```
 
@@ -274,7 +280,10 @@ Dependencies enable:
 
 #### Capability requirements
 
-The definition should record what a consumer must support (target — support reports arrive with [[phase-2-compiler-diagnostics|Phase 2]], the theme contract with [[phase-3-extensibility|Phase 3]]):
+The definition should record source-neutral semantic/presentation requirements
+a consumer may need to support (target—support reports arrive with
+[[phase-2-compiler-diagnostics|Phase 2]], UI contracts with
+[[phase-3-extensibility|Phase 3]]):
 
 ```elixir
 %Formentation.Requirements{
@@ -360,14 +369,14 @@ Preventing `Formentation.Definition` from becoming a god object is as important 
 | Raw submitted parameters                     | Form state                      |
 | Validation errors for the current submission | Form state/issues               |
 | Touched or submitted status                  | Form state                      |
-| Active conditional branch                    | `RenderPlan`                    |
-| Concrete collection items                    | Form state and `RenderPlan`     |
+| Active conditional branch                    | `Form`/prepared view            |
+| Concrete collection items                    | `Form` and prepared view        |
 | Collection item runtime identity             | Form state                      |
-| Phoenix form names                           | Phoenix adapter/projector       |
-| DOM IDs                                      | `RenderPlan` or renderer        |
-| CSS classes                                  | Theme                           |
-| Phoenix components                           | Renderer/theme registry         |
-| Translated error strings                     | Presentation layer              |
+| Phoenix form names                           | Phoenix renderer preparation    |
+| DOM IDs                                      | Prepared view/renderer          |
+| CSS classes                                  | UI integration/theme            |
+| Phoenix components                           | UI integration                  |
+| Translated issue strings                     | Renderer preparation            |
 | LiveView event state                         | LiveView/state engine           |
 | Persistence or submission workflow           | Backing form engine/application |
 | Authorization guarantees                     | Application/Ash action          |
@@ -393,7 +402,9 @@ This gives compilation a concrete completion criterion. It is not merely preproc
 
 ### It is the system’s common language
 
-Source adapters translate into it. Runtime projectors interpret it. Renderers consume projections derived from it. Tooling queries it.
+Source adapters translate into it. `Form` consumes its semantics. Renderers
+prepare concrete views from it. UI integrations consume those views. Tooling
+queries it.
 
 That prevents a proliferation of direct integrations:
 
@@ -407,7 +418,7 @@ Ash → Bootstrap renderer
 Instead:
 
 ```text
-Sources → Formentation.Definition → Projectors/renderers
+Sources → Formentation.Definition → Form/render preparation → UI integrations
 ```
 
 Adding another source does not require changing every renderer. Adding another renderer does not require learning every source language.
@@ -458,7 +469,7 @@ A definition can be combined with:
 
 This is why state is kept outside the definition. See [[07-phoenix-integration|Phoenix integration]].
 
-### Multiple renderers and themes
+### Multiple renderers and UI integrations
 
 The same definition can drive:
 
@@ -515,7 +526,9 @@ Compilation may involve reference resolution, normalization, inference, and veri
 
 ### Better testing
 
-Compiler tests can assert semantic definitions. Projection tests can use fake state. Renderer tests can consume fixed render plans. See [[11-testing-strategy|Testing strategy]].
+Compiler tests can assert semantic/presentation definitions. Preparation tests
+can use fake state. UI tests can consume fixed prepared views. See
+[[11-testing-strategy|Testing strategy]].
 
 This avoids requiring every test to begin with JSON Schema and end with a complete HTML snapshot.
 
@@ -531,9 +544,11 @@ When deciding whether something belongs in the form definition, ask:
 
 If yes, it probably belongs in the definition.
 
-If it depends on current values, it probably belongs in form state or the render plan.
+If it depends on current values, it probably belongs in `Form` or the prepared
+view.
 
-If it describes HTML, components, or styling, it belongs in the renderer or theme.
+If it describes HTML or concrete components, it belongs in the UI integration.
+If it describes visual styling, it belongs in that UI's theme/configuration.
 
 If it determines authoritative validity or persistence, it belongs in the validator or backing form engine.
 
@@ -541,11 +556,19 @@ If it determines authoritative validity or persistence, it belongs in the valida
 
 The module documentation should eventually read:
 
-> `Formentation.Definition` is the compiled semantic model of a form. It describes the form’s possible fields, groups, collections, alternatives, conditions, presentation roles, constraints, dependencies, origins, and required capabilities. It contains no current user data and no renderer-specific output. Definitions are consumed by introspection tools and combined with runtime form state to produce a concrete [[06-runtime-projection|render plan]].
+> `Formentation.Definition` is the compiled, source-neutral model of a form. It
+> contains separate semantic structure and presentation layout plus
+> constraints, dependencies, origins, and requirements. It contains no current
+> user data, concrete component, or renderer-specific output. Introspection
+> tools query it; `Form` and renderer preparation combine it with one
+> interaction to produce a concrete
+> [[20-renderer-ui-model#Prepared view|prepared view]].
 
 Or, even more compactly:
 
-> A form definition describes everything a form can be; a `RenderPlan` describes what it is for one current interaction.
+> A form definition describes what a form can mean and how it may be laid out;
+> `Form` records one interaction, and a prepared view describes what one
+> renderer/UI needs to output now.
 
 That distinction is the heart of Formentation.
 
@@ -554,6 +577,7 @@ That distinction is the heart of Formentation.
 - [[03-conceptual-model|Conceptual model]]
 - [[04-architecture|Architecture]]
 - [[06-runtime-projection|Runtime projection]]
+- [[20-renderer-ui-model|Renderer and UI model]]
 - [[09-diagnostics-provenance-introspection|Diagnostics, provenance, and introspection]]
 - [[16-open-questions|Open questions]]
 - [[18-decisions|Decision log]]

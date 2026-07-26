@@ -88,7 +88,11 @@ Collections are deliberately second: item identity adds a dimension of complexit
 
 ### Explicitly deferred
 
-`$ref`, composition, conditionals, remote anything; fingerprints and caching; `Info.explain/3` and the full `Decision` model; support reports; generated UI hints; extension APIs and a theme contract; a second theme. The introspection items land in [[phase-2-compiler-diagnostics|Phase 2]].
+`$ref`, composition, conditionals, remote anything; fingerprints and caching;
+`Info.explain/3` and the full `Decision` model; support reports; generated UI
+hints; extension APIs and a UI integration contract; a second substantially
+different UI. The introspection items land in
+[[phase-2-compiler-diagnostics|Phase 2]].
 
 ## Two declaration sources
 
@@ -192,7 +196,9 @@ Carried forward from the merged phase notes:
 - HTML `required`/`min`/`pattern` are progressive hints, not server validation.
 - Error visibility follows Phoenix conventions; untouched forms do not display every error.
 - Do not make the projector depend on `%Formentation.Form{}` specifically if `%Phoenix.HTML.Form{}` plus a small view interface suffices.
-- Do not polish a theme contract; that is [[phase-3-extensibility|Phase 3]]'s job, extracted from a second implementation.
+- Do not polish a UI integration contract; that is
+  [[phase-3-extensibility|Phase 3]]'s job, extracted from a second editable UI
+  and additional proof consumers.
 - Do not promise definition serialization.
 - Keep invalid schema, unsupported schema, and incompatible UI hints as distinct diagnostics.
 

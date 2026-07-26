@@ -497,12 +497,19 @@ It should not be the primary name for a UI-library adapter.
 > [!note] Deferred contract
 > Phase 1 keeps one built-in reference component set. UI behaviours,
 > descriptors, registries, capability negotiation, conformance suites, and a
-> second UI belong to a later phase. See [[phase-3-extensibility|Phase 3]].
+> second UI belong to a later phase. The canonical ownership, motivation,
+> transport, localization, and proof model is
+> [[20-renderer-ui-model|Renderer and UI model]]; implementation belongs to
+> [[phase-3-extensibility|Phase 3]].
 
 The governing rule for that phase is:
 
 > A UI does not interpret a form. It renders a prepared, source-neutral view of
 > a form using a particular component library.
+
+It also does not choose transport or decoding semantics. It faithfully emits
+the renderer-prepared transport contract. This refinement is recorded by
+[[18-decisions#D-030 — Renderer, UI, theme, and transport responsibilities are separate|D-030]].
 
 ## Widget resolution
 
@@ -642,6 +649,8 @@ The following are architectural decisions:
 - Definition adapters and state adapters are different extension categories.
 - Phoenix is a renderer; a UI is a component-library integration.
 - A visual theme is configuration within a UI, not the UI contract itself.
+- UI markup implements renderer-owned transport facts; it does not choose
+  decoding semantics.
 - Existing correctness invariants remain mandatory.
 - Breaking representation and API changes are allowed before `0.1.0`.
 
@@ -656,16 +665,9 @@ The alignment work may decide:
 - the private compiler context used during the cutover;
 - the eventual prepared-view shape.
 
-Later UI work must decide:
-
-- whether typed source dispatch uses a protocol, behaviour helper, wrapper
-  values, or a combination;
-- descriptor and contract versioning;
-- component assign contracts;
-- capability vocabulary and fallback rules;
-- UI inheritance and local overrides;
-- stateless versus LiveComponent or hook-backed widgets;
-- UI conformance suites.
+Later UI work must decide the contracts inventoried in
+[[20-renderer-ui-model#Decisions intentionally left open|Renderer and UI model]].
+Typed source dispatch remains a separate extensibility question.
 
 Those open choices cannot reverse the frozen ownership boundaries.
 
@@ -698,6 +700,7 @@ Collections then complete Phase 1 on the aligned foundation.
 - [[06-runtime-projection|Runtime projection]]
 - [[07-phoenix-integration|Phoenix integration]]
 - [[08-extension-model|Extension model]]
+- [[20-renderer-ui-model|Renderer and UI model]]
 - [[13-roadmap|Roadmap]]
 - [[18-decisions|Decision log]]
 - [[phase-1-north-star-alignment|Phase 1 — North-star alignment]]

@@ -41,9 +41,22 @@ Example: map `format: "money"` plus currency metadata to role `:money` and codec
 
 ### Presentation extensions
 
-These add widgets, containers, themes, or renderer support for semantic nodes.
+These add abstract widgets or layout vocabulary to the definition, or provide
+renderer/UI support for already-normalized semantics.
 
 They may reject unsupported semantic configurations, but they do not reinterpret source validation.
+
+The presentation-side extension categories are distinct:
+
+- a **presentation extension** contributes source-neutral layout vocabulary or
+  abstract widget intent;
+- a **renderer extension** contributes support for an output environment;
+- a **UI integration** maps prepared views to a component library;
+- a **theme** configures the visual appearance of one UI.
+
+Presentation declarations must not place arbitrary component modules in a
+definition. UI integrations must not traverse source declarations or recreate
+form semantics. See [[20-renderer-ui-model|Renderer and UI model]].
 
 ## Extension descriptor
 
@@ -63,34 +76,58 @@ Start with a plain struct:
 
 The descriptor makes extension contributions introspectable. It also provides inputs to definition fingerprints and compatibility reports.
 
-## Renderer and theme capabilities
+## Renderer and UI capabilities
 
-A renderer should publish a capability value rather than relying on `function_exported?` checks scattered throughout compilation:
+A renderer and UI should publish composed capability values rather than relying
+on `function_exported?` checks scattered throughout compilation or
+preparation:
 
 ```elixir
-%Formentation.Renderer.Capabilities{
-  node_kinds: MapSet.new([:field, :group, :collection, :choice]),
-  roles: MapSet.new([:text, :integer, :date, :boolean]),
+%Formentation.Phoenix.UI{
+  id: :plain,
+  contract_version: 1,
   widgets: MapSet.new([:text_input, :number_input, :date_input, :checkbox]),
+  containers: MapSet.new([:root, :object, :group, :collection]),
   features: MapSet.new([:errors, :help, :add_remove]),
-  constraints: %{max_nesting: 20}
+  metadata: %{}
 }
 ```
 
-Compatibility checks can occur during compilation when a target renderer is known, or immediately before projection otherwise.
+This shape is illustrative. Phase 3 must determine which capabilities belong
+to the renderer, UI, individual components, or a composed descriptor.
 
-Themes should be data-first where practical:
+Compatibility checks may occur:
+
+- against static requirements when a target UI is known;
+- during preparation for runtime-visible branches, collection items, and local
+  overrides.
+
+Reusable definitions must not require a target UI at compilation time. Missing
+capabilities must produce a structured failure or an explicit, inspectable
+fallback; they must never silently remove a field.
+
+Resource budgets are separate from capability claims. Compiler and renderer
+safety policy must limit such dimensions as semantic/presentation nesting,
+total nodes, options, diagnostics, visible occurrences, collection items,
+decoded bytes, and preparation work. A UI may advertise a narrower supported
+range, but it cannot weaken those engine-owned limits.
+
+Themes should be data-first where practical, but are deliberately narrower than
+the UI descriptor:
 
 ```elixir
-%Formentation.Theme{
-  name: :plain,
-  role_defaults: %{date: :date_input, text: :text_input},
-  components: %{date_input: &Components.date_input/1},
-  classes: %{field: "...", error: "..."}
+%MyAppWeb.FormUI.Theme{
+  name: :compact,
+  color_mode: :dark,
+  density: :compact,
+  tokens: %{control_size: :sm}
 }
 ```
 
-Actual Phoenix function components may require modules/functions that are not conveniently serializable; the introspectable descriptor should still identify them.
+Actual Phoenix function components may require module/function references that
+are not serializable. Those references belong to render configuration or the UI
+descriptor, not the semantic definition. The descriptor should still identify
+them for inspection and contract-version checks.
 
 ## Codecs
 
@@ -142,11 +179,23 @@ Provide reusable tests for:
 - raw-input preservation on decode error;
 - accessible widget markup;
 - correct field/error association;
+- semantic invariance across UI selection;
+- whole-form and subtree prepared-view agreement;
+- rendered-control to params to decode round trips;
+- blank-option, unchecked, omitted, repeated, and compound transport shapes;
 - pass determinism and ordering;
 - custom node serialization or inspection policy;
-- renderer behaviour for unsupported nodes.
+- UI behaviour for unsupported nodes and widget requirements;
+- explicit capability fallbacks;
+- browser-real behaviour for focus, hooks, and transport conventions.
 
-The second independent theme and first application extension should be treated as architecture tests. If they require internal pattern matching or compiler forks, the extension boundaries are not ready.
+The second independent UI and first application extension should be treated as
+architecture tests. If they require source traversal, internal pattern
+matching, or compiler/projector forks, the extension boundaries are not ready.
+A second set of CSS classes on the reference components is not an independent
+UI. The second UI should compile as a separate Mix project and CI should reject
+references to source adapters, `Formentation.Node.*`, private definition
+representation, and private preparation structs.
 
 ## Optional Spark DSL
 
@@ -175,6 +224,6 @@ The DSL must compile into the same descriptors available through ordinary Elixir
 - [[02-design-principles|Design principles]]
 - [[05-compiler-pipeline|Compiler pipeline]]
 - [[09-diagnostics-provenance-introspection|Diagnostics and introspection]]
+- [[20-renderer-ui-model|Renderer and UI model]]
 - [[12-ecosystem-and-dependencies#Spark|Spark]]
 - [[phase-3-extensibility|Phase 3]]
-

@@ -98,7 +98,7 @@ A result should be structured, with a human formatter:
   steps: [
     {:schema_annotation, "format", "date", origin},
     {:rule, :date_format_role, :date},
-    {:theme_mapping, :date, :date_input}
+    {:ui_default, :date, :date_input}
   ]
 }
 ```
@@ -163,4 +163,3 @@ Telemetry events can include diagnostic codes, counts, paths with configurable r
 - [[07-phoenix-integration#Error mapping|Phoenix error mapping]]
 - [[10-algorithms#Issue mapping|Issue mapping algorithm]]
 - [[11-testing-strategy|Testing strategy]]
-

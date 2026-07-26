@@ -9,7 +9,18 @@ status: draft
 
 # Runtime projection
 
-Runtime projection combines a static [[03-conceptual-model#Form definition|definition]] with current form state and context to produce a concrete render plan.
+Runtime projection combines a static
+[[03-conceptual-model#Form definition|definition]] with current form state,
+renderer context, and UI capabilities to produce a concrete prepared view.
+
+> [!important] Terminology direction
+> `RenderPlan` and render-node structs are the current Phase 1 implementation
+> seams, not yet public extension contracts.
+> [[20-renderer-ui-model|Renderer and UI model]] uses **prepared view** for the
+> target responsibility and defers its exact public shape until a second UI
+> proves it in Phase 3. New APIs and documentation distinguish **FormData
+> projection** (`Form` to `%Phoenix.HTML.Form{}`) from **render preparation**
+> (definition, projected form/root, context, and UI to prepared view).
 
 It exists because many form decisions cannot be made when the schema is compiled:
 
@@ -23,13 +34,15 @@ It exists because many form decisions cannot be made when the schema is compiled
 ## Inputs and output
 
 ```elixir
-Formentation.project(definition, form_view,
-  renderer: MyApp.FormRenderer,
+Formentation.Phoenix.prepare(form,
+  ui: MyAppWeb.FormUI,
   context: %{actor: actor, locale: "de"}
 )
 ```
 
-The result is either a render plan with warnings or a structured projection error.
+The result is either a prepared view with diagnostics or a structured
+preparation error. The current implementation may represent it as a render
+plan:
 
 ```elixir
 %Formentation.RenderPlan{
@@ -48,10 +61,16 @@ The result is either a render plan with warnings or a structured projection erro
 3. Materialize concrete children for groups and collections.
 4. Resolve runtime presentation decisions that legitimately depend on value or context.
 5. Associate field and global issues with nodes.
-6. allocate stable runtime identities for collection items and DOM nodes.
-7. Emit a render-node tree containing no source-specific traversal work.
+6. Derive the environment transport contract, including primary/auxiliary
+   controls, names, cardinality, blank/omission behaviour, and raw values.
+7. Localize visible structured issues and derive separate editing and read-only
+   display values.
+8. Allocate stable runtime identities for collection items and DOM nodes.
+9. Emit a render-node tree containing no source-specific traversal work.
 
-The render plan should contain enough data that the HEEx renderer does not need to revisit JSON Schema.
+The prepared view should contain enough data that the UI does not revisit JSON
+Schema, codecs, or semantic traversal. See
+[[20-renderer-ui-model#Widget transport contract|the widget transport contract]].
 
 ## Branch selection
 
@@ -107,6 +126,11 @@ During compilation, conditional nodes should record which instance paths can aff
 
 This is an optimization. The initial implementation should reproject the full visible tree and establish correctness first. The plan and dependency indexes should make later partial projection possible without changing semantics.
 
+Before the prepared-view API is stabilized, establish a cost model and
+large-collection fixture. Whole-form and subtree preparation must agree;
+semantic/presentation indexes should prevent accidental repeated linear scans;
+stable occurrence keys must not depend only on collection position.
+
 ## Runtime context
 
 Context may include actor, tenant, locale, feature flags, or read-only/disabled policy. Context-dependent functions are an escape hatch and can reduce determinism.
@@ -119,9 +143,11 @@ Rules:
 - treat UI hiding as convenience, not security;
 - avoid arbitrary callbacks where a serializable predicate would suffice.
 
-## Rendering boundary
+## Prepared-view boundary
 
-The projector chooses a semantic widget key and produces component-ready assigns. The renderer decides how that key becomes HEEx.
+Preparation resolves an abstract widget key and produces component-ready facts.
+The selected UI decides how that key maps to a concrete component and markup.
+The UI does not revisit source declarations or form semantics.
 
 For example:
 
@@ -137,7 +163,9 @@ For example:
 }
 ```
 
-No schema traversal is needed in the component.
+No schema traversal or semantic-policy reconstruction is needed in the
+component. A Phoenix prepared view may contain Phoenix bindings; source-neutral
+does not require it to be environment-neutral.
 
 ## Projection purity
 
@@ -147,7 +175,7 @@ Projection should be referentially transparent for the same definition, state vi
 
 - [[05-compiler-pipeline|Compiler pipeline]]
 - [[07-phoenix-integration|Phoenix integration]]
+- [[20-renderer-ui-model|Renderer and UI model]]
 - [[10-algorithms#Conditional projection|Conditional projection algorithm]]
 - [[phase-1-walking-skeleton|Phase 1]]
 - [[phase-4-dynamic-schemas|Phase 4]]
-

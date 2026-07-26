@@ -64,12 +64,30 @@ Prefer domain terms over source-specific terms in core APIs:
 - `Origin`, not `JSONPointerMetadata`;
 - `Issue`, not `ValidationException`;
 - `SourceAdapter`, not `SchemaLoader`;
-- `RenderPlan`, not `PhoenixTree`.
+- `PreparedView` for the target component-ready read model, not `PhoenixTree`;
+- `UI` or `UI integration` for a component-library adapter, not `Theme`;
+- `Theme` only for visual configuration within one UI.
 
 Source packages may use precise source terminology.
+
+Keep the runtime/rendering verbs distinct:
+
+- **FormData projection** turns `%Formentation.Form{}` into
+  `%Phoenix.HTML.Form{}`;
+- **render preparation** combines the definition, projected form/root, context,
+  UI descriptor, and overrides into a prepared view;
+- **rendering** turns that prepared view into output through a UI integration.
+
+`Projector`, `RenderPlan`, `RenderNode`, and
+`Formentation.Phoenix.Theme.Reference` are current Phase 1 implementation
+names. They do not define the future public vocabulary. Before `0.1.0`,
+`Projector` should be renamed for preparation and the reference component
+module should be renamed so “theme” does not continue to mean a component set.
+See
+[[20-renderer-ui-model#Projection and preparation terminology|the canonical terminology]].
 
 ## Related notes
 
 - [[15-glossary|Glossary]]
+- [[20-renderer-ui-model|Renderer and UI model]]
 - [[Formentation|Back to the entry point]]
-

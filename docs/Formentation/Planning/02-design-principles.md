@@ -12,9 +12,13 @@ These principles are intended to guide API and implementation decisions. Where t
 
 ## The semantic definition is the centre
 
-JSON Schema is a source adapter. Phoenix is a runtime and presentation adapter. A theme is a presentation policy. None owns the central model.
+JSON Schema is a definition source adapter. Phoenix is a renderer/runtime
+environment. A UI integration maps prepared facts to a component library. A
+theme configures the appearance of one UI. None owns the central model.
 
-Public APIs should make it natural to compile, inspect, project, and render a `Formentation.Definition` independently.
+Public APIs should make it natural to compile and inspect a
+`Formentation.Definition`, run one interaction through `Formentation.Form`, and
+render its Phoenix projection without exposing internal preparation stages.
 
 ## Anything, not everything
 
@@ -36,7 +40,9 @@ The definition should support a stable [[09-diagnostics-provenance-introspection
 
 ## Static and dynamic concerns remain separate
 
-Compilation answers questions that depend only on declarations and configured extensions. Projection answers questions that depend on current values, errors, action, locale, permissions, or renderer capabilities.
+Compilation answers questions that depend only on declarations and configured
+extensions. Render preparation answers questions that depend on current values,
+issues, action, locale, permissions, UI capabilities, or overrides.
 
 Do not compile a conditional schema according to initial values. Do not resolve `$ref` during every render. See [[05-compiler-pipeline|Compiler pipeline]] and [[06-runtime-projection|Runtime projection]].
 
@@ -61,7 +67,10 @@ Conversions should be explicit and tested. See [[10-algorithms#Paths and identit
 
 ## Provenance survives derivation
 
-Compilation must not erase where information came from. Schema annotations, UI hints, theme defaults, inference rules, call-site overrides, and extensions should all be identifiable in the resolved decision.
+Compilation and preparation must not erase where information came from. Schema
+annotations, UI hints, source-neutral presentation defaults, inference rules,
+UI defaults, call-site overrides, and extensions should be identifiable in the
+relevant resolved decision.
 
 This enables actionable diagnostics and explanation. See [[09-diagnostics-provenance-introspection|Diagnostics, provenance, and introspection]].
 
@@ -73,7 +82,8 @@ Use behaviours where independently implemented modules must be replaceable:
 - validator adapters;
 - compiler passes and verifiers;
 - codecs;
-- semantic widgets and renderers;
+- renderers and UI integrations once independent implementations prove the
+  contract;
 - possibly runtime state engines.
 
 Use ordinary pure functions for fixed internal steps. A behaviour for every helper makes navigation and evolution harder.
@@ -86,7 +96,10 @@ An extension that adds a widget must not silently redefine validation. Separate 
 
 ## Prefer explicit decisions over destructive merges
 
-Schema annotations, inference, themes, UI hints, and call-site overrides form precedence layers. Do not discard losing values immediately. Retain enough information to explain the winning value and diagnose conflicting configuration.
+Schema annotations, inference, UI hints, UI defaults, and call-site overrides
+form precedence layers across compilation and preparation. Do not discard
+losing values immediately. Retain enough information to explain the winning
+value and diagnose conflicting configuration.
 
 ## Determinism and purity by default
 
@@ -113,4 +126,3 @@ Start with one end-to-end useful path. Add abstraction when implementation exper
 - [[08-extension-model|Extension model]]
 - [[13-roadmap|Roadmap]]
 - [[Formentation|Back to the entry point]]
-

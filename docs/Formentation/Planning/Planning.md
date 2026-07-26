@@ -19,6 +19,10 @@ The recommended reading order lives in the [[Formentation|vault entry note]]. Th
 > intended public model and ownership boundaries before `0.1.0`. It is
 > authoritative where an older forward-looking planning note still describes
 > the mixed Phase 1 prototype.
+> [[20-renderer-ui-model|20 — Renderer and UI model]] extends that direction
+> for prepared views, widget transport, localization, component-library
+> integrations, capabilities, customization, limits, and visual themes without
+> prematurely freezing the Phase 3 contracts.
 
 ## Foundations
 
@@ -39,6 +43,7 @@ The recommended reading order lives in the [[Formentation|vault entry note]]. Th
 - [[08-extension-model|08 — Extension model]]
 - [[09-diagnostics-provenance-introspection|09 — Diagnostics, provenance, introspection]]
 - [[10-algorithms|10 — Algorithms and invariants]]
+- [[20-renderer-ui-model|20 — Renderer and UI model]]
 
 ## Process and reference
 

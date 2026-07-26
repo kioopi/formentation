@@ -9,11 +9,24 @@ status: draft
 
 # Phoenix integration
 
-Phoenix is Formentation's first runtime and rendering environment. The integration has three separable concerns:
+Phoenix is Formentation's first runtime and rendering environment. The
+integration has three separable concerns:
 
-1. JSON-backed state that implements `Phoenix.HTML.FormData`;
-2. adapting an existing `%Phoenix.HTML.Form{}` to runtime projection;
-3. rendering a `RenderPlan` with Phoenix components.
+1. projecting `%Formentation.Form{}` through `Phoenix.HTML.FormData`;
+2. preparing a concrete, source-neutral view from a projected
+   `%Phoenix.HTML.Form{}`;
+3. rendering that prepared view through a Phoenix UI integration.
+
+The permanent advanced path adapts an arbitrary `%Phoenix.HTML.Form{}` plus an
+explicit definition and state view. First-class backing-state integrations
+eventually wrap their state in `%Formentation.Form{}` and use the ordinary
+projection path.
+
+> [!important] Current architectural direction
+> [[19-north-star-architecture|North-star architecture]] defines the ordinary
+> `Definition`/`Form` path. [[20-renderer-ui-model|Renderer and UI model]]
+> defines the target ownership boundary for preparation, UI integrations,
+> capabilities, and themes. Concrete Phase 3 contracts remain provisional.
 
 Relevant APIs are [Phoenix.HTML.Form](https://hexdocs.pm/phoenix_html/Phoenix.HTML.Form.html), [Phoenix.HTML.FormData](https://hexdocs.pm/phoenix_html/Phoenix.HTML.FormData.html), and Phoenix Component form helpers.
 
@@ -73,6 +86,24 @@ The codec layer should return path-aware issues rather than raising on ordinary 
 
 Preserve raw params so a failed number conversion does not erase what the user typed: `input_value` returns the raw attempted value when decoding failed ([[18-decisions#D-009 — Form state separates transport from operation|D-009]]).
 
+## Widget transport
+
+Phoenix markup is part of the transport protocol even though components do not
+own decoding. Preparation must describe, and every UI must faithfully emit:
+
+- primary and auxiliary control names and values;
+- scalar, repeated/list, or structured cardinality;
+- unchecked, absent, blank-option, and explicit-null behaviour;
+- action/metadata controls that do not participate as ordinary data;
+- environment usage markers such as `_unused_`.
+
+The checkbox hidden `false` control is therefore a semantic invariant, not a
+reference-theme detail. Multiple choices, placeholders, compound controls,
+collections, and uploads require equivalent explicit contracts. Shared UI
+conformance must render controls, feed their emitted params through `Form`, and
+assert the decoded operation/candidate. The canonical ownership and test model is
+[[20-renderer-ui-model#Widget transport contract|the widget transport contract]].
+
 ## Error mapping
 
 Validator errors generally identify an instance location and schema keyword location. Phoenix expects errors attached to fields, conventionally as `{message, substitutions}` tuples.
@@ -88,6 +119,12 @@ The adapter should:
 - keep every issue in state and let per-path usage plus `action` drive visibility — cross-field issues attach to a declared primary path, root issues show only after submit ([[18-decisions#D-014 — Usage is a first-class interaction axis|D-014]]).
 
 See [[09-diagnostics-provenance-introspection#Submitted-instance issues|Submitted-instance issues]].
+
+Renderer preparation uses an application-supplied translation facility to
+convert visible structured issues into presentation-ready localized content.
+Editing keeps raw `control_value` separate from localized/read-only
+`display_value`; rerendering must never replace an invalid raw attempt with a
+formatted value.
 
 ## State view
 
@@ -114,27 +151,43 @@ component — takes an adapter argument; dispatch is entirely on
 
 ## Component API
 
-A basic public component could be:
+The ordinary public component receives the Phoenix projection of a
+`%Formentation.Form{}`:
 
 ```heex
-<Formentation.Phoenix.form
+<Formentation.Phoenix.fields form={@phoenix_form} />
+```
+
+The caller creates the projection through Phoenix's normal API and therefore
+retains ownership of `as` and `id`:
+
+```elixir
+phoenix_form =
+  Phoenix.Component.to_form(form_state,
+    as: "asset[payload]",
+    id: "asset_payload"
+  )
+```
+
+`fields/1` derives both the definition and the projected subtree from the
+Phoenix form's `%Formentation.Form{}` source. The component keeps a typed
+`%Phoenix.HTML.Form{}` contract and can coexist with hand-written
+`<.input field={@phoenix_form[:name]}>` calls.
+
+The permanent low-level interoperability path remains explicit:
+
+```heex
+<Formentation.Phoenix.fields
   definition={@definition}
-  form={@form}
-  theme={MyApp.FormTheme}
+  form={@ecto_or_ash_phoenix_form}
 />
 ```
 
-Advanced users should be able to render subtrees or override individual nodes:
-
-```heex
-<Formentation.Phoenix.field
-  definition={@definition}
-  form={@form}
-  path={["email"]}
-/>
-```
-
-Slots may be appropriate for form-level actions, collection controls, or wrapper customization. Avoid a slot API that forces callers to reimplement traversal.
+Phase 3 should add UI selection, prepared-view inspection, and individual
+field/subtree rendering through progressive disclosure. Slots may be
+appropriate for form-level actions, collection controls, or wrapper
+customization. Avoid a slot API that forces callers to reimplement traversal,
+issue association, or stable identity.
 
 Rendering must compose *inside* an enclosing hand-written form: [[00-use-case|the motivating use case]] embeds a payload form in a page whose other inputs come from an Ecto changeset, so names, IDs, and error routing have to work under a parent namespace such as `asset[payload][...]`. The component API must not assume it owns the `<form>` element. See [[17-end-to-end-example#Rendering|the end-to-end example]].
 
@@ -161,7 +214,15 @@ The default renderer should establish:
 - keyboard-operable collection actions;
 - no use of placeholder as the only label.
 
-Themes may change markup, but capability verification and contract tests should protect these semantics.
+UI integrations may change markup, but capability verification and conformance
+tests must protect these semantics. A visual theme configures one UI; it does
+not weaken the contract.
+
+The stateless tier also supports controller/static rendering and ordinary HTML
+POST. Without LiveSocket `_unused_` evidence, pristine forms hide issues and
+submitted forms show them; progressive per-field visibility is unavailable
+unless the caller provides equivalent usage state. Validation and submission
+semantics remain unchanged.
 
 ## Security
 
@@ -182,7 +243,7 @@ This is essential for [[phase-5-ash-integration|Ash integration]].
 
 - [[03-conceptual-model#Form state|Form state]]
 - [[06-runtime-projection|Runtime projection]]
+- [[20-renderer-ui-model|Renderer and UI model]]
 - [[11-testing-strategy#Phoenix and component tests|Phoenix and component tests]]
 - [[phase-1-walking-skeleton|Phase 1]]
 - [[phase-5-ash-integration|Phase 5]]
-

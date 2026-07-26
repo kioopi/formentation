@@ -89,9 +89,15 @@ Precedence should be explicit. A reasonable starting order is:
 
 1. schema meaning and annotations;
 2. named inference rules;
-3. theme defaults, if theme-aware compilation is requested — whether themes should influence compilation at all is [[16-open-questions#Rendering|an open question]]; if they do, theme identity must join the fingerprint and the definition loses some presentation-independence;
+3. source-neutral presentation defaults;
 4. explicit UI hints;
-5. call-site overrides.
+5. compile-time call-site overrides.
+
+UI defaults, UI capabilities, visual themes, and render-time overrides are
+resolved during support inspection or renderer preparation, not by reusable
+definition compilation. They must not change semantic structure or the
+definition fingerprint merely because a different component library is
+selected. See [[20-renderer-ui-model|Renderer and UI model]].
 
 Resolved choices should retain [[03-conceptual-model#Decision|decision]] and [[03-conceptual-model#Origin|origin]] information.
 
@@ -175,4 +181,3 @@ Avoid timestamps, random identifiers, process-dependent enumeration, and anonymo
 - [[09-diagnostics-provenance-introspection|Diagnostics and provenance]]
 - [[10-algorithms#Pass ordering|Pass ordering algorithm]]
 - [[phase-2-compiler-diagnostics|Phase 2]]
-

@@ -36,7 +36,8 @@ JSON Schema is the natural declaration and validation format for the payloads. T
 
 Recording non-needs is as useful as recording needs:
 
-- multiple UI themes — the application has one design system;
+- multiple UI integrations or visual themes—the application has one design
+  system;
 - full JSON Schema coverage — unsupported constructs may simply be diagnosed;
 - remote `$ref` resolution — schemas are local database rows;
 - Ash integration — this application is plain Ecto; [[phase-5-ash-integration|Phase 5]] remains a decoupling proof, not a customer requirement;
