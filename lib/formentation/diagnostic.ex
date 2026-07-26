@@ -8,7 +8,7 @@ defmodule Formentation.Diagnostic do
   attributed to a declaration location.
   """
 
-  alias Formentation.{Node, TemplatePath}
+  alias Formentation.{Origin, TemplatePath}
 
   @enforce_keys [:severity, :code, :message]
   defstruct [:severity, :code, :message, :origin, :template_path]
@@ -17,7 +17,7 @@ defmodule Formentation.Diagnostic do
           severity: :error | :warning,
           code: atom(),
           message: String.t(),
-          origin: Node.origin() | nil,
+          origin: Origin.t() | nil,
           template_path: TemplatePath.t() | nil
         }
 end

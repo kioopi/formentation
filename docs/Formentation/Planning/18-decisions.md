@@ -609,6 +609,44 @@ shape deliberately means a caller or projection that needs the reason asks
 `submission_status/1`/`submission_blockers/1` again; repeated classification is
 accepted here to keep one canonical status representation.
 
+## D-033 — Phase 1 layout covers each supported occurrence exactly once
+
+*2026-07-26*
+
+**Context.** Issue #18 splits stored semantics from stored presentation layout.
+The required safety invariant is soundness: every presentation object or field
+reference must resolve to exactly one semantic occurrence of the expected kind.
+The implementation could stop there and allow a supported semantic field to be
+omitted from layout, or to appear more than once. That would make “which
+semantic fields are shown?” a real layout-specific question. Today, however,
+Milestone A renders every supported scalar occurrence exactly once; even
+`hidden?` is a presentation mode that emits a hidden control, not omission.
+Unsupported preserve-only occurrences are the only semantic occurrences with no
+renderable scalar reference.
+
+**Decision.** For Phase 1 built-in adapters, native presentation layout is a
+total, unique coverage of supported semantic object and field occurrences:
+
+- every presentation reference resolves by semantic occurrence identity;
+- no supported semantic occurrence may be referenced more than once;
+- every supported semantic object and scalar field emitted by a built-in
+  adapter must be represented exactly once in layout;
+- unsupported occurrences remain semantic-only and are never referenced by
+  presentation controls;
+- hiding remains a presentation fact, not layout omission.
+
+This is an invariant of the native definition finalizer and therefore an
+architecture commitment for Milestone A, not a renderer convention.
+
+**Consequences.** For now, the answer to “which supported fields are shown?” is
+“all of them exactly once,” with presentation deciding order, grouping, labels,
+help, widget preference, and hidden-control mode. Phase 3 may introduce
+conditional visibility, optional prepared views, repeated layouts, or explicit
+review/edit projections, but those require a new decision that weakens or
+specializes this invariant. The invariant also gives adapters and future query
+indexes a simple lookup contract: a supported semantic occurrence has at most
+one layout descriptor in the built-in editable layout.
+
 ## Related notes
 
 - [[19-north-star-architecture|North-star architecture]]

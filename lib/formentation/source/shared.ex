@@ -95,12 +95,22 @@ defmodule Formentation.Source.Shared do
 
     case compile_object_fn.(source, nil, ctx) do
       {:ok, root, ctx} ->
-        diagnostics = Enum.reverse(ctx.diagnostics, policy_diagnostics(root))
-        {:ok, %Definition{root: root, diagnostics: diagnostics}, diagnostics}
+        finalize_legacy(root, ctx)
 
       {:error, %Diagnostic{} = diagnostic} ->
         {:error, [diagnostic]}
     end
+  end
+
+  def finalize_legacy(root, %Context{} = ctx, attrs \\ []) do
+    diagnostics = Enum.reverse(ctx.diagnostics, policy_diagnostics(root))
+
+    definition =
+      attrs
+      |> Keyword.merge(root: root, format_version: 2, diagnostics: diagnostics)
+      |> then(&struct!(Definition, &1))
+
+    {:ok, definition, diagnostics}
   end
 
   @reserved_names ["_csrf_token", "_target"]
