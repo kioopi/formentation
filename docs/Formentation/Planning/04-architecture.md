@@ -102,8 +102,7 @@ configures the visual appearance of one UI. Renderer and UI capabilities are
 checked by optional support inspection or concrete runtime preparation.
 
 See [[20-renderer-ui-model|Renderer and UI model]] and
-[[08-extension-model#Renderer and UI capabilities|Renderer and UI
-capabilities]].
+[[08-extension-model#Renderer and UI capabilities|Renderer and UI capabilities]].
 
 ## Package boundaries
 

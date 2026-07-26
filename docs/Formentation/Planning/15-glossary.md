@@ -111,8 +111,7 @@ UI component that implements it.
 
 **Widget key** — Identifier for an abstract widget, resolved from role/type,
 presentation intent, UI defaults/capabilities, and application overrides. See
-[[20-renderer-ui-model#Widget resolution|role → abstract widget → concrete
-component]].
+[[20-renderer-ui-model#Widget resolution|role → abstract widget → concrete component]].
 
 ## Related notes
 

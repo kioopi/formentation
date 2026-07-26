@@ -101,9 +101,8 @@ The checkbox hidden `false` control is therefore a semantic invariant, not a
 reference-theme detail. Multiple choices, placeholders, compound controls,
 collections, and uploads require equivalent explicit contracts. Shared UI
 conformance must render controls, feed their emitted params through `Form`, and
-assert the decoded operation/candidate. The canonical ownership and test model
-is [[20-renderer-ui-model#Widget transport contract|the widget transport
-contract]].
+assert the decoded operation/candidate. The canonical ownership and test model is
+[[20-renderer-ui-model#Widget transport contract|the widget transport contract]].
 
 ## Error mapping
 

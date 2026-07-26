@@ -406,8 +406,8 @@ This proves how semantic/compiler extensions and UI capabilities meet without
 letting the widget own validation.
 
 Follow the end-to-end
-[[20-renderer-ui-model#Worked example: a money field across UIs|money
-walkthrough]]: prove one supporting UI, a non-supporting UI, explicit fallback
+[[20-renderer-ui-model#Worked example: a money field across UIs|money walkthrough]]:
+prove one supporting UI, a non-supporting UI, explicit fallback
 or failure, raw invalid input, localized issue text, scalar transport, a
 compound-control variant, and read-only display formatting.
 

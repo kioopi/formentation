@@ -70,8 +70,7 @@ plan:
 
 The prepared view should contain enough data that the UI does not revisit JSON
 Schema, codecs, or semantic traversal. See
-[[20-renderer-ui-model#Widget transport contract|the widget transport
-contract]].
+[[20-renderer-ui-model#Widget transport contract|the widget transport contract]].
 
 ## Branch selection
 

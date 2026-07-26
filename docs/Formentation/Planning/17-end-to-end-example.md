@@ -102,8 +102,7 @@ Origins here are the compact tags of the simplified Phase 1 provenance model ([[
 The widget layering is visible in `notes`: semantic role `:text` (inferred),
 abstract widget key `:textarea` (presentation hint), concrete component chosen
 by the selected UI during render preparation. See
-[[20-renderer-ui-model#Widget resolution|role → abstract widget → concrete
-component]].
+[[20-renderer-ui-model#Widget resolution|role → abstract widget → concrete component]].
 
 ## Rendering
 

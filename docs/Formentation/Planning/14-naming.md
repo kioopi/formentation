@@ -83,8 +83,8 @@ Keep the runtime/rendering verbs distinct:
 names. They do not define the future public vocabulary. Before `0.1.0`,
 `Projector` should be renamed for preparation and the reference component
 module should be renamed so “theme” does not continue to mean a component set.
-See [[20-renderer-ui-model#Projection and preparation terminology|the canonical
-terminology]].
+See
+[[20-renderer-ui-model#Projection and preparation terminology|the canonical terminology]].
 
 ## Related notes
 

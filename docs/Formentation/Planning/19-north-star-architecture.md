@@ -666,8 +666,8 @@ The alignment work may decide:
 - the eventual prepared-view shape.
 
 Later UI work must decide the contracts inventoried in
-[[20-renderer-ui-model#Decisions intentionally left open|Renderer and UI
-model]]. Typed source dispatch remains a separate extensibility question.
+[[20-renderer-ui-model#Decisions intentionally left open|Renderer and UI model]].
+Typed source dispatch remains a separate extensibility question.
 
 Those open choices cannot reverse the frozen ownership boundaries.
 
