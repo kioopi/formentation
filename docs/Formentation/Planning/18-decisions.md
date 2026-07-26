@@ -70,6 +70,14 @@ Running log of architecture decisions, ADR-style but lightweight. Each entry rec
 
 **Consequences.** Renderers treat every container uniformly and consult `nests_data?` when deriving names and params. The end-to-end example's map declaration dropped a stray `group: "electrical"` on `notes`. If Phoenix work later shows the two behaviours diverging (naming, error routing, projection), splitting into two kinds is a new decision that links here.
 
+> [!note] Superseded as a target by D-029
+> The implementation continues to use this representation until
+> [[phase-1-north-star-alignment|the north-star alignment gate]] removes it.
+> [[#D-029 — Definition and Form are the ordinary public model|D-029]] decides
+> that data objects belong to semantic structure and presentation groups belong
+> to presentation layout. This entry remains the record of why the Phase 1
+> prototype chose the mixed representation.
+
 ## D-007 — Node-ID segments are escaped, not restricted
 
 *2026-07-21*
@@ -342,8 +350,85 @@ and the projector is unchanged.
 
 **Consequences.** `Formentation.Info.unsupported_nodes/1` is the extension point a future stricter policy (e.g. an `unsupported: :error` compile option that refuses definitions needing full edit capability) can build on without touching runtime classification. No opaque-replacement escape hatch was added — an unsupported node still cannot be edited by this form, only concretely diagnosed. The causal limit means a root-level or cross-field validation issue continues to render as an ordinary `{:invalid, _}` entry even when an unsupported node sits nearby in the tree; sharpening that requires validator-side metadata this decision deliberately does not invent.
 
+## D-029 — Definition and Form are the ordinary public model
+
+*2026-07-26*
+
+**Context.** Phase 1 proved the difficult end-to-end behaviour before
+Formentation's public model was frozen. The resulting internals are deliberately
+structured, but ordinary use still exposes too many stages: callers compile a
+`Definition`, construct a `Form`, project it to a Phoenix form, pass the
+definition beside that form, and encounter projector, render-plan, render-node,
+and theme vocabulary. The stored definition also mixes semantic data objects
+and presentation groups through
+[[#D-006 — One `:group` kind, flagged for data nesting|D-006]], making both
+`Form` and Phoenix interpret the same flag for different purposes. Collections
+would deepen that coupling. The mixed representation also leaks presentation
+into semantic introspection: when a UI group reorders fields, the current
+compiler reorders the stored children and `Info.fields/1` returns that layout
+order despite documenting declaration order.
+
+**Decision.** Adopt
+[[19-north-star-architecture|the north-star architecture]]:
+
+- `Definition` and `Form` are the two ordinary public concepts.
+- A static `Definition` and runtime `Form` remain separate.
+- `Definition` owns separate semantic structure and presentation layout.
+- `Form` is the sole ordinary runtime context and provides access to its
+  definition.
+- Existing `new/3` and `validate/2` remain the ordinary construction and
+  change-event operations. Submission exposes the application decision through
+  the complete `submission_status/1`, including blockers; lower-level
+  transition machinery may remain advanced.
+- `Info.fields/1` returns semantic declaration order. Presentation traversal
+  independently returns layout order. Correcting the current reordered-group
+  result is an intentional pre-`0.1.0` behaviour change.
+- Phoenix fields keep accepting `%Phoenix.HTML.Form{}`. In normal usage that
+  form is projected from `%Formentation.Form{}`, and the component derives its
+  definition from `form.source` rather than receiving a duplicate
+  `definition` assign. Phoenix `as` and `id` remain caller-owned.
+- Derivation recovers the projection root as well as the definition. A nested
+  projected form keeps the root `%Formentation.Form{}` as its source, so
+  deriving only the definition would render the whole form under a nested name.
+- Arbitrary `Phoenix.HTML.FormData` plus an explicit definition and state view
+  remains a permanent low-level integration path. First-class state
+  integrations should eventually wrap their backing state in
+  `%Formentation.Form{}`.
+- Projection/preparation remains independently testable but is not a mandatory
+  user-visible lifecycle stage.
+- Definition adapters and state adapters are distinct extension categories.
+- Phoenix is a renderer. A UI is a component-library integration. “Theme”, if
+  retained, means visual configuration within a UI rather than the UI adapter
+  itself.
+- UI contracts and a stable prepared-view contract remain deferred until a
+  second implementation proves them.
+
+Breaking representation and API changes are allowed before `0.1.0`. The
+alignment follows
+[[phase-1-north-star-alignment|the Phase 1 north-star alignment plan]] before
+Milestone B collections. Implicit typed-source dispatch is not part of this
+gate; explicit `adapter:` selection remains sufficient until extensibility work
+creates a real need. Built-in sources gain stable symbolic keys — `:map` and
+`:json_schema` — accepted by `compile/2` as well as by the façade, so the
+ordinary compile-once-and-reuse path never has to name an adapter
+implementation module. That is explicit selection, not inference.
+
+**Consequences.** D-006 remains accurate history and current implementation
+documentation until the cutover, but is no longer the target representation.
+Both adapters will produce split semantic and presentation structures;
+`Form` will consume semantic queries; Phoenix preparation will traverse layout
+and resolve semantic references. The old mixed root tree and `nests_data?` will
+then be removed with a definition-format bump. `Projector`, `RenderPlan`, and
+the built-in reference component set may remain structured internals without
+being ordinary public nouns. All existing correctness invariants—raw-input
+preservation, source-owned validation, used-input state, nested presence,
+preservation, blockers, path safety, accessibility, and browser transport—are
+mandatory acceptance criteria for the migration.
+
 ## Related notes
 
+- [[19-north-star-architecture|North-star architecture]]
+- [[phase-1-north-star-alignment|Phase 1 — North-star alignment]]
 - [[16-open-questions|Open questions]]
 - [[13-roadmap|Roadmap]]
 - [[00-use-case|Motivating use case]]

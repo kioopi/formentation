@@ -17,6 +17,23 @@ Turn the direct prototype compiler into a deliberate, ordered, observable compil
 
 This phase also pays back the introspection debt deliberately taken on in [[phase-1-walking-skeleton|Phase 1]] ([[18-decisions#D-003 — Simplified provenance first|D-003]]): origin tags grow into the full `Decision`/derivation model, `Info.explain/3` becomes public API, and fingerprints, support reports, and generated UI hints arrive here.
 
+## Prerequisites
+
+Phase 2 begins after Phase 1 is complete, including:
+
+- [[phase-1-north-star-alignment|the north-star alignment gate]];
+- the split semantic structure and presentation layout described by
+  [[19-north-star-architecture|the north-star architecture]];
+- Milestone B collections on that representation;
+- the ordinary `Definition`/`Form` lifecycle, complete submission decision, and
+  projected-Form Phoenix render path;
+- a green behavioural, differential, LiveView, architecture, and browser
+  acceptance matrix.
+
+The compiler-pass design must grow around the split definition. It must not
+recreate one mixed semantic/presentation compiler tree merely because the Phase
+1 prototype originally had one.
+
 ## Risk being retired
 
 As source features and UI hints grow, one recursive function can accumulate hidden ordering, destructive merges, inconsistent warnings, and duplicated derivation logic. This phase prevents that complexity from becoming the permanent architecture.
@@ -33,7 +50,7 @@ Formalize:
 
 - load/parse boundary;
 - normalize/resolve;
-- semantic construction;
+- semantic construction and presentation-layout construction;
 - derive;
 - decorate;
 - verify;
@@ -184,7 +201,7 @@ Review diagnostic formatting, support reports, explanation chains, and compiler 
 
 ## Exit and next phase
 
-The phase ends with a compiler that can grow safely. [[phase-3-extensibility|Phase 3]] then exposes selected seams to applications and independent renderer/theme packages.
+The phase ends with a compiler that can grow safely. [[phase-3-extensibility|Phase 3]] then exposes selected seams to applications and independent renderer/UI-integration packages.
 
 ## Related notes
 
@@ -193,4 +210,5 @@ The phase ends with a compiler that can grow safely. [[phase-3-extensibility|Pha
 - [[10-algorithms#Pass ordering|Pass ordering]]
 - [[12-ecosystem-and-dependencies#Spark|Spark inspiration]]
 - [[13-roadmap|Back to the roadmap]]
-
+- [[19-north-star-architecture|North-star architecture]]
+- [[phase-1-north-star-alignment|Phase 1 — North-star alignment]]

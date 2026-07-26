@@ -14,6 +14,12 @@ The **conceptual and design documentation** for Formentation: why the project ex
 
 The recommended reading order lives in the [[Formentation|vault entry note]]. This index groups the notes by kind.
 
+> [!important] Current architectural direction
+> [[19-north-star-architecture|19 — North-star architecture]] defines the
+> intended public model and ownership boundaries before `0.1.0`. It is
+> authoritative where an older forward-looking planning note still describes
+> the mixed Phase 1 prototype.
+
 ## Foundations
 
 - [[00-use-case|00 — Motivating use case]]
@@ -22,6 +28,7 @@ The recommended reading order lives in the [[Formentation|vault entry note]]. Th
 - [[03-conceptual-model|03 — Conceptual model]]
 - [[031-form-definition|031 — Form definition]]
 - [[17-end-to-end-example|17 — End-to-end example]]
+- [[19-north-star-architecture|19 — North-star architecture]]
 
 ## Architecture and engines
 

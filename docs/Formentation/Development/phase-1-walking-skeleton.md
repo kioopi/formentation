@@ -17,6 +17,14 @@ Deliver one thin, end-to-end vertical slice as early as possible: compile a deli
 
 This phase merges the formerly separate "static foundation" and "Phoenix runtime" phases ([[18-decisions#D-002 — Phase 1 is a walking skeleton|D-002]]). A definition-only phase could not retire its own headline risk: whether the IR is useful is only proven by a consumer.
 
+> [!important] Alignment gate before Milestone B
+> Milestone A proved the behaviour but also exposed a mixed
+> semantic/presentation definition and an over-explicit public lifecycle.
+> [[phase-1-north-star-alignment|Phase 1 — North-star alignment]] now comes
+> before collections. It migrates the working skeleton to
+> [[19-north-star-architecture|the north-star `Definition`/`Form` model]]
+> without changing this phase's behavioural promises.
+
 ## Progress
 
 > [!success] 2026-07-21 — Implementation strategy steps 1–2 complete (map-source static pipeline)
@@ -76,7 +84,7 @@ One JSON Schema dialect, chosen explicitly. Two milestones.
 - homogeneous arrays of supported scalars/objects;
 - stable item identity, hidden identity fields, add/remove/reorder LiveView helpers.
 
-Collections are deliberately second: item identity adds a dimension of complexity the skeleton should not start with.
+Collections are deliberately second: item identity adds a dimension of complexity the skeleton should not start with. They begin only after [[phase-1-north-star-alignment|the alignment gate]], so semantic item templates and presentation collection layouts do not deepen the transitional mixed tree.
 
 ### Explicitly deferred
 
@@ -137,7 +145,8 @@ Classic TDD in thin slices; each iteration leaves the suite green and something 
 5. **`FormData`.** Root, then nested objects, using [Phoenix.HTML.FormData](https://hexdocs.pm/phoenix_html/Phoenix.HTML.FormData.html) and the phoenix_ecto implementation as behavioural references. Includes the transport normalizer and the dual-params rule — Phoenix-compatible params for `used_input?/1`, cleaned domain params for decoding ([[18-decisions#D-014 — Usage is a first-class interaction axis|D-014]]). *(Done 2026-07-23 — see the step-5 callout.)*
 6. **Projector, components, theme.** Static render of the example; accessibility contract from the start. *(Done 2026-07-23 — see the step-6 callout.)*
 7. **LiveView.** Validate/submit lifecycle, embedding, error visibility. *(Done 2026-07-24 — see the step-7 callout.)*
-8. **Milestone B.** Collections, identity, add/remove/reorder.
+8. **North-star alignment gate.** Separate semantic structure from presentation layout; move `Form` and Phoenix behind query seams; converge the ordinary API on `Definition` plus `Form`. See [[phase-1-north-star-alignment|the detailed plan]].
+9. **Milestone B.** Collections, identity, add/remove/reorder on the aligned definition.
 
 Keep the compiler a straightforward recursive function with a context struct. Do not create pass behaviours until [[phase-2-compiler-diagnostics|Phase 2]] extracts them from real, working code.
 
@@ -167,6 +176,7 @@ Keep the compiler a straightforward recursive function with a context struct. Do
 - [ ] Unsupported constructs produce structured diagnostics rather than crashes or misleading fields.
 - [x] Default components meet the documented accessibility contract; schema-provided text is escaped.
 - [ ] No atoms are created from schema property names; depth/node guards are enforced.
+- [ ] The [[phase-1-north-star-alignment|north-star alignment gate]] is complete before collection types or transitions are added.
 - [ ] (Milestone B) Collection items keep stable identity across add/remove/reorder in LiveView tests.
 - [x] The decode/validate interplay policy is written down, even if crude ([[18-decisions#D-012 — Schema validation defers while any decode fails|D-012]]).
 
@@ -188,7 +198,18 @@ Carried forward from the merged phase notes:
 
 ## Exit and next phase
 
-The phase ends when the use case's payload forms work end to end for the supported subset, with an honest list of everything that was deferred. [[phase-2-compiler-diagnostics|Phase 2]] then restructures the grown-but-working compiler into ordered passes and pays back the deferred introspection: full provenance, explanation, support reports, fingerprints, and caching.
+The phase ends when the use case's payload forms work end to end for the supported subset, including collections, with an honest list of everything that was deferred.
+
+Before collection work, [[phase-1-north-star-alignment|the alignment gate]]
+declares **Aligned Milestone A**: split semantic/presentation definition,
+layout-invariant semantic queries and form behaviour, `Definition` and `Form`
+as the ordinary model, and Phoenix rendering from the projected `Form` without
+a duplicate definition assign. Milestone B then completes collections on that
+foundation.
+[[phase-2-compiler-diagnostics|Phase 2]] restructures the resulting
+grown-but-working compiler into ordered passes and pays back the deferred
+introspection: full provenance, explanation, support reports, fingerprints, and
+caching.
 
 ## Related notes
 
@@ -198,3 +219,5 @@ The phase ends when the use case's payload forms work end to end for the support
 - [[07-phoenix-integration|Phoenix integration]]
 - [[11-testing-strategy|Testing strategy]]
 - [[13-roadmap|Back to the roadmap]]
+- [[19-north-star-architecture|North-star architecture]]
+- [[phase-1-north-star-alignment|Phase 1 — North-star alignment]]

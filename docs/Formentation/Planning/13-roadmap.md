@@ -10,9 +10,18 @@ status: draft
 
 The roadmap is organized as vertical capabilities, not only internal layers. Each phase should leave a demonstrable, tested result and a clean stopping point. Phase 1 merges the formerly separate foundation and Phoenix-runtime phases into a single walking skeleton — see [[18-decisions#D-002 — Phase 1 is a walking skeleton|D-002]].
 
+The working Milestone A proved the behaviour before the public architecture was
+frozen. Before Milestone B collections, Phase 1 therefore passes through
+[[phase-1-north-star-alignment|the north-star alignment gate]]. The gate aligns
+the implementation with
+[[19-north-star-architecture|the two-noun `Definition`/`Form` model]]; it is not
+a separate product phase.
+
 ```mermaid
 flowchart TD
-    P1["1 Walking skeleton"] --> P2["2 Compiler and diagnostics"]
+    P1A["1A Milestone A<br/>working skeleton"] --> Align["Phase 1 alignment gate"]
+    Align --> P1B["1B Milestone B<br/>collections"]
+    P1B --> P2["2 Compiler and diagnostics"]
     P2 --> P3["3 Extensibility"]
     P3 --> P4["4 Dynamic schemas"]
     P4 --> P5["5 Ash integration"]
@@ -25,9 +34,10 @@ flowchart TD
 
 | Phase | Primary risk retired | Demonstrable result |
 | --- | --- | --- |
-| [[phase-1-walking-skeleton\|1 — Walking skeleton]] | Whether a source-independent definition is real (two sources) and composes with Phoenix state, components, and LiveView. | An expert-defined payload form from [[00-use-case\|the use case]] compiles from JSON Schema *and* plain Elixir data, renders, validates, and submits. |
+| [[phase-1-walking-skeleton\|1 — Walking skeleton]] | Whether a source-independent definition is real (two sources) and composes with Phoenix state, components, and LiveView. | An expert-defined payload form from [[00-use-case\|the use case]] compiles from JSON Schema *and* plain Elixir data, renders, validates, and submits; collections complete the use case. |
+| [[phase-1-north-star-alignment\|Phase 1 alignment gate]] | Whether Milestone A can adopt the intended public model and split semantic/presentation definition without losing proven behaviour. | `Definition` and `Form` are the ordinary concepts; both adapters emit split definitions; a Phoenix form projected from `Form` renders without a duplicate definition assign; collections can begin on that foundation. |
 | [[phase-2-compiler-diagnostics\|2 — Compiler and diagnostics]] | Whether complexity can grow without opaque passes and errors. | Ordered passes, verifiers, full provenance, explanation, support reports, and caching. |
-| [[phase-3-extensibility\|3 — Extensibility]] | Whether applications and UI libraries can extend the system without forks. | A second theme and a custom semantic role/widget implemented externally. |
+| [[phase-3-extensibility\|3 — Extensibility]] | Whether applications and UI libraries can extend the system without forks. | A second UI integration and a custom semantic role/widget implemented externally. |
 | [[phase-4-dynamic-schemas\|4 — Dynamic schemas]] | Whether composition and conditional behaviour can remain correct during editing. | `oneOf` and conditional fields react to data while preserving state and errors. |
 | [[phase-5-ash-integration\|5 — Ash integration]] | Whether definition, state, and renderer are genuinely decoupled. | Render an `AshPhoenix.Form` and derive useful definitions from Ash metadata. |
 
@@ -36,13 +46,14 @@ flowchart TD
 Phase numbers indicate implementation order, not mandatory package dependencies. In particular:
 
 - the definition never depends on Phoenix form state;
+- semantic structure does not depend on presentation layout;
 - JSON-backed state is not required by an Ash-backed renderer;
 - dynamic condition AST work can begin earlier if a real use case demands it;
 - Ash exploration can run as a spike before Phase 5, but production integration waits for stable boundaries.
 
 ## Release ideas
 
-- `0.1` after Phase 1 Milestone A: first end-to-end Phoenix forms from a compiled definition.
+- `0.1` after aligned Phase 1 Milestone A: first end-to-end Phoenix forms through the intended `Definition`/`Form` public model.
 - `0.2` after Phase 1 Milestone B: collections; the [[00-use-case|use case]] becomes servable.
 - `0.3` after Phase 2: structured compiler API suitable for broader experimentation.
 - `0.4` after Phase 3: supported third-party extension contracts.
@@ -77,14 +88,16 @@ Before accepting a feature, ask:
 ## Phase documents
 
 - [[phase-1-walking-skeleton|Phase 1 — Walking skeleton]]
+- [[phase-1-north-star-alignment|Phase 1 — North-star alignment]]
 - [[phase-2-compiler-diagnostics|Phase 2 — Compiler pipeline and diagnostics]]
-- [[phase-3-extensibility|Phase 3 — Extensibility and themes]]
+- [[phase-3-extensibility|Phase 3 — Extensibility and UI integrations]]
 - [[phase-4-dynamic-schemas|Phase 4 — Dynamic and compositional schemas]]
 - [[phase-5-ash-integration|Phase 5 — Ash integration and optional declarative DSL]]
 
 ## Related notes
 
 - [[00-use-case|Motivating use case]]
+- [[19-north-star-architecture|North-star architecture]]
 - [[18-decisions|Decision log]]
 - [[11-testing-strategy|Testing strategy]]
 - [[16-open-questions|Open questions]]
