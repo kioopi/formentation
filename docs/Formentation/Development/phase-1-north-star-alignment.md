@@ -404,6 +404,8 @@ No permanent dual representation remains.
 
 ### A2 — Submission decision API and demo correctness
 
+**Status:** Done 2026-07-26.
+
 **Outcome:** ordinary submission exposes success versus redisplay using the
 complete `submission_status/1`, including blockers.
 
@@ -424,8 +426,8 @@ duplicated.
 Acceptance includes:
 
 - `validate/2` retains raw invalid input and stores issues;
-- `submit/2`, or one clearly named companion selected by the implementation
-  issue, exposes success versus redisplay directly;
+- `submit/2` exposes success versus redisplay directly as
+  `{:ok, candidate, submitted_form} | {:error, submitted_form}`;
 - `:undecodable`, `{:blocked, blockers}`, and `{:invalid, issues}` all take the
   redisplay path;
 - `:ready` returns the decoded candidate;
@@ -791,7 +793,7 @@ to this gate.
       documented.
 - [ ] Existing `new/3` and `validate/2` remain the ordinary construction and
       change-event operations.
-- [ ] Submission exposes success versus redisplay through
+- [x] Submission exposes success versus redisplay through
       `submission_status/1`, including blockers, and the demo no longer
       hand-rolls readiness.
 - [ ] `Formentation.form/2` provides the agreed convenience path, and both it

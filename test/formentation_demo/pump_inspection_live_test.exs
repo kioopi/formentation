@@ -109,6 +109,21 @@ defmodule FormentationDemo.PumpInspectionLiveTest do
       assert [_errors] = Floki.find(doc, "#asset_payload_operating_hours_errors")
       refute html =~ "decoded-candidate"
     end
+
+    test "editing after a successful submit clears the decoded candidate" do
+      {lv, _html} = mount!()
+
+      lv
+      |> form("#asset-form", %{"asset" => %{"payload" => @valid_payload}})
+      |> render_submit()
+
+      html =
+        lv
+        |> form("#asset-form", %{"asset" => %{"payload" => %{"notes" => "Changed"}}})
+        |> render_change()
+
+      refute html =~ "decoded-candidate"
+    end
   end
 
   describe "phx-submit" do
@@ -155,6 +170,25 @@ defmodule FormentationDemo.PumpInspectionLiveTest do
                "insulation_ok" => true,
                "notes" => "Runs fine."
              }
+    end
+
+    test "a failed submit after success clears the decoded candidate" do
+      {lv, _html} = mount!()
+
+      lv
+      |> form("#asset-form", %{"asset" => %{"payload" => @valid_payload}})
+      |> render_submit()
+
+      html =
+        lv
+        |> form("#asset-form", %{"asset" => %{"payload" => %{"operating_hours" => "51o2"}}})
+        |> render_submit()
+
+      doc = parse!(html)
+      assert Floki.find(doc, "pre#decoded-candidate") == []
+      assert [hours] = Floki.find(doc, "input[name='asset[payload][operating_hours]']")
+      assert Floki.attribute(hours, "value") == ["51o2"]
+      assert [_errors] = Floki.find(doc, "#asset_payload_operating_hours_errors")
     end
 
     test "after a failed submit, edits keep field errors visible and drop the summary" do

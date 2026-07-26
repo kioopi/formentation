@@ -1,6 +1,8 @@
 defmodule Formentation.Phoenix.StateViewTest do
   use ExUnit.Case, async: true
 
+  import Formentation.Test.FormHelpers
+
   doctest Formentation.Phoenix.StateView
 
   alias Formentation.{Form, Params, SubmissionBlocker}
@@ -75,7 +77,7 @@ defmodule Formentation.Phoenix.StateViewTest do
       {changed, changed_form} = form_pair(Form.validate(Form.new(definition), %{"title" => "t"}))
 
       {submitted, submitted_form} =
-        form_pair(Form.submit(Form.new(definition), %{"title" => "t"}))
+        form_pair(submitted_form(Form.new(definition), %{"title" => "t"}))
 
       refute StateView.submitted?(pristine, pristine_form)
       refute StateView.submitted?(changed, changed_form)
@@ -95,7 +97,7 @@ defmodule Formentation.Phoenix.StateViewTest do
           values: %{"title" => "t"},
           event: :change
         }),
-        Form.submit(Form.new(definition), %{"title" => "t"})
+        submitted_form(Form.new(definition), %{"title" => "t"})
       ]
 
       paths = [[], ["title"], ["address"], ["address", "street"]]
@@ -114,7 +116,7 @@ defmodule Formentation.Phoenix.StateViewTest do
     end
 
     test "never answers :default" do
-      {form_state, form} = form_pair(Form.submit(Form.new(address_definition()), %{}))
+      {form_state, form} = form_pair(submitted_form(Form.new(address_definition()), %{}))
 
       for segments <- [[], ["title"], ["address"]] do
         refute StateView.issue_visibility(form_state, form, InstancePath.new!(segments)) ==
@@ -123,7 +125,7 @@ defmodule Formentation.Phoenix.StateViewTest do
     end
 
     test "normalizes every issue with its absolute path and message" do
-      {form_state, form} = form_pair(Form.submit(Form.new(address_definition()), %{}))
+      {form_state, form} = form_pair(submitted_form(Form.new(address_definition()), %{}))
 
       assert {:ok, issues} = StateView.issues(form_state, form)
       assert [%StateView.Issue{} | _] = issues
@@ -137,7 +139,7 @@ defmodule Formentation.Phoenix.StateViewTest do
     end
 
     test "orders normalized issues deterministically by path" do
-      {form_state, form} = form_pair(Form.submit(Form.new(address_definition()), %{}))
+      {form_state, form} = form_pair(submitted_form(Form.new(address_definition()), %{}))
 
       assert {:ok, issues} = StateView.issues(form_state, form)
       paths = Enum.map(issues, & &1.path.segments)
@@ -151,7 +153,7 @@ defmodule Formentation.Phoenix.StateViewTest do
     # blockers first, then this path sort — which the blocker describe below
     # pins directly.
     test "the path sort above is the whole order only while nothing is blocked" do
-      {form_state, _form} = form_pair(Form.submit(Form.new(address_definition()), %{}))
+      {form_state, _form} = form_pair(submitted_form(Form.new(address_definition()), %{}))
 
       assert Form.submission_blockers(form_state) == []
     end
@@ -172,7 +174,7 @@ defmodule Formentation.Phoenix.StateViewTest do
 
     test "preserves relative order of multiple issues sharing one path" do
       {form_state, form} =
-        form_pair(Form.submit(Form.new(code_definition()), %{"code" => "ab"}))
+        form_pair(submitted_form(Form.new(code_definition()), %{"code" => "ab"}))
 
       # Derive the expected order from Form.issues/1 directly, rather than
       # hardcoding JSV's current emission order, so this pins normalization's
@@ -208,7 +210,7 @@ defmodule Formentation.Phoenix.StateViewTest do
       {:ok, definition, _diagnostics} =
         Formentation.compile(schema, adapter: Formentation.JSONSchema)
 
-      form_state = definition |> Form.new(data) |> Form.submit(params)
+      form_state = definition |> Form.new(data) |> submitted_form(params)
       {form_state, Phoenix.HTML.FormData.to_form(form_state, [])}
     end
 
@@ -295,7 +297,7 @@ defmodule Formentation.Phoenix.StateViewTest do
           adapter: Formentation.Source.Map
         )
 
-      form_state = definition |> Form.new(%{}) |> Form.submit(%{})
+      form_state = definition |> Form.new(%{}) |> submitted_form(%{})
       form = Phoenix.HTML.FormData.to_form(form_state, [])
 
       assert [%SubmissionBlocker{issues: [], message: capability}] =

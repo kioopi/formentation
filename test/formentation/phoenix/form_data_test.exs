@@ -1,6 +1,8 @@
 defmodule Formentation.Phoenix.FormDataTest do
   use ExUnit.Case, async: true
 
+  import Formentation.Test.FormHelpers
+
   alias Formentation.Fixtures.PumpInspection
   alias Formentation.{Form, Params}
   alias Phoenix.HTML.FormData
@@ -255,7 +257,7 @@ defmodule Formentation.Phoenix.FormDataTest do
 
       {:ok, definition, []} = Formentation.compile(schema, adapter: Formentation.JSONSchema)
 
-      form_state = Form.submit(Form.new(definition), %{"title" => "t"})
+      form_state = submitted_form(Form.new(definition), %{"title" => "t"})
       form = FormData.to_form(form_state, [])
 
       assert form.errors == []

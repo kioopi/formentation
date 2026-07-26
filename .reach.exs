@@ -176,12 +176,14 @@
       # layer. Formentation.SourceFixture is the D-027 state-view contract
       # proof; its two defimpl-generated modules need no entry, being
       # covered already by the phoenix layer's FormData and
-      # Formentation.Phoenix.* patterns.
+      # Formentation.Phoenix.* patterns. Formentation.Test.FormHelpers is
+      # the submit-decision unwrapper shared by state-oriented tests.
       ignore: [
         "Formentation.Fixture",
         "Formentation.Fixtures.*",
         "Formentation.HTMLAssertions",
         "Formentation.SourceFixture",
+        "Formentation.Test.FormHelpers",
         # Documentation lint run by `mix ci`; build tooling, not library
         # code, so it participates in no layer.
         "Mix.Tasks.Vault.Links"

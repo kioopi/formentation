@@ -132,11 +132,12 @@ restyled freely while its guarantees stay pinned.
 
 ### The demo is where the LiveView lifecycle gets tested
 
-`Form.validate/2` and `Form.submit/2` add no verification mechanism of
-their own — they are `transition/2` underneath, already covered by the
-state layer's example and property tests. What they add is a *caller*
-worth testing in its own right: a real `mount/3`, real `handle_event/3`
-clauses, and a real `<.form>` template wired to
+`Form.validate/2` is still covered as the form-returning change
+transition. `Form.submit/2` now owns the application decision around the
+submitted form, so the state layer has dedicated `submit/2 decision`
+coverage in addition to the transition/property tests. The demo adds a
+*caller* worth testing in its own right: a real `mount/3`, real
+`handle_event/3` clauses, and a real `<.form>` template wired to
 `phx-change`/`phx-submit`, none of which the layered unit tests above
 exercise. `test/formentation_demo/` drives
 `FormentationDemo.PumpInspectionLive` (embedded under a hand-written
