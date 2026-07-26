@@ -8,17 +8,19 @@ status: draft
 
 # Architecture
 
-Formentation is best understood as a compiler plus runtime projection system, with adapters on both sides.
+Formentation is best understood as a compiler plus runtime form and rendering
+system, with adapters at the source, state, renderer, and UI boundaries.
 
 ```mermaid
 flowchart TD
     A["Declaration sources"] --> B["Source adapters"]
     B --> C["Compiler and verifiers"]
-    C --> D["FormDefinition"]
-    D --> E["Runtime projector"]
-    F["Form state"] --> E
-    E --> G["RenderPlan"]
-    G --> H["Renderer and theme"]
+    C --> D["Definition"]
+    D --> E["Form"]
+    E --> F["Renderer preparation"]
+    F --> G["Prepared view"]
+    G --> H["UI integration"]
+    I["Theme / visual config"] --> H
 ```
 
 ## Architectural layers
@@ -45,14 +47,16 @@ The compiler normalizes declarations into semantic nodes, applies named transfor
 
 ```elixir
 Formentation.compile(source,
-  adapter: Formentation.JSONSchema,
+  adapter: :json_schema,
   ui: ui_schema,
-  extensions: [...],
-  renderer: MyApp.FormRenderer
+  extensions: [...]
 )
 ```
 
-The `renderer:` option is optional and exists only for early capability verification. It must add diagnostics, never change the compiled semantics — otherwise the same schema would compile to different definitions per renderer, and the definition would stop being presentation-independent. Whether themes may influence compilation at all is [[16-open-questions#Rendering|an open question]].
+A reusable definition does not require a renderer or UI. Optional
+target-specific support inspection may add a report but must never change
+compiled semantics—otherwise the same declaration would produce different
+definitions per UI.
 
 See [[05-compiler-pipeline|Compiler pipeline]].
 
@@ -68,23 +72,38 @@ The definition is the project's durable in-memory product, examined in depth in 
 
 Definitions should include a format version and a deterministic fingerprint. Persistence or serialization can be considered later; do not promise safe long-term serialization before module references and extension metadata are understood.
 
-### Runtime state view
+### Form and advanced state view
 
-The projector requires values, parameters, errors, and nested-form access. The first integration can adapt a `%Phoenix.HTML.Form{}` and a JSON-backed `Formentation.Form`.
+`Formentation.Form` is the ordinary runtime object and owns or wraps values,
+parameters, decoding, issues, usage, blockers, and backing state. Phoenix
+projects it through `FormData`.
 
-Avoid requiring a broad state-engine behaviour before both JSON-backed and Ash-backed use cases have been exercised. Start with the smallest read interface the projector actually needs.
+The permanent advanced path accepts an arbitrary `%Phoenix.HTML.Form{}` plus an
+explicit definition and the smallest state-view interface render preparation
+actually needs.
 
-### Projector
+### Render preparation
 
-The projector evaluates runtime conditions, selects active alternatives, materializes collection items, maps instance paths to form fields, resolves runtime widget choices, and produces a render plan.
+Renderer preparation evaluates runtime conditions, selects active alternatives,
+materializes collection items, maps instance paths to form fields, resolves
+widgets/capabilities, derives transport and localized presentation facts, and
+produces a prepared view.
 
-The projector does not emit HEEx and does not mutate submitted data merely because a field is hidden. See [[06-runtime-projection|Runtime projection]].
+Preparation does not emit HEEx and does not mutate submitted data merely
+because a field is hidden. The current `Formentation.Phoenix.Projector` and
+`RenderPlan` are Phase 1 implementation names. See
+[[06-runtime-projection|Runtime projection]].
 
-### Renderer and theme
+### Renderer, UI, and theme
 
-The Phoenix renderer consumes a render plan and component registry. A theme supplies presentation defaults, component mappings, classes, and layout conventions. Renderers and themes advertise capabilities that can be checked during compilation or projection.
+The Phoenix renderer prepares Phoenix bindings and transport facts. A UI
+integration maps the prepared view to concrete components and markup. A theme
+configures the visual appearance of one UI. Renderer and UI capabilities are
+checked by optional support inspection or concrete runtime preparation.
 
-See [[08-extension-model#Renderer and theme capabilities|Renderer and theme capabilities]].
+See [[20-renderer-ui-model|Renderer and UI model]] and
+[[08-extension-model#Renderer and UI capabilities|Renderer and UI
+capabilities]].
 
 ## Package boundaries
 
@@ -94,7 +113,7 @@ The conceptual packages are:
 | --- | --- |
 | `formentation` | Definition, compiler contracts, introspection, diagnostics, projection concepts. |
 | `formentation_json_schema` | JSON Schema source adapter and validator integration. |
-| `formentation_phoenix` | `FormData` support, Phoenix components, themes, LiveView helpers. |
+| `formentation_phoenix` | `FormData` support, Phoenix preparation, reference UI/components, LiveView helpers. |
 | `formentation_ash` | Ash declaration and `AshPhoenix.Form` integration. |
 
 These should begin as namespaces in one repository unless independent release cycles or dependency graphs become painful. Prematurely publishing four Hex packages would increase maintenance without proving the boundaries.
@@ -121,7 +140,8 @@ Cache the static definition using a fingerprint of:
 - extension identities and relevant options;
 - selected capability contract, if renderer-specific verification is included.
 
-Do not cache render plans globally: they contain runtime values, active branches, and concrete collection identity.
+Do not cache prepared views globally: they contain runtime values, active
+branches, concrete collection identity, locale, UI selection, and overrides.
 
 ## Failure boundaries
 
@@ -156,4 +176,3 @@ See [[09-diagnostics-provenance-introspection|Diagnostics, provenance, and intro
 - [[07-phoenix-integration|Phoenix integration]]
 - [[10-algorithms|Algorithms and invariants]]
 - [[Formentation|Back to the entry point]]
-

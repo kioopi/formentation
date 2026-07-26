@@ -22,7 +22,7 @@ The conceptual roadmap that frames these phases is [[13-roadmap|Planning/13 — 
 | [[phase-1-walking-skeleton\|1 — Walking skeleton]] | 🚧 In progress | A form compiled from two sources renders, validates, and submits end to end through Phoenix. |
 | [[phase-1-north-star-alignment\|Phase 1 — North-star alignment]] | 📋 Planned | Milestone A adopts split semantic/presentation structure, layout-invariant semantics, a complete submission decision, and the intended Phoenix projection path before collections. |
 | [[phase-2-compiler-diagnostics\|2 — Compiler and diagnostics]] | 📋 Planned | Compilation becomes an ordered, explainable pipeline with verifiers, full provenance, and stable diagnostics. |
-| [[phase-3-extensibility\|3 — Extensibility]] | 📋 Planned | Applications and UI packages can add semantics, codecs, widgets, UI integrations, and compiler passes safely. |
+| [[phase-3-extensibility\|3 — Extensibility and UI integrations]] | 📋 Planned | Applications and UI packages can add semantics, codecs, prepared-view consumers, stateless and interactive widgets, and compiler passes through proven contracts. |
 | [[phase-4-dynamic-schemas\|4 — Dynamic schemas]] | 📋 Planned | Conditional and compositional schemas project against changing data without losing state. |
 | [[phase-5-ash-integration\|5 — Ash integration]] | 🔭 TBD | The same rendering concepts work with Ash declarations and `AshPhoenix.Form`. |
 
@@ -30,6 +30,13 @@ The conceptual roadmap that frames these phases is [[13-roadmap|Planning/13 — 
 
 > [!warning] Phases 2–5 are sketches
 > Their notes record direction and known hazards, not commitments; expect Phase 1 experience to revise them. See [[13-roadmap|the roadmap]].
+
+Phase 3's rendering direction is developed in
+[[20-renderer-ui-model|Planning/20 — Renderer and UI model]]. That note constrains
+current Definition and Phoenix work but deliberately defers public prepared-view,
+transport, UI, capability, localization, and interactive-widget contracts until
+a built-in UI, a separately compiling second editable UI, and read-only review
+rendering can prove the relevant boundaries.
 
 ## Current work
 
@@ -80,6 +87,7 @@ rewrite current-state `Techdocs` or `Userguide` ahead of implementation.
 
 - [[13-roadmap|Planning/13 — Roadmap]]
 - [[19-north-star-architecture|Planning/19 — North-star architecture]]
+- [[20-renderer-ui-model|Planning/20 — Renderer and UI model]]
 - [[phase-1-north-star-alignment|Phase 1 — North-star alignment]]
 - [[Planning]]
 - [[Formentation|Vault entry note]]

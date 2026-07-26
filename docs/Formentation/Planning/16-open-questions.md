@@ -13,7 +13,12 @@ These questions should be answered by prototypes, tests, and user needs. They ar
 ## Core representation
 
 - ~~Should semantic node kinds be separate structs or one tagged struct?~~ Answered 2026-07-22: one struct per kind, split when the shape differs rather than when values differ — [[18-decisions#D-015 — One struct per node kind|D-015]].
-- Should `:group`'s two flavors (data-nesting vs presentational) become separate structs too? `nests_data?` still flags kind-like variation inside one struct; a split is now a cheap, localized change. Links [[18-decisions#D-006 — One `:group` kind, flagged for data nesting|D-006]] and [[18-decisions#D-015 — One struct per node kind|D-015]].
+- ~~Should `:group`'s two flavors (data-nesting vs presentational) become
+  separate structs too?~~ Answered 2026-07-26: the target `Definition`
+  separates semantic objects from presentation groups and eliminates
+  `nests_data?`; D-006 remains a historical description of the Phase 1
+  representation — [[18-decisions#D-029 — Definition and Form are the ordinary public model|D-029]]
+  and [[19-north-star-architecture#Definition separates semantics from presentation|North-star split]].
 - A presentation group's `fields:` list or a `fields` UI hint can claim a property that is not a field. Since D-015, membership stamps and hints apply only to `Field` nodes; non-field claims are placed (groups) or ignored (hints) silently. Should they warn instead? Related to the existing hint-strictness questions.
 - How opaque should `Formentation.Definition` be to extension authors?
 - Which decisions merit full provenance objects versus compact origin references? (Initial answer: tags only — [[18-decisions|D-003]]; the question returns when the full model lands.)
@@ -22,6 +27,10 @@ These questions should be answered by prototypes, tests, and user needs. They ar
 - What are the semantics of a field claimed by two presentation groups? Today the second group emits a misleading `unknown_group_field` warning; overlap needs a real decision.
 - Should a failed compile return all diagnostics accumulated before the error instead of only the fatal one? Revisit with the Phase 2 compiler/diagnostics restructuring.
 - Group declarations are outside the node budget: many groups with many unknown field names generate unbounded warning diagnostics. Fold into the next guards/hardening pass.
+- Which limits are configurable versus absolute for source bytes, semantic and
+  presentation nodes/nesting, options, diagnostics, visible occurrences,
+  collection items, decoded bytes, and preparation work? Which layer reports
+  each failure?
 
 ## Source and validation
 
@@ -36,9 +45,18 @@ These questions should be answered by prototypes, tests, and user needs. They ar
 
 ## UI declaration
 
+The ownership boundaries are fixed in
+[[20-renderer-ui-model|Renderer and UI model]]. The questions here concern the
+declaration vocabulary and its compilation into source-neutral presentation,
+not concrete UI components.
+
 - Should the first UI format closely follow RJSF `uiSchema`, or define a smaller Formentation-specific vocabulary? (A first provisional vocabulary is drafted in [[17-end-to-end-example|the end-to-end example]].)
 - Are UI hints a declaration source with their own adapter, or a compile option attached to a primary source? The conceptual model and the compile API currently disagree.
-- How are ordered layouts expressed without making object map order semantically significant?
+- ~~How are ordered layouts expressed without making object map order
+  semantically significant?~~ Answered architecturally 2026-07-26:
+  `Definition` owns an explicit presentation layout whose order is independent
+  of semantic declaration order. Exact declaration syntax remains open —
+  [[19-north-star-architecture#Two independent order contracts|two order contracts]].
 - Can UI hints target semantic/template paths as well as source schema paths?
 - How are conditional UI rules represented and composed with schema conditions?
 - Should field hints targeting a nested-object (group) node warn or apply? Today `fields.<name>` hints stamp widget/help onto non-field nodes silently.
@@ -63,12 +81,73 @@ These questions should be answered by prototypes, tests, and user needs. They ar
 ## Rendering
 
 - ~~Does theme selection affect compilation, projection, or only rendering?~~ Answered 2026-07-23, for Phase 1: rendering only, and there is no theme selection yet — `Formentation.Phoenix.Theme.Reference` is called directly rather than dispatched through a configurable parameter — [[18-decisions#D-020 — The reference theme is a markup set, not a contract|D-020]].
-- Which capability failures should be compile errors versus projection errors?
-- What component customization can be expressed with theme data, and where are slots/callbacks needed?
-- What is the minimum accessible markup contract every theme must satisfy? First answered 2026-07-23 by the reference theme's documented, Floki-tested contract (labels, `aria-describedby`, `aria-invalid`, fieldsets with legends, a submit-gated error summary, no duplicate ids, escaped schema text) — [[18-decisions#D-020 — The reference theme is a markup set, not a contract|D-020]]. The question stays open until [[phase-3-extensibility|Phase 3]] extracts the general contract from a second theme implementation.
-- How do behavioural widgets fit the render-plan model? File uploads, async option search (live_select-style comboboxes), and widgets needing JS hooks or their own LiveView events are not pure render functions; the capability model currently only describes render-time support.
+  Refined 2026-07-26: a UI is a component-library integration; a theme is only
+  visual configuration within one UI. The future contract is planned in
+  [[20-renderer-ui-model|Renderer and UI model]].
+- Does the public prepared-view boundary use structs, typed queries over an
+  opaque value, a renderer-neutral core plus environment bindings, or a hybrid?
+- How does the prepared view remain complete enough to prevent semantic work in
+  components without becoming the union of every UI's convenience facts?
+  Should it use typed queries, lazy derived facts, edit/review profiles, or a
+  hybrid? Arbitrary UI-defined derivation must not become a semantic-traversal
+  escape hatch.
+- What typed representation describes primary and auxiliary controls, scalar
+  versus repeated/structured params, unchecked/absent/null behaviour, blank
+  options, action metadata, uploads, and environment usage markers?
+- Which compound widgets are representative enough to prove that transport
+  contract beyond the current checkbox?
+- Which capability requirements are static enough for a definition support
+  report, and which can only be checked during runtime preparation?
+- How should required widgets, preferred widgets, UI defaults, and equivalent
+  fallbacks be represented and explained?
+- How should preparation/configuration failures appear to explicit API callers,
+  high-level components, and the demo in development versus production?
+- Which capabilities belong to the renderer, the UI, an individual component,
+  or a composed descriptor?
+- What component customization can be expressed with UI/theme data, and where
+  are component overrides, slots, or callbacks needed?
+- What is the deterministic precedence between renderer defaults,
+  application-wide UI selection, per-form selection, definition presentation
+  intent, and local overrides?
+- How should local overrides address semantic/template paths, layout
+  identities, and repeated runtime occurrences without depending on child
+  positions?
+- How can two UI integrations coexist in one application without relying on
+  process-global configuration?
+- Which translation facility turns structured issues into localized content,
+  and what representation supports runtime/user-authored labels and help
+  without assuming compile-time Gettext extraction?
+- How does explicit locale context reach codecs that intentionally accept
+  localized input while keeping invalid `control_value` separate from
+  formatted `display_value`?
+- Does review/confirmation rendering share the edit prepared view, use a
+  profile over one opaque view, or require a distinct renderer-prepared view?
+- What is the minimum accessible markup contract every UI must satisfy? First
+  answered 2026-07-23 by the reference component set's documented,
+  Floki-tested contract (labels, `aria-describedby`, `aria-invalid`, fieldsets
+  with legends, a submit-gated error summary, no duplicate IDs, escaped schema
+  text) — [[18-decisions#D-020 — The reference theme is a markup set, not a contract|D-020]].
+  The question stays open until
+  [[phase-3-extensibility|Phase 3]] extracts the general contract from a second
+  UI implementation.
+- How should the general accessibility contract distinguish renderer
+  obligations, UI obligations, and responsibilities assumed by an application
+  override?
+- How do behavioural widgets fit the prepared-view model? File uploads, async
+  option search (live_select-style comboboxes), and widgets needing JS hooks or
+  their own LiveView events are not pure render functions. The planned
+  stateless and advanced tiers need a concrete event/state ownership contract.
+- Which representative advanced widget should prove the LiveComponent/hook
+  tier without distorting the stateless baseline?
+- How are UI and prepared-view contract versions negotiated before component
+  execution?
+- What preparation work is cached; which definition, form, locale, UI, and
+  override revisions invalidate it; and what complexity is promised for
+  whole-form, subtree, and large-collection preparation?
+- Can future stream-based collection rendering use the same stable occurrence
+  identities and partial-preparation contract?
 - ~~Number inputs render `type="number"`; browsers may refuse to display non-numeric raw text (e.g. `"51o2"`) even though the attribute carries it.~~ Answered 2026-07-24: confirmed against a real browser (Chrome) — it fails raw-input preservation two ways at once, blocking non-numeric keystrokes outright and, when invalid text is force-injected anyway, sanitizing it away on the round-trip patch. The number widget now ships as `type="text" inputmode="numeric"` instead of `type="number"` (commit "Fall back number inputs to text with numeric inputmode") — [[18-decisions#D-021 — LiveView integration is wrappers plus a demo, not framework machinery|D-021]].
-- Under embedding, `Formentation.Phoenix.fields/1` renders the submit-gated error summary at the top of the Formentation fields block, before the group/field markup — which lands mid-form whenever hand-written parent inputs precede the embedded block (observed live in the pump-inspection demo, where `asset[name]` precedes the payload fields). Acceptable for [[phase-1-walking-skeleton|Phase 1]], which has no slot mechanism; the [[phase-3-extensibility|Phase 3]] theme-contract/slot design should let callers reposition or suppress the summary — [[18-decisions#D-021 — LiveView integration is wrappers plus a demo, not framework machinery|D-021]].
+- Under embedding, `Formentation.Phoenix.fields/1` renders the submit-gated error summary at the top of the Formentation fields block, before the group/field markup — which lands mid-form whenever hand-written parent inputs precede the embedded block (observed live in the pump-inspection demo, where `asset[name]` precedes the payload fields). Acceptable for [[phase-1-walking-skeleton|Phase 1]], which has no slot mechanism; the [[phase-3-extensibility|Phase 3]] UI-contract/slot design should let callers reposition or suppress the summary — [[18-decisions#D-021 — LiveView integration is wrappers plus a demo, not framework machinery|D-021]].
 - ~~Step 7 showed that `Phoenix.LiveViewTest` never runs the browser's `LiveSocket` hook, so it cannot observe `_unused_` marker gating at all — the LiveView test suite and a real browser check had to disagree on record to both be right ([[18-decisions#D-021 — LiveView integration is wrappers plus a demo, not framework machinery|D-021]]). Should Formentation adopt browser-real end-to-end tests (Playwright, Wallaby) to close that gap with automated coverage, and if so, at what layer — library test suite, demo-only, or both? Flagged for discussion after step 7.~~ Answered 2026-07-24: adopted PhoenixTest + Playwright as an opt-in, demo-driven suite — the layer is the library's test suite (`test/browser/`) driving the demo, tagged `browser: :chromium`, run via `mix test.browser`, excluded from `mix test`/`mix ci` — [[18-decisions#D-022 — Browser-real tests are an opt-in, demo-driven Playwright suite|D-022]].
 
 ## Extensions
@@ -77,6 +156,8 @@ These questions should be answered by prototypes, tests, and user needs. They ar
 - How are extension versions and configuration included in fingerprints?
 - Can custom nodes remain introspectable without exposing arbitrary opaque terms?
 - What compatibility promises are made to third-party renderer packages before 1.0?
+- When real third-party definition adapters exist, should typed source dispatch
+  use a protocol, wrapper values, a behaviour helper, or a combination?
 
 ## Ash
 
@@ -94,6 +175,6 @@ Answered questions move to the [[18-decisions|decision log]]. Each decision shou
 - [[18-decisions|Decision log]]
 - [[13-roadmap|Roadmap]]
 - [[10-algorithms|Algorithms and invariants]]
+- [[20-renderer-ui-model|Renderer and UI model]]
 - [[phase-1-walking-skeleton|Phase 1]]
 - [[Formentation|Back to the entry point]]
-

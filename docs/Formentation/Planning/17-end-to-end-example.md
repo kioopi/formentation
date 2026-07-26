@@ -99,7 +99,11 @@ Info.origins(definition, ["notes"])
 
 Origins here are the compact tags of the simplified Phase 1 provenance model ([[18-decisions#D-003 — Simplified provenance first|D-003]]); the full `Decision`/`explain` machinery arrives in [[phase-2-compiler-diagnostics|Phase 2]].
 
-The widget layering is visible in `notes`: semantic role `:text` (inferred), abstract widget key `:textarea` (UI hint), concrete component chosen by the theme at render time. See [[03-conceptual-model#Renderer, theme, and widget|role → widget key → component]].
+The widget layering is visible in `notes`: semantic role `:text` (inferred),
+abstract widget key `:textarea` (presentation hint), concrete component chosen
+by the selected UI during render preparation. See
+[[20-renderer-ui-model#Widget resolution|role → abstract widget → concrete
+component]].
 
 ## Rendering
 
@@ -109,15 +113,16 @@ The payload form is embedded in the hand-written asset form, so field names are 
 <.form for={@asset_form} phx-change="validate" phx-submit="save">
   <.input field={@asset_form[:name]} label="Asset name" />
 
-  <Formentation.Phoenix.form
-    definition={@definition}
-    form={@payload_form}
-    theme={MyApp.FormTheme}
-  />
+  <Formentation.Phoenix.fields form={@payload_form} />
 </.form>
 ```
 
-Expected semantic structure (plain reference theme, styling elided):
+`@payload_form` is the `%Phoenix.HTML.Form{}` projected from
+`%Formentation.Form{}` with caller-owned `as: "asset[payload]"` and ID. The
+component recovers both the root definition and selected projection root from
+that form; no duplicate definition assign is required.
+
+Expected output structure (built-in reference UI, styling elided):
 
 ```html
 <div class="ftn-field">
@@ -205,7 +210,8 @@ Each item links to where the question lives:
 
 1. **Presentation group vs object container** — the fieldset nests markup but not data; `:group` currently conflates both meanings ([[16-open-questions#Core representation|open question]]).
 2. **Enum as field, not structural choice** — `condition` is a field with options, reserving `:choice` for `oneOf`-style alternatives ([[18-decisions#D-005 — Scalar enums are fields, not choice nodes|D-005]]).
-3. **Role → widget key → component layering** — visible in `notes` ([[03-conceptual-model#Renderer, theme, and widget|conceptual model]]).
+3. **Role → widget key → component layering** — visible in `notes`
+   ([[20-renderer-ui-model#Widget resolution|renderer/UI model]]).
 4. **Ordering** — JSON needs an explicit order hint; the map source is natively ordered; the differential test must define what "same definition" means for order.
 5. **Decode/validate interplay** — the `"51o2"` walkthrough above ([[18-decisions#D-012 — Schema validation defers while any decode fails|D-012]]).
 6. **Embedding under a parent form** — names, IDs, and error routing under `asset[payload]` ([[00-use-case|requirement 5]]).

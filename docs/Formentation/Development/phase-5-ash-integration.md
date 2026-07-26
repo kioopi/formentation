@@ -50,7 +50,8 @@ Accept `AshPhoenix.Form` through its `%Phoenix.HTML.Form{}` representation and a
 - nested/global error retrieval;
 - sparse collections and hidden fields.
 
-The same Phoenix renderer and theme should work without Ash-specific component forks.
+The same Phoenix renderer and selected UI integration should work without
+Ash-specific component forks.
 
 ## Deliverables
 
@@ -164,7 +165,7 @@ Compile per action initially. Sharing/merging definitions can be considered afte
 
 ### Decoupling tests
 
-Run the same semantic definition and reference theme with:
+Run the same semantic definition and reference UI/component set with:
 
 - JSON-backed `Formentation.Form`;
 - an `AshPhoenix.Form`.
@@ -231,4 +232,3 @@ These are not automatic Phase 7 commitments. Apply [[01-philosophy#Incremental d
 - [[08-extension-model#Optional Spark DSL|Optional Spark DSL]]
 - [[11-testing-strategy#Ash integration tests|Ash integration tests]]
 - [[13-roadmap|Back to the roadmap]]
-

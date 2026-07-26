@@ -17,12 +17,18 @@ the implementation with
 [[19-north-star-architecture|the two-noun `Definition`/`Form` model]]; it is not
 a separate product phase.
 
+The alignment work also preserves the boundary described in
+[[20-renderer-ui-model|the renderer and UI model]]. It does not implement UI
+selection or capabilities yet: it ensures that presentation remains
+UI-independent and that the reference components do not become an accidental
+extension contract before Phase 3.
+
 ```mermaid
 flowchart TD
     P1A["1A Milestone A<br/>working skeleton"] --> Align["Phase 1 alignment gate"]
     Align --> P1B["1B Milestone B<br/>collections"]
     P1B --> P2["2 Compiler and diagnostics"]
-    P2 --> P3["3 Extensibility"]
+    P2 --> P3["3 Extensibility<br/>and UI integrations"]
     P3 --> P4["4 Dynamic schemas"]
     P4 --> P5["5 Ash integration"]
 ```
@@ -37,7 +43,7 @@ flowchart TD
 | [[phase-1-walking-skeleton\|1 — Walking skeleton]] | Whether a source-independent definition is real (two sources) and composes with Phoenix state, components, and LiveView. | An expert-defined payload form from [[00-use-case\|the use case]] compiles from JSON Schema *and* plain Elixir data, renders, validates, and submits; collections complete the use case. |
 | [[phase-1-north-star-alignment\|Phase 1 alignment gate]] | Whether Milestone A can adopt the intended public model and split semantic/presentation definition without losing proven behaviour. | `Definition` and `Form` are the ordinary concepts; both adapters emit split definitions; a Phoenix form projected from `Form` renders without a duplicate definition assign; collections can begin on that foundation. |
 | [[phase-2-compiler-diagnostics\|2 — Compiler and diagnostics]] | Whether complexity can grow without opaque passes and errors. | Ordered passes, verifiers, full provenance, explanation, support reports, and caching. |
-| [[phase-3-extensibility\|3 — Extensibility]] | Whether applications and UI libraries can extend the system without forks. | A second UI integration and a custom semantic role/widget implemented externally. |
+| [[phase-3-extensibility\|3 — Extensibility and UI integrations]] | Whether applications, definition adapters, and UI libraries can extend the system without compiler, transport, or preparation forks. | A separately compiling second editable UI, read-only review rendering, public transport/accessibility conformance, an advanced interactive widget, resource/performance evidence, and a custom semantic role/widget implemented externally. |
 | [[phase-4-dynamic-schemas\|4 — Dynamic schemas]] | Whether composition and conditional behaviour can remain correct during editing. | `oneOf` and conditional fields react to data while preserving state and errors. |
 | [[phase-5-ash-integration\|5 — Ash integration]] | Whether definition, state, and renderer are genuinely decoupled. | Render an `AshPhoenix.Form` and derive useful definitions from Ash metadata. |
 
@@ -56,7 +62,8 @@ Phase numbers indicate implementation order, not mandatory package dependencies.
 - `0.1` after aligned Phase 1 Milestone A: first end-to-end Phoenix forms through the intended `Definition`/`Form` public model.
 - `0.2` after Phase 1 Milestone B: collections; the [[00-use-case|use case]] becomes servable.
 - `0.3` after Phase 2: structured compiler API suitable for broader experimentation.
-- `0.4` after Phase 3: supported third-party extension contracts.
+- `0.4` after Phase 3: supported third-party extension, prepared-view, and UI
+  integration contracts.
 - `0.5` after Phase 4: dynamic/compositional schema preview.
 - `0.6` after Phase 5: optional Ash integration.
 - `1.0` only after the supported feature matrix, compatibility promises, migration story, and extension contracts have real users.
@@ -70,6 +77,9 @@ These numbers are illustrative. Do not let a version scheme force incomplete fea
 - document unsupported behaviour;
 - preserve source origins;
 - update `Info` rather than encouraging internal pattern matching;
+- preserve semantic behaviour across presentation and UI changes;
+- treat rendered control shape as a tested transport contract;
+- keep raw edit values distinct from localized display values;
 - review security budgets and escaping;
 - benchmark only after correctness is established;
 - keep the entry note, roadmap links, and [[18-decisions|decision log]] current.
@@ -98,6 +108,7 @@ Before accepting a feature, ask:
 
 - [[00-use-case|Motivating use case]]
 - [[19-north-star-architecture|North-star architecture]]
+- [[20-renderer-ui-model|Renderer and UI model]]
 - [[18-decisions|Decision log]]
 - [[11-testing-strategy|Testing strategy]]
 - [[16-open-questions|Open questions]]

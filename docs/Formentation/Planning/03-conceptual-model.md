@@ -104,17 +104,22 @@ They may share path and message conventions but should remain distinct types. Us
 
 ## The static and dynamic models
 
-`Formentation.Definition` is static. `Formentation.RenderPlan` is dynamic.
+`Formentation.Definition` is static. `Formentation.Form` owns one dynamic
+interaction lifecycle. Renderer preparation derives a dynamic prepared view
+for concrete visible occurrences; the current Phase 1 `RenderPlan` is an
+internal implementation of that responsibility, not an ordinary public noun.
 
-The render plan is produced from:
+The prepared view is produced from:
 
 - the definition;
-- a current form/value view;
-- validation issues;
+- a current projected form/root or advanced state view;
 - runtime context;
-- renderer capabilities.
+- the selected UI descriptor/capabilities and overrides.
 
-It contains active branches, visible nodes, concrete collection items, resolved component/widget choices, and runtime identifiers. See [[06-runtime-projection|Runtime projection]].
+It contains active branches, visible occurrences, concrete collection items,
+resolved widget/component choices, transport facts, localized feedback, and
+runtime identifiers. See [[06-runtime-projection|Runtime projection]] and
+[[20-renderer-ui-model|Renderer and UI model]].
 
 ## Form state
 
@@ -138,19 +143,29 @@ Examples:
 
 Codecs need path-aware errors and should be composable for nested and collection values.
 
-## Renderer, theme, and widget
+## Renderer, UI, theme, and widget
 
-- A **renderer** walks a render plan and produces output for a platform, initially Phoenix HEEx.
-- A **theme** maps semantic presentation roles to components, classes, layouts, and defaults.
-- A **widget** renders or coordinates a particular input interaction.
+- A **renderer** integrates an output environment and prepares concrete
+  component-ready occurrences, initially Phoenix/HEEx.
+- A **UI integration** maps a prepared view to one component library or
+  application design system.
+- A **theme** supplies visual configuration inside one UI.
+- A **widget** is an abstract input interaction implemented by a concrete UI
+  component.
 
 Presentation choices form three distinct levels, and every note should be explicit about which level it means:
 
 1. **Role** — semantic meaning, chosen during compilation: `:text`, `:date`, `:money`.
-2. **Widget key** — abstract interaction kind, resolved from role, UI hints, and theme defaults: `:textarea`, `:date_input`. This is what a `Decision` with `key: :widget` stores.
-3. **Component** — the concrete function a theme binds to a widget key at render time.
+2. **Widget key** — abstract interaction kind, resolved from role/type,
+   presentation intent, UI defaults/capabilities, and overrides:
+   `:textarea`, `:date_input`.
+3. **Component** — the concrete function one UI binds to a resolved widget at
+   render time.
 
-Roles and widget keys may appear in a definition; concrete components never do. Keeping these concepts separate allows a Tailwind and Bootstrap theme to share widget semantics, or a custom widget to participate in multiple themes.
+Roles and widget keys may appear in a definition; concrete components never do.
+Keeping these concepts separate allows Tailwind- and Bootstrap-oriented UIs to
+share widget semantics, or a custom widget to participate in several UIs. See
+[[20-renderer-ui-model#Widget resolution|the canonical widget model]].
 
 ## Info API
 
@@ -165,6 +180,6 @@ See [[09-diagnostics-provenance-introspection#The Info API|The Info API]].
 - [[04-architecture|Architecture]]
 - [[05-compiler-pipeline|Compiler pipeline]]
 - [[06-runtime-projection|Runtime projection]]
+- [[20-renderer-ui-model|Renderer and UI model]]
 - [[15-glossary|Glossary]]
 - [[Formentation|Back to the entry point]]
-

@@ -70,7 +70,8 @@ Document which data each phase may read and write.
 ### Provenance
 
 - origin table or derivation graph;
-- provenance for schema facts, inference, UI hints, theme defaults, overrides, and extensions;
+- provenance for schema facts, inference, UI hints, source-neutral presentation
+  defaults, UI defaults, overrides, and extensions;
 - related origins on conflicts;
 - formatter showing source URI/pointer and derivation steps.
 

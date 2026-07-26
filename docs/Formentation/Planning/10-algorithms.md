@@ -94,7 +94,10 @@ primitive type default
 unsupported
 ```
 
-Widget inference follows role selection and renderer/theme compatibility. An explicit unsupported widget should produce a diagnostic rather than silently selecting a different widget unless permissive fallback is configured.
+Widget resolution follows role selection and renderer/UI compatibility. An
+explicit unsupported widget should produce a diagnostic rather than silently
+selecting a different widget unless an explicit fallback policy permits and
+explains the substitution.
 
 ## Conditional projection
 
@@ -104,8 +107,8 @@ Compile conditions into a small expression AST with declared dependencies. At ru
 2. evaluate predicates using decoded values and the validator adapter;
 3. use three-valued results `true | false | unknown` for incomplete input;
 4. apply a configured `unknown` policy without discarding state;
-5. record branch-selection reason in the render plan;
-6. project the selected subtree;
+5. record the branch-selection reason in the prepared view;
+6. prepare the selected subtree;
 7. preserve inactive branch data unless the state engine explicitly transitions it.
 
 For `oneOf`, do not treat the first branch as a discriminator. See [[06-runtime-projection#Branch selection|Branch selection]].
@@ -181,4 +184,3 @@ Start with explicit recursive functions that carry `%TraversalContext{}`. A comm
 - [[09-diagnostics-provenance-introspection|Diagnostics and provenance]]
 - [[11-testing-strategy|Testing strategy]]
 - [[phase-4-dynamic-schemas|Phase 4]]
-

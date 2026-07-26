@@ -128,6 +128,12 @@ Running log of architecture decisions, ADR-style but lightweight. Each entry rec
 
 **Consequences.** Absence keeps one meaning across all field types, partial params cannot fabricate values, and `required` on booleans stays meaningful. A theme that omits the hidden input fails conformance tests instead of silently making unchecking impossible; the reference theme's checkbox carries the first such test. The contract binds editable checkboxes only: a read-only boolean renders as a disabled checkbox with no hidden input ([[#D-016 — Participation is definition-driven, not transport-driven|D-016]]).
 
+> [!note] Ownership terminology amended by D-030
+> This transport rule remains unchanged. What this entry called the control's
+> “theme contract” is now the renderer-prepared widget transport contract that
+> every UI must emit faithfully. See
+> [[#D-030 — Renderer, UI, theme, and transport responsibilities are separate|D-030]].
+
 ## D-012 — Schema validation defers while any decode fails
 
 *2026-07-22*
@@ -221,6 +227,15 @@ Amended by [[18-decisions#D-027 — Projection reads semantic state through a St
 **Decision.** Phase 1 has no theme parameter. `Formentation.Phoenix.Theme.Reference` holds per-widget function components called directly by `Formentation.Phoenix.fields/1` and `field/1`; nothing dispatches through a configurable module. The accessibility contract is documented and Floki-tested against these components: labels for every control, `aria-describedby` for help and visible errors, `aria-invalid`, fieldsets with legends (groups and radio groups), a submit-gated error summary linking to controls, no duplicate ids, all schema text escaped. Conformance obligations bind here: the editable checkbox carries the [[#D-011 — Booleans use the hidden-input transport contract|D-011]] hidden input; read-only renders `readonly`/`disabled` with no hidden mirrors and a read-only boolean drops the hidden input ([[#D-016 — Participation is definition-driven, not transport-driven|D-016]]); selects always lead with a blank option; a required boolean never renders the HTML `required` attribute on its checkbox (HTML required means must-be-*checked*).
 
 **Consequences.** Users cannot plug a theme in before Phase 3 designs the real contract, so nothing informal freezes. The reference components are the executable specification a second theme will be measured against when the contract is extracted.
+
+> [!note] Terminology amended by D-030
+> This entry keeps the historical Phase 1 module name and decision title.
+> [[#D-030 — Renderer, UI, theme, and transport responsibilities are separate|D-030]]
+> reserves **theme** for visual configuration inside one UI. The current
+> `Formentation.Phoenix.Theme.Reference` is therefore a reference component
+> set/reference UI, not a theme in the target architecture, and should be
+> renamed before `0.1.0`. Its accessibility and transport requirements remain
+> valid evidence for the later contract.
 
 ## D-021 — LiveView integration is wrappers plus a demo, not framework machinery
 
@@ -425,9 +440,85 @@ preservation, source-owned validation, used-input state, nested presence,
 preservation, blockers, path safety, accessibility, and browser transport—are
 mandatory acceptance criteria for the migration.
 
+## D-030 — Renderer, UI, theme, and transport responsibilities are separate
+
+*2026-07-26*
+
+**Context.** D-029 establishes Phoenix as a renderer and defers a public UI
+contract until independent implementations can prove it. The detailed planning
+exposed several durable ownership decisions that are not contingent on the
+eventual struct or behaviour names. The current Phase 1 vocabulary also uses
+“projector,” “renderer,” and “theme” for overlapping concerns. Most
+importantly, the reference checkbox proves that markup participates in decoding
+transport: its hidden `false` input implements D-011. Treating a UI as “only
+markup” without a prepared transport contract would let another component set
+silently change form semantics.
+
+**Decision.** Adopt
+[[20-renderer-ui-model|the renderer and UI model]] as the canonical ownership
+note:
+
+- A **renderer** owns integration with an output environment and prepares
+  concrete occurrences, bindings, names, IDs, visible issues, transport facts,
+  localization/formatting facts, capabilities, and fallbacks. Phoenix is the
+  first renderer.
+- A **UI integration** maps a prepared view onto one component library or
+  application design system. It owns concrete components and markup
+  composition, not semantic traversal, decoding, validation, branch selection,
+  or submission policy.
+- A **theme** is visual configuration within one UI: tokens, density, colour
+  mode, spacing, sizing, or a component-library theme name. It is not a
+  component registry or form adapter.
+- Widget resolution has three distinct levels: semantic role, abstract
+  interaction widget, and concrete UI component.
+- A prepared view is source-neutral but may be renderer/environment-specific.
+  Phoenix preparation may expose `%Phoenix.HTML.FormField{}` and
+  Phoenix/LiveView transport facts; it must not expose JSON Schema, map, Ash, or
+  native-state internals.
+- A UI does not choose transport or decoding semantics. Renderer preparation
+  supplies a typed transport contract—primary/auxiliary controls, names,
+  cardinality, raw values, and unchecked/absent/blank/null behaviour—and the UI
+  emits it faithfully.
+- Renderer preparation uses an application-supplied translation facility to
+  turn visible structured issues into presentation-ready localized content.
+  Editable `control_value` remains separate from localized/read-only
+  `display_value`; rerendering never replaces an invalid raw attempt with
+  formatted output.
+- The baseline UI contract is implementable with stateless Phoenix function
+  components and ordinary HTML POST. LiveComponent-, hook-, upload-, or
+  browser-state widgets use a separate advanced tier.
+- A public prepared-view/UI contract must be earned by the built-in UI and a
+  substantially different editable UI that compiles in a separate Mix project.
+  Executable module-graph checks forbid source adapters, private definition
+  representation, and private preparation structs.
+- Read-only review/confirmation rendering is an additional proof consumer,
+  especially for display formatting and container mapping, but does not replace
+  the second editable UI.
+- Shared conformance asserts typed facts, structural DOM/accessibility,
+  render-to-params-to-decode round trips, and browser behaviour. It does not
+  require exact HTML goldens across UIs.
+- Compiler/runtime resource budgets and preparation cost are engine-owned
+  correctness concerns, not UI capabilities.
+
+The exact prepared structs or queries, UI descriptor, component callbacks,
+capability vocabulary, override precedence, transport structs, localization
+representation, and interactive event API remain Phase 3 prototype decisions.
+
+**Consequences.** [[15-glossary|The glossary]] and
+[[14-naming|naming note]] use the new vocabulary. D-020 remains the historical
+record of why Phase 1 did not freeze a configurable contract, but its
+`Formentation.Phoenix.Theme.Reference` name is transitional. The current
+`Formentation.Phoenix.Projector` performs render preparation and should be
+renamed before `0.1.0` so “projection” remains available for
+`Form` → `%Phoenix.HTML.Form{}`. Phase 3 must build the second UI and review
+consumer concurrently with the contract, publish the round-trip conformance
+suite, define capability-failure developer experience, and establish resource
+limits/performance evidence before exposing a stable prepared view.
+
 ## Related notes
 
 - [[19-north-star-architecture|North-star architecture]]
+- [[20-renderer-ui-model|Renderer and UI model]]
 - [[phase-1-north-star-alignment|Phase 1 — North-star alignment]]
 - [[16-open-questions|Open questions]]
 - [[13-roadmap|Roadmap]]

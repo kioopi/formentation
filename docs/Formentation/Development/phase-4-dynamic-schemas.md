@@ -33,7 +33,8 @@ Introduce features incrementally:
 6. tuple/prefix-item arrays if not already supported;
 7. recursive definitions with bounded rendering policy.
 
-For each feature, distinguish validation support, definition support, automatic projection support, and reference-theme support.
+For each feature, distinguish validation support, definition support, automatic
+preparation support, and reference-UI support.
 
 ## Deliverables
 
@@ -176,7 +177,8 @@ Use official JSON Schema test-suite cases where compatible with the validator. E
 - [ ] A condition AST provides three-valued evaluation, dependencies, provenance, and explanation.
 - [ ] `oneOf` works with an explicit discriminator and handles zero/multiple matches honestly.
 - [ ] Branch switching preserves inactive data by default.
-- [ ] Projector and renderer never syntactically merge `allOf` without a verified safe transformation.
+- [ ] Preparation and rendering never syntactically merge `allOf` without a
+      verified safe transformation.
 - [ ] Branch-level errors are summarized without overwhelming users with raw validator branch failures.
 - [ ] LiveView lifecycle tests cover condition and branch transitions.
 - [ ] Recursion, depth, branch count, and projection work have enforced budgets.
@@ -205,4 +207,3 @@ The phase ends when dynamic behaviour is correct and explainable for a declared 
 - [[12-ecosystem-and-dependencies#Crux|Crux]]
 - [[11-testing-strategy#LiveView lifecycle tests|LiveView testing]]
 - [[13-roadmap|Back to the roadmap]]
-

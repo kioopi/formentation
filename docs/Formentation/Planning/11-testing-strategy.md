@@ -102,10 +102,14 @@ Verify:
 - hidden collection identifiers;
 - translated errors;
 - escaping of untrusted schema annotations;
-- theme capability fallbacks;
+- UI capability failures and explicit fallbacks;
 - accessible fieldsets, legends, and summaries.
 
-Keep a small number of intentional rendered snapshots for human review of each reference theme.
+Add render-to-params-to-decode round trips for checkbox auxiliaries, choice
+blanks, repeated names, nested fields, collections, and compound controls.
+Keep any exact HTML snapshots package-local and intentionally narrow; the
+shared cross-UI contract uses structural DOM, accessibility, transport, and
+behavioural assertions rather than golden markup.
 
 ### LiveView lifecycle tests
 
@@ -122,7 +126,12 @@ End-to-end LiveView tests should cover:
 
 ### Extension conformance tests
 
-Publish reusable test modules for source adapters, codecs, compiler passes, renderers, themes, and widgets. See [[08-extension-model#Conformance suite|Extension conformance suite]].
+Publish reusable test modules for source adapters, codecs, compiler passes,
+renderers, prepared views, UI integrations, transport contracts, and widgets.
+The second UI must compile in a separate Mix project, with `mix xref`, Reach,
+or both enforcing that it does not reference source adapters or private
+definition/preparation modules. See
+[[08-extension-model#Conformance suite|Extension conformance suite]].
 
 ### Ash integration tests
 
@@ -148,8 +157,8 @@ Every golden update should be reviewed semantically. Avoid snapshots containing 
 - path encode/decode round-trips;
 - stable identifiers do not depend on map insertion order;
 - issue prefix/group operations preserve all issues;
-- projection never invents a semantic node;
-- renderer plans refer only to supported widgets after successful verification.
+- preparation never invents a semantic node;
+- prepared views refer only to supported widgets after successful verification.
 
 Generating arbitrary complete JSON Schema is not necessary. Generate a documented supported grammar and add regression fixtures for discoveries.
 
@@ -161,7 +170,7 @@ Track tests by:
 - Elixir/OTP versions;
 - Phoenix HTML and LiveView versions;
 - validator adapter;
-- reference theme;
+- reference UI/component set;
 - strictness mode.
 
 Avoid claiming dialect-wide support when only selected keywords are covered. The matrix should link to a machine-readable feature registry if one is created.
@@ -173,8 +182,8 @@ Benchmark separately:
 - source loading/resolution;
 - cold compilation;
 - cached definition lookup;
-- full projection;
-- branch-only projection when implemented;
+- full preparation;
+- subtree/branch-only preparation when implemented;
 - component rendering;
 - large collection state transitions.
 
@@ -187,12 +196,13 @@ Include adversarial depth, breadth, and reference graphs. Performance tests must
 - Keep source fixtures independent of renderer fixtures.
 - Give every production bug a minimal regression fixture.
 - Run extension contract suites in extension repositories.
-- Treat the second theme and Ash adapter as architectural integration tests.
+- Treat the separately compiling second UI, read-only review consumer, and Ash
+  adapter as architectural integration tests.
 
 ## Related notes
 
 - [[09-diagnostics-provenance-introspection|Diagnostics and introspection]]
 - [[10-algorithms|Algorithms and invariants]]
 - [[13-roadmap|Roadmap]]
+- [[20-renderer-ui-model|Renderer and UI model]]
 - Every phase note contains its phase-specific test plan.
-
