@@ -681,4 +681,72 @@ defmodule Formentation.Phoenix.ProjectorTest do
 
     defp flatten_fields(%RenderNode.Field{} = field), do: [field]
   end
+
+  describe "architectural boundary" do
+    # `.reach.exs` permits phoenix -> core, so no layer rule can express
+    # "the projector knows nothing concrete about Formentation.Form".
+    # A source-text assertion states that obligation directly, and is the
+    # regression PR #13 must keep green when it rebases its blocker work
+    # into the Formentation.Form state view.
+    @projector_source File.read!("lib/formentation/phoenix/projector.ex")
+    # File.read!/1 above is not a Mix compile dependency by itself; it
+    # currently recompiles correctly only incidentally, via the
+    # `doctest Formentation.Phoenix.Projector` at the top of this file.
+    # This makes the recompilation guarantee explicit rather than
+    # incidental, so the pin can never validate a stale snapshot.
+    @external_resource "lib/formentation/phoenix/projector.ex"
+
+    test "the projector names no concrete runtime-state struct" do
+      refute @projector_source =~ "Formentation.Form"
+      refute @projector_source =~ "%Form{"
+      refute @projector_source =~ "SubmissionBlocker"
+    end
+
+    test "the projector never interprets the Phoenix action itself" do
+      refute @projector_source =~ "form.action"
+      refute @projector_source =~ "action: :submit"
+    end
+  end
+
+  describe "projection contract regressions" do
+    test "project_at/3 applies visibility using the same absolute path as project/2" do
+      # :change, not :submit: Form.show_issues?/2 short-circuits to true on
+      # :submit regardless of path, so that event can't discriminate a
+      # context built with the wrong (non-absolute) path — see "nested
+      # paths reach the state view" above for the same technique. On
+      # :change, visibility depends on Info.node_at(definition, segments)
+      # resolving to this exact Node.Field with :used usage; a project_at/3
+      # that dropped the parent segments from its path would land on an
+      # unknown path and answer :hide instead.
+      definition = nested_path_definition()
+
+      form_state =
+        Form.transition(Form.new(definition), %Formentation.Params{
+          values: %{"address" => %{"geo" => %{"lat" => "x"}}},
+          event: :change
+        })
+
+      form = FormData.to_form(form_state, [])
+
+      from_whole =
+        Projector.project(definition, form).root
+        |> flatten_fields()
+        |> Enum.find(&(&1.field.name == "address[geo][lat]"))
+
+      from_at = Projector.project_at(definition, form, ["address", "geo", "lat"])
+
+      assert from_at.show_errors? == from_whole.show_errors?
+      assert from_at.show_errors? == true
+      assert from_at.errors == from_whole.errors
+    end
+
+    test "project_at/3 raises for an unknown path" do
+      definition = nested_path_definition()
+      form = FormData.to_form(Form.new(definition), [])
+
+      assert_raise ArgumentError, ~r/no node at instance path/, fn ->
+        Projector.project_at(definition, form, ["nope"])
+      end
+    end
+  end
 end
