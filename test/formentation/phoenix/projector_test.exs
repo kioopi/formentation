@@ -597,6 +597,81 @@ defmodule Formentation.Phoenix.ProjectorTest do
     end
   end
 
+  # D-028's end of the wiring. The projector knows nothing about blockers —
+  # these assert only the normalized outcome a blocker produces once
+  # Formentation.Form's state view has translated it, which is the same
+  # shape any other source's issues/2 could produce.
+  describe "submission blockers reach the summary through the state view" do
+    defp blocked_plan(schema, data, params) do
+      {:ok, definition, _diagnostics} =
+        Formentation.compile(schema, adapter: Formentation.JSONSchema)
+
+      form_state = definition |> Form.new(data) |> Form.submit(params)
+      Projector.project(definition, FormData.to_form(form_state, []))
+    end
+
+    test "a required unsupported property is explained once, labelled, and unlinked" do
+      # `oneOf` compiles to a preserve-only Unsupported node, so `required`
+      # lands on ["address"]. The single-element match is the assertion that
+      # matters: the bare generic "required" line must not appear beside it.
+      plan =
+        blocked_plan(
+          %{
+            "type" => "object",
+            "required" => ["address"],
+            "properties" => %{
+              "address" => %{"oneOf" => [%{"type" => "string"}, %{"type" => "object"}]}
+            }
+          },
+          %{},
+          %{}
+        )
+
+      assert [%{id: nil, label: "Address", message: message}] = plan.summary
+      assert message =~ "unsupported"
+    end
+
+    test "an editable field's error keeps its link alongside a blocker's entry" do
+      plan =
+        blocked_plan(
+          %{
+            "type" => "object",
+            "required" => ["tags"],
+            "properties" => %{
+              "name" => %{"type" => "string", "minLength" => 3},
+              "tags" => %{"type" => "array", "items" => %{"type" => "integer"}}
+            }
+          },
+          %{},
+          %{"name" => "x"}
+        )
+
+      assert [
+               %{id: name_id, label: "Name"},
+               %{id: nil, label: "Tags", message: message}
+             ] = plan.summary
+
+      assert name_id != nil
+      assert message =~ "unsupported"
+    end
+
+    test "on change the summary stays empty even though the form is already blocked" do
+      schema = %{
+        "type" => "object",
+        "required" => ["tags"],
+        "properties" => %{"tags" => %{"type" => "array", "items" => %{"type" => "integer"}}}
+      }
+
+      {:ok, definition, _diagnostics} =
+        Formentation.compile(schema, adapter: Formentation.JSONSchema)
+
+      form_state = Form.validate(Form.new(definition), %{})
+
+      assert {:blocked, [_]} = Form.submission_status(form_state)
+      assert Projector.project(definition, FormData.to_form(form_state, [])).summary == []
+    end
+  end
+
   describe "nested paths reach the state view" do
     test "a used, invalid nested field is visible on :change via the state view, not action" do
       # Discriminates against a projector that computes the wrong path for
