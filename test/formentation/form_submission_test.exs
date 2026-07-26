@@ -1,6 +1,8 @@
 defmodule Formentation.FormSubmissionTest do
   use ExUnit.Case, async: true
 
+  import Formentation.Test.FormHelpers
+
   alias Formentation.{
     Definition,
     Form,
@@ -33,11 +35,16 @@ defmodule Formentation.FormSubmissionTest do
   end
 
   defp submit(definition, original, params \\ %{}) do
-    definition |> Form.new(original) |> Form.submit(params)
+    definition
+    |> Form.new(original)
+    |> submitted_form(params)
   end
 
   describe "JSON Schema runtime matrix" do
     test "optional + absent -> :ready, no blockers" do
+      assert {:ok, _candidate, _form} =
+               Form.submit(Form.new(tags_schema(tags_required: false), %{"title" => "t"}), %{})
+
       form = submit(tags_schema(tags_required: false), %{"title" => "t"})
       assert Form.submission_blockers(form) == []
       assert Form.submission_status(form) == :ready
@@ -77,7 +84,9 @@ defmodule Formentation.FormSubmissionTest do
     end
 
     test "required + present valid -> :ready" do
-      form = submit(tags_schema(tags_required: true), %{"tags" => [1]})
+      assert {:ok, _candidate, form} =
+               Form.submit(Form.new(tags_schema(tags_required: true), %{"tags" => [1]}), %{})
+
       assert Form.submission_blockers(form) == []
       assert Form.submission_status(form) == :ready
     end
@@ -163,6 +172,121 @@ defmodule Formentation.FormSubmissionTest do
       message: "#{code} at #{inspect(segments)}",
       source: source
     }
+  end
+
+  describe "submit/2 decision" do
+    test "ready returns the decoded candidate and submitted form" do
+      definition = compile_map(%{kind: :object, properties: [{"age", %{kind: :integer}}]})
+      original = %{"old" => "kept"}
+      params = %{"age" => "42"}
+
+      assert {:ok, %{"old" => "kept", "age" => 42} = candidate, submitted_form} =
+               Form.submit(Form.new(definition, original), params)
+
+      assert Form.candidate(submitted_form) == {:ok, candidate}
+      assert Form.submission_status(submitted_form) == :ready
+      assert submitted_form.action == :submit
+      assert Form.submitted?(submitted_form)
+      assert original == %{"old" => "kept"}
+      assert params == %{"age" => "42"}
+    end
+
+    test "undecodable returns the submitted form for redisplay" do
+      definition = compile_map(%{kind: :object, properties: [{"age", %{kind: :integer}}]})
+
+      assert {:error, submitted_form} =
+               Form.submit(Form.new(definition), %{"age" => "not-a-number"})
+
+      assert Form.candidate(submitted_form) == :none
+      assert Form.submission_status(submitted_form) == :undecodable
+      assert Form.submission_blockers(submitted_form) == []
+      assert submitted_form.action == :submit
+      assert Form.submitted?(submitted_form)
+      assert Form.show_issues?(submitted_form, ["age"])
+
+      assert [
+               %Issue{
+                 path: %InstancePath{segments: ["age"]},
+                 code: :invalid_integer,
+                 source: :decode
+               }
+             ] = Form.issues(submitted_form, ["age"])
+
+      assert Form.field(submitted_form, ["age"]).display_value == "not-a-number"
+      assert Form.usage(submitted_form, ["age"]) == :used
+    end
+
+    test "blocked required unsupported map source returns error despite candidate and no ordinary issues" do
+      definition =
+        compile_map(%{
+          kind: :object,
+          required: ["attachment"],
+          properties: [
+            {"title", %{kind: :string}},
+            {"attachment", %{kind: :file}}
+          ]
+        })
+
+      assert {:error, submitted_form} =
+               Form.submit(Form.new(definition), %{"title" => "Inspection"})
+
+      assert {:ok, %{"title" => "Inspection"}} = Form.candidate(submitted_form)
+      assert Form.issues(submitted_form) == []
+      assert submitted_form.action == :submit
+      assert Form.submitted?(submitted_form)
+
+      assert {:blocked,
+              [
+                %SubmissionBlocker{
+                  code: :unsupported_required,
+                  path: %InstancePath{segments: ["attachment"]},
+                  issues: []
+                }
+              ]} = Form.submission_status(submitted_form)
+    end
+
+    test "invalid returns the submitted form while preserving decoded candidate and validation issue" do
+      schema = %{
+        "type" => "object",
+        "properties" => %{"title" => %{"type" => "string", "minLength" => 3}}
+      }
+
+      {:ok, definition, _diagnostics} =
+        Formentation.compile(schema, adapter: Formentation.JSONSchema)
+
+      assert {:error, submitted_form} = Form.submit(Form.new(definition), %{"title" => "No"})
+
+      assert {:ok, %{"title" => "No"}} = Form.candidate(submitted_form)
+      assert Form.field(submitted_form, ["title"]).display_value == "No"
+      assert submitted_form.action == :submit
+      assert Form.submitted?(submitted_form)
+      assert Form.show_issues?(submitted_form, ["title"])
+
+      assert {:invalid,
+              [
+                %Issue{
+                  path: %InstancePath{segments: ["title"]},
+                  code: :minLength,
+                  source: :validation
+                }
+              ]} = Form.submission_status(submitted_form)
+    end
+
+    test "validate and transition still expose low-level form transitions" do
+      definition = compile_map(%{kind: :object, properties: [{"title", %{kind: :string}}]})
+      form = Form.new(definition)
+
+      changed = Form.validate(form, %{"title" => "Draft"})
+
+      transitioned =
+        Form.transition(form, %Formentation.Params{values: %{"title" => "Done"}, event: :submit})
+
+      assert %Form{action: :change} = changed
+      assert %Form{action: :submit} = transitioned
+
+      assert {:ok, %{"title" => "Done"}, %Form{action: :submit}} =
+               Form.submit(form, %{"title" => "Done"})
+    end
   end
 
   describe "status precedence and mixed issues" do
@@ -254,7 +378,7 @@ defmodule Formentation.FormSubmissionTest do
           adapter: Formentation.Source.Map
         )
 
-      form = definition |> Form.new(%{}) |> Form.submit(%{"age" => "not-a-number"})
+      form = definition |> Form.new(%{}) |> submitted_form(%{"age" => "not-a-number"})
 
       assert Form.candidate(form) == :none
       assert Form.submission_status(form) == :undecodable
@@ -274,7 +398,7 @@ defmodule Formentation.FormSubmissionTest do
   describe "validation-less source (map): missing-required fallback" do
     test "optional unsupported absent -> :ready" do
       definition = compile_map(%{kind: :object, properties: [{"attachment", %{kind: :file}}]})
-      form = definition |> Form.new(%{}) |> Form.submit(%{})
+      form = definition |> Form.new(%{}) |> submitted_form(%{})
       assert Form.submission_status(form) == :ready
     end
 
@@ -286,7 +410,7 @@ defmodule Formentation.FormSubmissionTest do
           properties: [{"attachment", %{kind: :file}}]
         })
 
-      form = definition |> Form.new(%{}) |> Form.submit(%{})
+      form = definition |> Form.new(%{}) |> submitted_form(%{})
 
       assert [%SubmissionBlocker{code: :unsupported_required, issues: []}] =
                Form.submission_blockers(form)
@@ -300,7 +424,9 @@ defmodule Formentation.FormSubmissionTest do
           properties: [{"attachment", %{kind: :file}}]
         })
 
-      form = definition |> Form.new(%{"attachment" => ["a.png"]}) |> Form.submit(%{})
+      assert {:ok, _candidate, form} =
+               Form.submit(Form.new(definition, %{"attachment" => ["a.png"]}), %{})
+
       assert Form.submission_blockers(form) == []
       assert Form.submission_status(form) == :ready
     end
@@ -313,7 +439,7 @@ defmodule Formentation.FormSubmissionTest do
           properties: [{"attachment", %{kind: :file}}]
         })
 
-      form = definition |> Form.new(%{}) |> Form.submit(%{"attachment" => "sneaky"})
+      form = definition |> Form.new(%{}) |> submitted_form(%{"attachment" => "sneaky"})
       assert {:ok, candidate} = Form.candidate(form)
       refute Map.has_key?(candidate, "attachment")
       assert [%SubmissionBlocker{code: :unsupported_required}] = Form.submission_blockers(form)
@@ -340,7 +466,7 @@ defmodule Formentation.FormSubmissionTest do
 
   describe "nested presence integration with #1 (map source)" do
     test "an absent optional parent deactivates its required unsupported child (no blocker)" do
-      form = profile_definition() |> Form.new(%{}) |> Form.submit(%{})
+      form = profile_definition() |> Form.new(%{}) |> submitted_form(%{})
       assert {:ok, %{}} = Form.candidate(form)
       assert Form.submission_blockers(form) == []
       assert Form.submission_status(form) == :ready
@@ -350,7 +476,7 @@ defmodule Formentation.FormSubmissionTest do
       form =
         profile_definition()
         |> Form.new(%{})
-        |> Form.submit(%{"profile" => %{"nickname" => "vt"}})
+        |> submitted_form(%{"profile" => %{"nickname" => "vt"}})
 
       assert {:ok, %{"profile" => %{"nickname" => "vt"}}} = Form.candidate(form)
 
@@ -364,7 +490,7 @@ defmodule Formentation.FormSubmissionTest do
       form =
         profile_definition()
         |> Form.new(%{"profile" => %{"legacy_tags" => ["a.png"]}})
-        |> Form.submit(%{"profile" => %{"nickname" => "vt"}})
+        |> submitted_form(%{"profile" => %{"nickname" => "vt"}})
 
       assert {:ok, %{"profile" => %{"nickname" => "vt", "legacy_tags" => ["a.png"]}}} =
                Form.candidate(form)
@@ -379,7 +505,7 @@ defmodule Formentation.FormSubmissionTest do
       form =
         profile_definition()
         |> Form.new(%{"profile" => %{"nickname" => "vt"}})
-        |> Form.submit(%{"profile" => %{}})
+        |> submitted_form(%{"profile" => %{}})
 
       assert {:ok, candidate} = Form.candidate(form)
       refute Map.has_key?(candidate, "profile")
@@ -393,7 +519,7 @@ defmodule Formentation.FormSubmissionTest do
       form =
         profile_definition()
         |> Form.new(%{"profile" => %{"nickname" => "vt"}})
-        |> Form.submit(%{"profile" => %{"nickname" => ""}})
+        |> submitted_form(%{"profile" => %{"nickname" => ""}})
 
       assert {:ok, %{"profile" => %{"nickname" => ""}}} = Form.candidate(form)
 
@@ -411,7 +537,7 @@ defmodule Formentation.FormSubmissionTest do
       form =
         definition
         |> Form.new(%{"tags" => ["x"], "title" => "keep"})
-        |> Form.submit(%{"title" => "changed", "tags" => "ignored"})
+        |> submitted_form(%{"title" => "changed", "tags" => "ignored"})
 
       # original invalid unsupported value survives byte-for-byte...
       assert {:ok, %{"tags" => ["x"], "title" => "changed"}} = Form.candidate(form)
@@ -426,7 +552,7 @@ defmodule Formentation.FormSubmissionTest do
       form =
         tags_schema(tags_required: false)
         |> Form.new(%{"tags" => ["x"]})
-        |> Form.submit(%{"tags" => "ignored"})
+        |> submitted_form(%{"tags" => "ignored"})
 
       assert {:ok, %{"tags" => ["x"]}} = Form.candidate(form)
 

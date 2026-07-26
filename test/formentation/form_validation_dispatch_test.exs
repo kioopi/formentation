@@ -1,6 +1,8 @@
 defmodule Formentation.FormValidationDispatchTest do
   use ExUnit.Case, async: true
 
+  import Formentation.Test.FormHelpers
+
   alias Formentation.{Form, InstancePath, Issue, ValidationPlan}
 
   # A Validation implementation with no relationship to JSON Schema or JSV.
@@ -92,7 +94,7 @@ defmodule Formentation.FormValidationDispatchTest do
     form = Form.new(definition, %{})
     assert_receive {:validated, %{}}
 
-    broken = Form.submit(form, %{"age" => "not-an-int"})
+    broken = submitted_form(form, %{"age" => "not-an-int"})
     assert Form.candidate(broken) == :none
     refute_receive {:validated, _}
   end

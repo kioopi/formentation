@@ -10,7 +10,7 @@ status: current
 
 # Getting started
 
-*Covers Formentation as of 2026-07-24. Every snippet below was run
+*Covers Formentation as of 2026-07-26. Every snippet below was run
 against that version.*
 
 This page walks the whole loop once: declare a form, compile it, render
@@ -189,50 +189,62 @@ validation in the next step.
 
 ## 5 · Handle the submission
 
-Submitted params go back through a **transition**. Wrap them in a
-`Formentation.Params` envelope rather than passing the bare map:
+Submitted params go through `Formentation.Form.submit/2`. It runs the
+submit transition, then answers the application question directly:
 
 ```elixir
 def create(conn, %{"payload" => params}) do
-  form =
-    Formentation.Form.transition(form, %Formentation.Params{
-      values: params,
-      event: :submit
-    })
+  case Formentation.Form.submit(form, params) do
+    {:ok, instance, _submitted_form} ->
+      save_it(conn, instance)
 
-  case Formentation.Form.candidate(form) do
-    {:ok, instance} -> save_it(conn, instance)
-    :none           -> render(conn, :new, form: Phoenix.Component.to_form(form, as: "payload"))
+    {:error, submitted_form} ->
+      render(conn, :new,
+        form: Phoenix.Component.to_form(submitted_form, as: "payload")
+      )
   end
 end
 ```
 
-The envelope is required, not decorative. A bare params map is ambiguous
-— an absent key could mean "the user cleared this field" or "this field
-wasn't on the page" — and only you know which, so `transition/2` refuses
-to guess. `event:` is `:change` or `:submit`, and it controls when errors
-become visible.
+The success branch carries the decoded JSON instance. The error branch
+carries the exact submitted form state for redisplay, including raw
+input, issue visibility, decode issues, validation issues, and blockers.
+Persistence stays in your application; Formentation only classifies the
+submitted data.
 
 ### What you get back
 
-On success, `candidate/1` returns the JSON instance the form describes —
+On success, the tuple's instance is the JSON object the form describes —
 a **plain map**, with values decoded to their declared types:
 
 ```elixir
-Formentation.Form.candidate(form)
-#=> {:ok, %{"age" => 36, "email" => "ada@example.com", "subscribed" => false}}
+{:ok, instance, submitted_form} = Formentation.Form.submit(form, params)
+instance
+#=> %{"age" => 36, "email" => "ada@example.com", "subscribed" => false}
 ```
 
 Note `36`, not `"36"`, and `false`, not `"false"`. That map is what you
 persist; nothing downstream of the form has to know Formentation exists.
 
-When any field fails to decode, there is **no candidate at all**:
+When submission fails, redisplay the returned submitted form. Inspect
+`submission_status/1` only if you need to distinguish the reasons:
+
+- `:undecodable` — some raw input could not decode, so there is no candidate.
+- `{:blocked, blockers}` — a preserve-only unsupported node blocks submission.
+- `{:invalid, issues}` — decoding succeeded, but validation found ordinary issues.
+
+A candidate is materialization output, not permission to persist:
+blockers can coexist with `candidate/1 == {:ok, map}` and an empty
+ordinary issue list. Only the `{:ok, instance, submitted_form}` branch
+means application-ready.
+
+For an undecodable field, the returned form has no candidate:
 
 ```elixir
-Formentation.Form.candidate(form)
+Formentation.Form.candidate(submitted_form)
 #=> :none
 
-Formentation.Form.issues(form)
+Formentation.Form.issues(submitted_form)
 #=> [%Formentation.Issue{
 #=>    path: %InstancePath{segments: ["age"]},
 #=>    code: :invalid_integer,
@@ -247,11 +259,11 @@ validation.
 
 ### Re-rendering keeps what the user typed
 
-Hand the transitioned form straight back to `to_form/2` and render
+Hand the returned submitted form straight back to `to_form/2` and render
 again. The bad input is still there:
 
 ```elixir
-Formentation.Form.field(form, ["age"]).display_value
+Formentation.Form.field(submitted_form, ["age"]).display_value
 #=> "36x"
 ```
 

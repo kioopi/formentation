@@ -9,7 +9,6 @@ defmodule FormentationDemo.NestedLive do
   use Phoenix.LiveView
 
   alias Formentation.Form
-  alias FormentationDemo.LiveHelpers
   alias Phoenix.HTML.FormData
 
   @schema %{
@@ -40,16 +39,26 @@ defmodule FormentationDemo.NestedLive do
 
   @impl true
   def handle_event("validate", %{"payload" => payload}, socket) do
-    {:noreply, assign_payload(socket, Form.validate(socket.assigns.form_state, payload))}
+    {:noreply,
+     socket
+     |> assign(:submitted, nil)
+     |> assign_payload(Form.validate(socket.assigns.form_state, payload))}
   end
 
   def handle_event("save", %{"payload" => payload}, socket) do
-    form_state = Form.submit(socket.assigns.form_state, payload)
+    case Form.submit(socket.assigns.form_state, payload) do
+      {:ok, candidate, submitted_form} ->
+        {:noreply,
+         socket
+         |> assign(:submitted, candidate)
+         |> assign_payload(submitted_form)}
 
-    {:noreply,
-     socket
-     |> assign(:submitted, LiveHelpers.submitted_candidate(form_state))
-     |> assign_payload(form_state)}
+      {:error, submitted_form} ->
+        {:noreply,
+         socket
+         |> assign(:submitted, nil)
+         |> assign_payload(submitted_form)}
+    end
   end
 
   @impl true

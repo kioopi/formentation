@@ -1,6 +1,8 @@
 defmodule Formentation.Phoenix.ProjectorTest do
   use ExUnit.Case, async: true
 
+  import Formentation.Test.FormHelpers
+
   doctest Formentation.Phoenix.Projector
 
   alias Formentation.Form
@@ -441,7 +443,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
 
       {:ok, definition, []} = Formentation.compile(schema, adapter: Formentation.JSONSchema)
 
-      form_state = Form.submit(Form.new(definition), %{"title" => "t"})
+      form_state = submitted_form(Form.new(definition), %{"title" => "t"})
       plan = Projector.project(definition, FormData.to_form(form_state, []))
 
       assert [%{id: nil, label: nil, message: message}] = plan.summary
@@ -709,7 +711,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
       {:ok, definition, _diagnostics} =
         Formentation.compile(schema, adapter: Formentation.JSONSchema)
 
-      form_state = definition |> Form.new(data) |> Form.submit(params)
+      form_state = definition |> Form.new(data) |> submitted_form(params)
       Projector.project(definition, FormData.to_form(form_state, []))
     end
 

@@ -227,9 +227,10 @@ it to the definition. It runs on every transition, once every field has
 decoded:
 
 ```elixir
-form = Formentation.Form.transition(form, %Params{values: %{"age" => "10"}, event: :submit})
+{:error, submitted_form} =
+  Formentation.Form.submit(form, %{"age" => "10"})
 
-Formentation.Form.issues(form)
+Formentation.Form.issues(submitted_form)
 #=> [%Issue{path: %InstancePath{segments: ["age"]}, code: :minimum,
 #=>         message: "value 10 is lower than minimum 18", source: :validation}]
 ```

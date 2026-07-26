@@ -243,7 +243,7 @@ Amended by [[18-decisions#D-027 — Projection reads semantic state through a St
 
 **Context.** Step 7 needed a lifecycle surface for `phx-change`/`phx-submit` handlers and the phase's example application ([[phase-1-walking-skeleton|Phase 1]]'s LiveView definition-of-done item), while [[07-phoenix-integration|Phoenix integration]] forbids the renderer from owning business submission. Spec: `docs/superpowers/specs/2026-07-24-phase1-step7-liveview-design.md`.
 
-**Decision.** `Form.validate/2` and `Form.submit/2` are thin wrappers that build the [[18-decisions#D-013 — Transitions take an explicit params envelope|D-013]] envelope internally (`event: :change` / `:submit`); extracting the caller's subtree from the event params stays in the handler, which alone knows its embedding namespace — no `use` macro, no auto-wired `handle_event`, no event-handling helpers beyond the two wrappers. `_persistent_id` joins the [[18-decisions#D-014 — Usage is a first-class interaction axis|D-014]] transport-metadata strip performed by `Transport.normalize/1` at every nesting level, alongside `_unused_*`, `_csrf_token`, and `_target` (amending D-014's "later `_persistent_id`" wording in place with this link). The phase's example application is a repo-root `demo/` directory compiled in dev and test via `elixirc_paths`, not a separate examples project: one LiveView set (`FormentationDemo.PumpInspectionLive`, `FormentationDemo.NestedLive`) serves both the `Phoenix.LiveViewTest` suite and a browser, the latter via `mix demo [port]` (default 4000) on Bandit — so the tested and the browsed version can never drift apart. The end-to-end pump-inspection JSON Schema declaration is demo-owned (`FormentationDemo.PumpInspection`); the test fixture (`Formentation.Fixtures.PumpInspection`) delegates `json_schema/0` and `ui_hints/0` to it while keeping `map_source/0` test-only, because map-source definitions carry no validator — only the JSON Schema adapter can demonstrate live required/format errors ([[16-open-questions#Runtime and state|open question]]). [[18-decisions#D-018 — Reach is the architecture gate|Reach]] grows a `demo` layer permitted to call Phoenix and the library with server/io effects; the library's own layers still forbid depending on it.
+**Decision.** Step 7 introduced `Form.validate/2` and `Form.submit/2` to build the [[18-decisions#D-013 — Transitions take an explicit params envelope|D-013]] envelope internally (`event: :change` / `:submit`); extracting the caller's subtree from the event params stays in the handler, which alone knows its embedding namespace — no `use` macro, no auto-wired `handle_event`, no event-handling helpers beyond these ordinary entry points. Amended by [[#D-032 — Submit returns the application decision]]: `validate/2` remains the form-returning wrapper, while `submit/2` now wraps the transition in the public success-or-redisplay decision. `_persistent_id` joins the [[18-decisions#D-014 — Usage is a first-class interaction axis|D-014]] transport-metadata strip performed by `Transport.normalize/1` at every nesting level, alongside `_unused_*`, `_csrf_token`, and `_target` (amending D-014's "later `_persistent_id`" wording in place with this link). The phase's example application is a repo-root `demo/` directory compiled in dev and test via `elixirc_paths`, not a separate examples project: one LiveView set (`FormentationDemo.PumpInspectionLive`, `FormentationDemo.NestedLive`) serves both the `Phoenix.LiveViewTest` suite and a browser, the latter via `mix demo [port]` (default 4000) on Bandit — so the tested and the browsed version can never drift apart. The end-to-end pump-inspection JSON Schema declaration is demo-owned (`FormentationDemo.PumpInspection`); the test fixture (`Formentation.Fixtures.PumpInspection`) delegates `json_schema/0` and `ui_hints/0` to it while keeping `map_source/0` test-only, because map-source definitions carry no validator — only the JSON Schema adapter can demonstrate live required/format errors ([[16-open-questions#Runtime and state|open question]]). [[18-decisions#D-018 — Reach is the architecture gate|Reach]] grows a `demo` layer permitted to call Phoenix and the library with server/io effects; the library's own layers still forbid depending on it.
 
 **Consequences.** The library's LiveView story stays documentation, not API surface: `validate/2`, `submit/2`, and the pluck-then-call pattern are what the Userguide teaches, nothing framework-shaped ships. The demo lives inside `mix ci`, so it cannot rot silently. Reality diverged from the spec's working belief on markers, corrected in a preceding commit: `Phoenix.LiveViewTest`'s `form/3` plus `render_change/1`/`render_submit/1` re-serialize the *entire* rendered form on every call and carry no `_unused_` markers on any event, change or submit alike — the marker convention is JS-client-only, applied by the browser's `LiveSocket` hook before requests ever reach the server, and `Phoenix.LiveViewTest` never runs that hook. The LiveView suite therefore pins marker-less semantics (every serialized field `:used`, blank required fields erroring from the very first change); a real-browser check independently confirmed the `_unused_` gating the spec had originally expected (an untouched blank required field shows no error until touched) — both are true, for different transports. The Task 11 browser check on `type="number"` failed raw-input preservation two ways at once: Chrome blocks non-numeric keystrokes outright, and a force-injected invalid value is sanitized away on the re-patched round trip — so the number widget shipped as `type="text" inputmode="numeric"` (commit "Fall back number inputs to text with numeric inputmode"), closing the [[16-open-questions#Rendering|open question]] with the fallback rather than leaving `type="number"` in place. Because `fields/1` renders the error summary at the top of its own block, an embedded payload form shows the summary mid-page when hand-written inputs precede it — observed in the step-7 browser check and acceptable without slots; repositioning belongs to the [[phase-3-extensibility|Phase 3]] theme contract ([[16-open-questions#Rendering|open question]]).
 
@@ -568,6 +568,46 @@ duplicate property names with `:duplicate_property`, because duplicate semantic
 references cannot satisfy the descriptor invariant. The later split-storage
 work replaces the compatibility query implementation without another projector
 rewrite.
+
+## D-032 — Submit returns the application decision
+
+*2026-07-26*
+
+**Context.** A2 of
+[[phase-1-north-star-alignment|the Phase 1 north-star alignment gate]] exposed a
+bug in the demo submission policy: it treated "no ordinary issues and a decoded
+candidate" as success. That is not the same as readiness. A required
+unsupported preserve-only node can leave `candidate/1 == {:ok, map}` and
+`issues/1 == []` while `submission_status/1` is `{:blocked, blockers}`.
+Resolves [GitHub issue #19](https://github.com/kioopi/formentation/issues/19).
+
+**Decision.** `Formentation.Form.submit/2` is the ordinary application-facing
+submission operation and returns exactly:
+
+```elixir
+{:ok, candidate :: map(), submitted_form :: Form.t()}
+| {:error, submitted_form :: Form.t()}
+```
+
+It first performs the same pure full-form `:submit` transition as before, then
+classifies only through `submission_status(submitted_form)`. Only `:ready`
+returns the `:ok` branch. `:undecodable`, `{:blocked, blockers}`, and
+`{:invalid, issues}` all return `{:error, submitted_form}` for redisplay. The
+failure tuple does not duplicate issues, blockers, or status; callers inspect
+the returned form through `submission_status/1`, `issues/1`, and
+`submission_blockers/1` when they need detail. `validate/2` remains the
+form-returning change-event operation, and `transition/2` remains the advanced
+form-returning primitive.
+
+**Consequences.** This is an intentional pre-`0.1.0` breaking correction: no
+legacy form-returning `submit/2`, compatibility shim, companion result API, or
+stored submission-result field remains. Demo LiveViews pattern-match the public
+result directly and clear any previous success output on every error branch.
+Ordinary docs now teach the tuple as permission to persist; `candidate/1` is
+materialization output, not a readiness decision. The failure tuple's smaller
+shape deliberately means a caller or projection that needs the reason asks
+`submission_status/1`/`submission_blockers/1` again; repeated classification is
+accepted here to keep one canonical status representation.
 
 ## Related notes
 

@@ -145,9 +145,10 @@ case Formentation.Form.submit(form, params) do
 end
 ```
 
-The precise tuple shapes are an implementation decision for the alignment work.
-The lifecycle decision is not: the existing `new` and `validate` operations
-remain ordinary, and submission exposes the application decision directly.
+The tuple shape is intentionally exact: success is `{:ok, candidate,
+submitted_form}` and redisplay is `{:error, submitted_form}`. The existing
+`new` and `validate` operations remain ordinary form-returning operations,
+and submission exposes the application decision directly.
 `validate` deliberately keeps Phoenix's conventional `phx-change="validate"`
 vocabulary. Lower-level transition and parameter-envelope APIs may remain as
 advanced interfaces.
@@ -660,7 +661,6 @@ The alignment work may decide:
 
 - exact semantic and presentation struct names;
 - tree, graph, index, or hybrid storage;
-- exact lifecycle return tuples;
 - whether `Info` moves into `Definition` or delegates temporarily;
 - the private compiler context used during the cutover;
 - the eventual prepared-view shape.

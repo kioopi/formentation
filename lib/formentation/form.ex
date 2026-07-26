@@ -18,14 +18,11 @@ defmodule Formentation.Form do
       ...>     adapter: Formentation.Source.Map
       ...>   )
       iex> form = Formentation.Form.new(definition)
-      iex> form =
-      ...>   Formentation.Form.transition(form, %Formentation.Params{
-      ...>     values: %{"age" => "42"},
-      ...>     event: :submit
-      ...>   })
-      iex> Formentation.Form.candidate(form)
-      {:ok, %{"age" => 42}}
-      iex> Formentation.Form.field(form, ["age"]).display_value
+      iex> {:ok, candidate, submitted_form} =
+      ...>   Formentation.Form.submit(form, %{"age" => "42"})
+      iex> candidate
+      %{"age" => 42}
+      iex> Formentation.Form.field(submitted_form, ["age"]).display_value
       "42"
   """
 
@@ -75,6 +72,10 @@ defmodule Formentation.Form do
           | :undecodable
           | {:invalid, [Issue.t()]}
           | {:blocked, [SubmissionBlocker.t()]}
+
+  @type submit_result ::
+          {:ok, candidate :: map(), submitted_form :: t()}
+          | {:error, submitted_form :: t()}
 
   @doc """
   A pristine form over `data`. No transports, operations, or usage yet;
@@ -231,8 +232,9 @@ defmodule Formentation.Form do
       ...>     adapter: Formentation.Source.Map
       ...>   )
       iex> form = Formentation.Form.new(definition)
-      iex> {Formentation.Form.submitted?(form),
-      ...>  Formentation.Form.submitted?(Formentation.Form.submit(form, %{"a" => "x"}))}
+      iex> {:ok, _candidate, submitted_form} =
+      ...>   Formentation.Form.submit(form, %{"a" => "x"})
+      iex> {Formentation.Form.submitted?(form), Formentation.Form.submitted?(submitted_form)}
       {false, true}
   """
   @spec submitted?(t()) :: boolean()
@@ -287,22 +289,44 @@ defmodule Formentation.Form do
   end
 
   @doc """
-  Applies a full-form `:submit` replace transition — the LiveView
-  `phx-submit` entry point. Submit opens the D-014 visibility gate:
-  every stored issue, including root and group issues, becomes visible.
+  Applies a full-form `:submit` replace transition and returns the
+  application-facing submission decision. Only `submission_status/1 ==
+  :ready` succeeds; undecodable, blocked, and invalid submitted forms are
+  returned for redisplay with raw input, usage, issues, and visibility
+  state intact.
 
       iex> {:ok, definition, []} =
       ...>   Formentation.compile(
       ...>     %{kind: :object, properties: [{"age", %{kind: :integer}}]},
       ...>     adapter: Formentation.Source.Map
       ...>   )
-      iex> form = Formentation.Form.submit(Formentation.Form.new(definition), %{"age" => "x"})
-      iex> {form.action, Formentation.Form.candidate(form)}
+      iex> {:ok, candidate, submitted_form} =
+      ...>   Formentation.Form.submit(Formentation.Form.new(definition), %{"age" => "42"})
+      iex> {candidate, submitted_form.action}
+      {%{"age" => 42}, :submit}
+      iex> {:error, submitted_form} =
+      ...>   Formentation.Form.submit(Formentation.Form.new(definition), %{"age" => "x"})
+      iex> {submitted_form.action, Formentation.Form.candidate(submitted_form)}
       {:submit, :none}
   """
-  @spec submit(t(), map()) :: t()
+  @spec submit(t(), map()) :: submit_result()
   def submit(%__MODULE__{} = form, values) when is_map(values) do
-    transition(form, %Params{values: values, event: :submit})
+    submitted_form = transition(form, %Params{values: values, event: :submit})
+
+    case submission_status(submitted_form) do
+      :ready ->
+        {:ok, candidate} = candidate(submitted_form)
+        {:ok, candidate, submitted_form}
+
+      :undecodable ->
+        {:error, submitted_form}
+
+      {:blocked, _blockers} ->
+        {:error, submitted_form}
+
+      {:invalid, _issues} ->
+        {:error, submitted_form}
+    end
   end
 
   defp check_envelope!(%Params{mode: :patch}) do

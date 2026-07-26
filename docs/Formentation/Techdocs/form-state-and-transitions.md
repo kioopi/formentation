@@ -12,7 +12,7 @@ status: current
 
 # Form state and transitions
 
-> [!note] As of 2026-07-26 · content-derived nested-object presence (D-026); derived submission status (D-028)
+> [!note] As of 2026-07-26 · content-derived nested-object presence (D-026); derived submission status (D-028); submit decision result (D-032)
 > Describes the runtime state layer as built: `Formentation.Form`,
 > `Formentation.Transport`, and `Formentation.Codec` — now including the
 > `validate/2`/`submit/2` LiveView entry points and the derived
@@ -245,21 +245,41 @@ def validate(%__MODULE__{} = form, values) when is_map(values) do
 end
 
 def submit(%__MODULE__{} = form, values) when is_map(values) do
-  transition(form, %Params{values: values, event: :submit})
+  submitted_form = transition(form, %Params{values: values, event: :submit})
+
+  case submission_status(submitted_form) do
+    :ready ->
+      {:ok, candidate} = candidate(submitted_form)
+      {:ok, candidate, submitted_form}
+
+    :undecodable ->
+      {:error, submitted_form}
+
+    {:blocked, _blockers} ->
+      {:error, submitted_form}
+
+    {:invalid, _issues} ->
+      {:error, submitted_form}
+  end
 end
 ```
 
-Both are sugar over `transition/2`, nothing more
-([[18-decisions#D-021 — LiveView integration is wrappers plus a demo, not framework machinery|D-021]]):
-they build the `%Params{}` envelope so a LiveView `handle_event/3` clause
-does not have to. Extracting the caller's own subtree from the event
-params — needed whenever the payload form is embedded under a
-hand-written parent form — stays the handler's job, since only the
-handler knows its own embedding namespace. There is no `use` macro, no
-auto-wired `handle_event`, and no other LiveView-specific surface added
-here: the layer is exactly as Phoenix-free as it was before these two
-functions existed. The demo LiveViews (`demo/formentation_demo/`) are
-the canonical callers, exercised by `test/formentation_demo/`.
+`validate/2` remains the change-event form transition. `submit/2` is the
+ordinary application-facing submit operation: it performs the same
+`:submit` transition, then classifies the submitted form through
+`submission_status/1`. Only `:ready` returns `{:ok, candidate,
+submitted_form}`. `:undecodable`, `{:blocked, blockers}`, and `{:invalid,
+issues}` return `{:error, submitted_form}` so the caller can redisplay
+that exact state. `transition/2` remains the lower-level primitive for
+code that needs only the transitioned form.
+
+Extracting the caller's own subtree from the event params — needed
+whenever the payload form is embedded under a hand-written parent form —
+stays the handler's job, since only the handler knows its own embedding
+namespace. There is no `use` macro, no auto-wired `handle_event`, and no
+other LiveView-specific surface added here. The demo LiveViews
+(`demo/formentation_demo/`) are the canonical callers, exercised by
+`test/formentation_demo/`.
 
 ## Issues and their visibility
 

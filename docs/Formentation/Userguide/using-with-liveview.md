@@ -91,12 +91,19 @@ def handle_event("validate", %{"asset" => asset_params}, socket) do
 end
 
 def handle_event("save", %{"asset" => asset_params}, socket) do
-  form_state = Form.submit(socket.assigns.form_state, payload_params(asset_params))
+  case Form.submit(socket.assigns.form_state, payload_params(asset_params)) do
+    {:ok, candidate, submitted_form} ->
+      {:noreply,
+       socket
+       |> assign(:submitted, candidate)
+       |> assign_payload(submitted_form)}
 
-  {:noreply,
-   socket
-   |> assign(:submitted, LiveHelpers.submitted_candidate(form_state))
-   |> assign_payload(form_state)}
+    {:error, submitted_form} ->
+      {:noreply,
+       socket
+       |> assign(:submitted, nil)
+       |> assign_payload(submitted_form)}
+  end
 end
 ```
 
@@ -111,11 +118,13 @@ attributes:
 </.form>
 ```
 
-`Form.validate/2` and `Form.submit/2` are sugar over `transition/2` with
-`event: :change` and `event: :submit` — nothing else differs about what
-they do to the form state. What they add is the LiveView-shaped
-signature: hand them the raw params subtree Phoenix already gave you: no
-`%Formentation.Params{}` envelope to build yourself.
+`Form.validate/2` is sugar over `transition/2` with `event: :change` and
+returns the changed form state. `Form.submit/2` runs the corresponding
+`:submit` transition, then returns `{:ok, candidate, submitted_form}` only
+when `submission_status/1` is `:ready`; undecodable, blocked, and invalid
+submissions return `{:error, submitted_form}` for redisplay. Hand both
+functions the raw params subtree Phoenix already gave you: no
+`%Formentation.Params{}` envelope to build yourself in ordinary handlers.
 
 ### Under embedding, pluck your subtree first
 
@@ -235,9 +244,9 @@ Two routes, `FormentationDemo.PumpInspectionLive` at `/` and
   form. The one place to see nested names and nested error placement
   without a presentation group's flat names in the way.
 
-Both pages render the decoded candidate as JSON in a `<pre>` once a
-submit fully validates, so you can watch `Form.candidate/1`'s output
-land on the page.
+Both pages render the decoded candidate as JSON in a `<pre>` once
+`Form.submit/2` returns the `:ok` branch. A failed submit clears that
+output and redisplays the returned submitted form.
 
 ### The "Native browser validation" toggle
 

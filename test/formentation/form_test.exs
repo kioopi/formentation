@@ -253,9 +253,9 @@ defmodule Formentation.FormTest do
       assert {:ok, %{"operating_hours" => 4800}} = Form.candidate(form)
     end
 
-    test "submit/2 applies a :submit replace transition" do
+    test "submit/2 applies a :submit replace transition and returns the decision tuple" do
       form = Form.new(json_pump_definition())
-      form = Form.submit(form, %{"operating_hours" => "51o2"})
+      assert {:error, form} = Form.submit(form, %{"operating_hours" => "51o2"})
 
       assert form.action == :submit
       assert Form.candidate(form) == :none
@@ -593,7 +593,10 @@ defmodule Formentation.FormTest do
     test "is true after submit/2" do
       definition = pump_definition()
 
-      assert Form.submitted?(Form.submit(Form.new(definition), %{"serial_number" => "PX"}))
+      assert {:ok, _candidate, form} =
+               Form.submit(Form.new(definition), %{"serial_number" => "PX"})
+
+      assert Form.submitted?(form)
     end
 
     test "is true after an explicit :submit transition envelope" do

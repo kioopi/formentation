@@ -67,8 +67,9 @@ as the extension point —
 ### LiveView is wrappers, not a framework
 
 `Formentation.Form.validate/2` and `Formentation.Form.submit/2` are the
-whole LiveView surface — thin sugar over `transition/2` for
-`phx-change` and `phx-submit`, described on
+whole LiveView surface. `validate/2` is the form-returning `phx-change`
+transition; `submit/2` runs the `phx-submit` transition and returns the
+success-or-redisplay decision, described on
 [[using-with-liveview|Using Formentation with LiveView]]. There is no
 `use` macro, no generated LiveView, no LiveComponent, no automatic
 mount/handler wiring, and no upload support: you write `mount/3` and

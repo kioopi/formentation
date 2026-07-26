@@ -1,6 +1,8 @@
 defmodule Formentation.LayoutInvarianceTest do
   use ExUnit.Case, async: true
 
+  import Formentation.Test.FormHelpers
+
   alias Formentation.{Form, Info, Issue, SubmissionBlocker}
 
   @field_paths [
@@ -56,7 +58,7 @@ defmodule Formentation.LayoutInvarianceTest do
         assert_layout_invariant(definitions, fn definition ->
           definition
           |> Form.new(original)
-          |> Form.submit(params)
+          |> submitted_form(params)
         end)
 
       assert summary.candidate ==
@@ -102,7 +104,7 @@ defmodule Formentation.LayoutInvarianceTest do
         assert_layout_invariant(definitions, fn definition ->
           definition
           |> Form.new()
-          |> Form.submit(%{"quantity" => "3x"})
+          |> submitted_form(%{"quantity" => "3x"})
         end)
 
       assert summary.fields[["quantity"]].transport == {:provided, "3x"}
@@ -124,7 +126,7 @@ defmodule Formentation.LayoutInvarianceTest do
         assert_layout_invariant(definitions, fn definition ->
           definition
           |> Form.new()
-          |> Form.submit(%{})
+          |> submitted_form(%{})
         end)
 
       assert {:ok, candidate} = summary.candidate
@@ -138,7 +140,7 @@ defmodule Formentation.LayoutInvarianceTest do
         assert_layout_invariant(definitions, fn definition ->
           definition
           |> Form.new(%{"details" => %{"width" => 4}})
-          |> Form.submit(%{"details" => %{"width" => ""}})
+          |> submitted_form(%{"details" => %{"width" => ""}})
         end)
 
       assert {:ok, candidate} = summary.candidate
@@ -153,7 +155,7 @@ defmodule Formentation.LayoutInvarianceTest do
         assert_layout_invariant(definitions, fn definition ->
           definition
           |> Form.new()
-          |> Form.submit(%{"details" => %{"width" => "4"}})
+          |> submitted_form(%{"details" => %{"width" => "4"}})
         end)
 
       assert summary.candidate == {:ok, %{"details" => %{"width" => 4}}}
@@ -173,7 +175,7 @@ defmodule Formentation.LayoutInvarianceTest do
         assert_layout_invariant(definitions, fn definition ->
           definition
           |> Form.new(%{"details" => %{"legacy_nested" => "keep-nested"}})
-          |> Form.submit(%{})
+          |> submitted_form(%{})
         end)
 
       assert summary.candidate == {:ok, %{"details" => %{"legacy_nested" => "keep-nested"}}}
@@ -193,7 +195,7 @@ defmodule Formentation.LayoutInvarianceTest do
         assert_layout_invariant(definitions, fn definition ->
           definition
           |> Form.new(%{"details" => %{"attachment" => ["a.png"]}})
-          |> Form.submit(%{})
+          |> submitted_form(%{})
         end)
 
       assert summary.candidate == {:ok, %{"details" => %{"attachment" => ["a.png"]}}}

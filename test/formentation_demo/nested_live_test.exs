@@ -46,6 +46,26 @@ defmodule FormentationDemo.NestedLiveTest do
     assert [_title_errors] = Floki.find(doc, "#payload_title_errors")
   end
 
+  test "editing after a successful submit clears the decoded candidate" do
+    {lv, _html} = mount!()
+
+    valid_payload = %{
+      "title" => "HQ",
+      "address" => %{"street" => "Main Street", "number" => "12"}
+    }
+
+    lv
+    |> form("#nested-form", %{"payload" => valid_payload})
+    |> render_submit()
+
+    html =
+      lv
+      |> form("#nested-form", %{"payload" => %{"title" => "HQ changed"}})
+      |> render_change()
+
+    refute html =~ "decoded-candidate"
+  end
+
   test "nested decode failure preserves raw input; valid submit nests the candidate" do
     {lv, _html} = mount!()
 
@@ -75,5 +95,29 @@ defmodule FormentationDemo.NestedLiveTest do
     assert decoded["title"] == "HQ"
     assert decoded["address"]["street"] == "Main Street"
     assert decoded["address"]["number"] == 12
+  end
+
+  test "a failed submit after success clears the decoded candidate" do
+    {lv, _html} = mount!()
+
+    valid_payload = %{
+      "title" => "HQ",
+      "address" => %{"street" => "Main Street", "number" => "12"}
+    }
+
+    lv
+    |> form("#nested-form", %{"payload" => valid_payload})
+    |> render_submit()
+
+    html =
+      lv
+      |> form("#nested-form", %{"payload" => %{"title" => "", "address" => %{"number" => "12x"}}})
+      |> render_submit()
+
+    doc = parse!(html)
+    assert Floki.find(doc, "pre#decoded-candidate") == []
+    assert [number] = Floki.find(doc, "input[name='payload[address][number]']")
+    assert Floki.attribute(number, "value") == ["12x"]
+    assert [_errors] = Floki.find(doc, "#payload_address_number_errors")
   end
 end

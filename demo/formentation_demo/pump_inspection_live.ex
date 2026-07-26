@@ -11,7 +11,7 @@ defmodule FormentationDemo.PumpInspectionLive do
   use Phoenix.LiveView
 
   alias Formentation.Form
-  alias FormentationDemo.{LiveHelpers, PumpInspection}
+  alias FormentationDemo.PumpInspection
   alias Phoenix.HTML.FormData
 
   @impl true
@@ -38,16 +38,24 @@ defmodule FormentationDemo.PumpInspectionLive do
     {:noreply,
      socket
      |> assign(:asset_form, to_form(Map.delete(asset_params, "payload"), as: :asset))
+     |> assign(:submitted, nil)
      |> assign_payload(Form.validate(socket.assigns.form_state, payload_params(asset_params)))}
   end
 
   def handle_event("save", %{"asset" => asset_params}, socket) do
-    form_state = Form.submit(socket.assigns.form_state, payload_params(asset_params))
+    case Form.submit(socket.assigns.form_state, payload_params(asset_params)) do
+      {:ok, candidate, submitted_form} ->
+        {:noreply,
+         socket
+         |> assign(:submitted, candidate)
+         |> assign_payload(submitted_form)}
 
-    {:noreply,
-     socket
-     |> assign(:submitted, LiveHelpers.submitted_candidate(form_state))
-     |> assign_payload(form_state)}
+      {:error, submitted_form} ->
+        {:noreply,
+         socket
+         |> assign(:submitted, nil)
+         |> assign_payload(submitted_form)}
+    end
   end
 
   def handle_event("toggle_native_validation", _params, socket) do

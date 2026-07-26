@@ -12,7 +12,7 @@ status: current
 
 # End-to-end data flow
 
-> [!note] As of 2026-07-25 · StateView protocol (D-027)
+> [!note] As of 2026-07-26 · submit decision result (D-032)
 > Follows one form through every layer that exists today, and stops
 > where the built system stops. Each layer has its own deep-dive note;
 > this one is about the **joins between them** — what crosses each
@@ -35,6 +35,7 @@ flowchart TD
     Plan["RenderPlan"]
     HTML["HTML"]
     Params["Browser params"]
+    Decision["submit decision<br/>success or redisplay"]
     Cand["candidate<br/>JSON instance"]
 
     Decl -->|"compile/2"| Def
@@ -44,8 +45,10 @@ flowchart TD
     PForm -->|"Projector.project/2"| Plan
     Plan -->|"reference theme"| HTML
     HTML -.->|"POST"| Params
-    Params -->|"%Params{} · transition/2"| State
-    State -->|"candidate/1"| Cand
+    Params -->|"validate/2 or transition/2"| State
+    Params -->|"submit/2"| Decision
+    Decision -->|"success"| Cand
+    Decision -->|"redisplay"| State
 
     class Def,State,Plan internal-link
 ```
@@ -197,26 +200,32 @@ render plan is discarded, and the definition is untouched. The form is
 recomputed from `original` + operations every time, so there is no
 incremental state to drift.
 
-In a LiveView, `phx-change`/`phx-submit` reach this leg through
-[[form-state-and-transitions#LiveView entry points|`Form.validate/2`/`Form.submit/2`]],
-which build the envelope from the handler's own params subtree; a plain
-controller reaches the same leg through `transition/2` with a
-hand-built one. Either way it is the same code path, and the render plan
-from step 4 is discarded and rebuilt the same way in both.
+In a LiveView, `phx-change` reaches this leg through
+[[form-state-and-transitions#LiveView entry points|`Form.validate/2`]],
+which builds the envelope from the handler's own params subtree. A plain
+controller, or advanced lifecycle code, can reach the same leg through
+`transition/2` with a hand-built envelope. The render plan from step 4 is
+discarded and rebuilt after each transition.
 
-## 7 · `Form` → candidate
+## 7 · Submitted `Form` → decision and candidate
 
-**Crosses:** nothing new. **Comes back:** `{:ok, instance}` or `:none`.
+**Crosses:** raw submit params. **Comes back:** `{:ok, instance,
+submitted_form}` or `{:error, submitted_form}`.
 
-`Form.candidate/1` is the chain's output: the JSON instance this form
-would submit, assembled from the decode operations over the original
-data. It is `:none` while **any** field fails to decode
+`Form.submit/2` is the ordinary submit leg. It performs the same
+`:submit` transition, then classifies the submitted form through
+`submission_status/1` ([[18-decisions#D-032 — Submit returns the application decision|D-032]]).
+Only `:ready` returns the success tuple with the decoded instance.
+Undecodable, blocked, and invalid states return the submitted form for
+redisplay.
+
+`Form.candidate/1` remains the materialization query: the JSON instance
+this form would submit, assembled from the decode operations over the
+original data. It is `:none` while **any** field fails to decode
 ([[18-decisions#D-012 — Schema validation defers while any decode fails|D-012]]),
 which is also why schema validation cannot run on half-decoded input.
-
-The candidate is what an application persists. It is a plain map — not a
-Formentation structure — so nothing downstream of the form inherits a
-dependency on this library.
+Because blockers can coexist with a candidate, callers persist only the
+candidate returned by `submit/2`'s `:ok` branch.
 
 ## What the flow shows that the layer notes cannot
 
@@ -245,10 +254,11 @@ becomes replaceable.
 
 The chain closes the same way whether step 6 is a plain controller
 action or a LiveView `handle_event/3`: a raw params map re-enters
-through `%Params{}` either way.
+through the form state layer either way.
 [[form-state-and-transitions#LiveView entry points|`Form.validate/2`/`Form.submit/2`]]
-are the `phx-change`/`phx-submit`-shaped sugar over `transition/2` that
-step 7 added, and `_persistent_id` now joins the metadata
+are the `phx-change`/`phx-submit`-shaped ordinary entry points: validate
+returns a changed form, while submit returns the application decision
+around the submitted form. `_persistent_id` now joins the metadata
 `Transport.normalize/1` strips at every nesting level, alongside
 `_unused_*`, `_csrf_token`, and `_target`. What the chain still does not
 have: collections would add a dimension to steps 1, 4, and 6 (indexed

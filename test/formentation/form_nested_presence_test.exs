@@ -1,6 +1,8 @@
 defmodule Formentation.FormNestedPresenceTest do
   use ExUnit.Case, async: true
 
+  import Formentation.Test.FormHelpers
+
   alias Formentation.{Form, Issue}
 
   # A JSON Schema definition carrying a real ValidationPlan, so the
@@ -40,7 +42,7 @@ defmodule Formentation.FormNestedPresenceTest do
       form =
         address_schema(address_required: false, street_required: true)
         |> Form.new(%{"title" => "Old"})
-        |> Form.submit(%{"title" => "New"})
+        |> submitted_form(%{"title" => "New"})
 
       assert Form.candidate(form) == {:ok, %{"title" => "New"}}
       assert Form.issues(form, ["address"]) == []
@@ -53,7 +55,7 @@ defmodule Formentation.FormNestedPresenceTest do
       form =
         address_schema(address_required: true, street_required: true)
         |> Form.new(%{"title" => "Old"})
-        |> Form.submit(%{"title" => "New"})
+        |> submitted_form(%{"title" => "New"})
 
       assert {:ok, candidate} = Form.candidate(form)
       refute Map.has_key?(candidate, "address")
@@ -66,7 +68,7 @@ defmodule Formentation.FormNestedPresenceTest do
       definition = address_schema(address_required: true, street_required: true)
 
       changed = Form.validate(Form.new(definition, %{"title" => "Old"}), %{"title" => "New"})
-      submitted = Form.submit(Form.new(definition, %{"title" => "Old"}), %{"title" => "New"})
+      submitted = submitted_form(Form.new(definition, %{"title" => "Old"}), %{"title" => "New"})
 
       # The group-level :required issue is produced regardless of event, at the
       # group path and no child path — so the gate below is gating a real issue.
@@ -84,7 +86,7 @@ defmodule Formentation.FormNestedPresenceTest do
       form =
         address_schema(address_required: true, street_required: false)
         |> Form.new(%{"address" => %{"house_number" => 4}})
-        |> Form.submit(%{"address" => %{"house_number" => ""}})
+        |> submitted_form(%{"address" => %{"house_number" => ""}})
 
       assert {:ok, candidate} = Form.candidate(form)
       refute Map.has_key?(candidate, "address")
@@ -97,7 +99,7 @@ defmodule Formentation.FormNestedPresenceTest do
       form =
         address_schema(address_required: true, street_required: false)
         |> Form.new(%{})
-        |> Form.submit(%{"address" => %{"house_number" => "4"}})
+        |> submitted_form(%{"address" => %{"house_number" => "4"}})
 
       assert Form.candidate(form) == {:ok, %{"address" => %{"house_number" => 4}}}
       assert Form.issues(form, ["address"]) == []
@@ -178,7 +180,7 @@ defmodule Formentation.FormNestedPresenceTest do
       form =
         box_definition()
         |> Form.new()
-        |> Form.submit(%{"title" => "New", "dimensions" => %{"width" => "4"}})
+        |> submitted_form(%{"title" => "New", "dimensions" => %{"width" => "4"}})
 
       assert Form.candidate(form) == {:ok, %{"title" => "New", "dimensions" => %{"width" => 4}}}
     end
@@ -187,7 +189,7 @@ defmodule Formentation.FormNestedPresenceTest do
       form =
         box_definition()
         |> Form.new()
-        |> Form.submit(%{"dimensions" => %{"label" => "", "width" => ""}})
+        |> submitted_form(%{"dimensions" => %{"label" => "", "width" => ""}})
 
       assert {:ok, candidate} = Form.candidate(form)
       assert candidate["dimensions"] == %{"label" => ""}
@@ -197,7 +199,7 @@ defmodule Formentation.FormNestedPresenceTest do
       form =
         box_definition()
         |> Form.new(%{"dimensions" => %{"width" => 4}})
-        |> Form.submit(%{"dimensions" => %{"width" => ""}})
+        |> submitted_form(%{"dimensions" => %{"width" => ""}})
 
       assert {:ok, candidate} = Form.candidate(form)
       refute Map.has_key?(candidate, "dimensions")
@@ -210,7 +212,7 @@ defmodule Formentation.FormNestedPresenceTest do
       form =
         box_definition()
         |> Form.new(%{"dimensions" => %{"width" => 4}})
-        |> Form.submit(%{})
+        |> submitted_form(%{})
 
       assert {:ok, candidate} = Form.candidate(form)
       refute Map.has_key?(candidate, "dimensions")
@@ -220,7 +222,7 @@ defmodule Formentation.FormNestedPresenceTest do
       kept =
         box_definition()
         |> Form.new(%{"dimensions" => %{"width" => 4, "legacy_identifier" => "A-17"}})
-        |> Form.submit(%{"dimensions" => %{"width" => ""}})
+        |> submitted_form(%{"dimensions" => %{"width" => ""}})
 
       assert {:ok, candidate} = Form.candidate(kept)
       assert candidate["dimensions"] == %{"legacy_identifier" => "A-17"}
@@ -228,7 +230,7 @@ defmodule Formentation.FormNestedPresenceTest do
       ignored =
         box_definition()
         |> Form.new()
-        |> Form.submit(%{"dimensions" => %{"unknown" => "x"}})
+        |> submitted_form(%{"dimensions" => %{"unknown" => "x"}})
 
       assert Form.candidate(ignored) == {:ok, %{}}
     end
@@ -239,7 +241,7 @@ defmodule Formentation.FormNestedPresenceTest do
         |> Form.new(%{
           "dimensions" => %{"width" => 4, "sku" => "RO-1", "attachment" => ["a.png"]}
         })
-        |> Form.submit(%{"dimensions" => %{"width" => ""}})
+        |> submitted_form(%{"dimensions" => %{"width" => ""}})
 
       assert {:ok, candidate} = Form.candidate(form)
       assert candidate["dimensions"] == %{"sku" => "RO-1", "attachment" => ["a.png"]}
@@ -249,7 +251,7 @@ defmodule Formentation.FormNestedPresenceTest do
       form =
         box_definition()
         |> Form.new()
-        |> Form.submit(%{"dimensions" => %{"width" => "x"}})
+        |> submitted_form(%{"dimensions" => %{"width" => "x"}})
 
       assert Form.candidate(form) == :none
 
@@ -263,7 +265,7 @@ defmodule Formentation.FormNestedPresenceTest do
       created =
         deep_definition()
         |> Form.new()
-        |> Form.submit(%{"contact" => %{"address" => %{"width" => "4"}}})
+        |> submitted_form(%{"contact" => %{"address" => %{"width" => "4"}}})
 
       assert Form.candidate(created) ==
                {:ok, %{"contact" => %{"address" => %{"width" => 4}}}}
@@ -271,14 +273,14 @@ defmodule Formentation.FormNestedPresenceTest do
       neither =
         deep_definition()
         |> Form.new()
-        |> Form.submit(%{})
+        |> submitted_form(%{})
 
       assert Form.candidate(neither) == {:ok, %{}}
 
       cleared =
         deep_definition()
         |> Form.new(%{"contact" => %{"address" => %{"width" => 4}}})
-        |> Form.submit(%{"contact" => %{"address" => %{"width" => ""}}})
+        |> submitted_form(%{"contact" => %{"address" => %{"width" => ""}}})
 
       assert Form.candidate(cleared) == {:ok, %{}}
     end
@@ -287,7 +289,7 @@ defmodule Formentation.FormNestedPresenceTest do
       form =
         defaulted_box_definition()
         |> Form.new(%{}, defaults: :apply)
-        |> Form.submit(%{})
+        |> submitted_form(%{})
 
       assert {:ok, candidate} = Form.candidate(form)
       refute Map.has_key?(candidate, "dimensions")
@@ -297,7 +299,7 @@ defmodule Formentation.FormNestedPresenceTest do
       form =
         box_definition()
         |> Form.new(%{"dimensions" => %{}})
-        |> Form.submit(%{})
+        |> submitted_form(%{})
 
       assert {:ok, candidate} = Form.candidate(form)
       refute Map.has_key?(candidate, "dimensions")
@@ -308,7 +310,7 @@ defmodule Formentation.FormNestedPresenceTest do
         form =
           box_definition()
           |> Form.new(original)
-          |> Form.submit(%{})
+          |> submitted_form(%{})
 
         assert {:ok, candidate} = Form.candidate(form)
         refute Map.has_key?(candidate, "dimensions")
