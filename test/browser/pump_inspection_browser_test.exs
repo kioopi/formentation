@@ -15,11 +15,40 @@ defmodule FormentationDemo.PumpInspectionBrowserTest do
   # of that key — while giving the config consumer a value it accepts.
   @moduletag browser: :chromium
 
+  # LiveView attaches its client-side event handlers only once the LiveSocket
+  # has joined, but `visit/2` returns on the page `load` event, which fires
+  # earlier. Interacting inside that window produces no `phx-change` or
+  # `phx-submit` push at all: the server never receives an event, so the DOM
+  # never patches and no assertion timeout can rescue it — raising the 5s
+  # timeout to 30s changes nothing, the run just waits 30s and still fails.
+  #
+  # `.phx-connected` is LiveView's own "this view has joined" marker, so
+  # waiting on it closes the race. Note `assert_has("form#asset-form")` does
+  # NOT: that element is present in the static render and matches before the
+  # socket joins, which is why the tests below still flaked despite it.
+  #
+  # The join gets its own, longer timeout: it is the one step that legitimately
+  # takes a while on a loaded machine (CI runners, a dev box mid-compile), and
+  # unlike a post-interaction assertion it is genuinely waiting for something
+  # that *will* arrive. Every later assertion keeps the default 5s, so a real
+  # regression still fails fast rather than hanging.
+  #
+  # Measured on this suite, whole runs failed out of 8, with half the cores
+  # busy-looping to stand in for a loaded CI runner: 4/8 before, 0/8 after.
+  # Idle, 0/12 after. Under *full* CPU saturation the join itself starves and
+  # runs still fail — that regime is not worth chasing, but it is why the
+  # timeout above is generous rather than tight.
+  @connect_timeout to_timeout(second: 15)
+
+  defp visit_connected(conn, path) do
+    conn |> visit(path) |> assert_has(".phx-connected", timeout: @connect_timeout)
+  end
+
   test "a fully valid submit renders the decoded candidate", %{conn: conn} do
     # serial_number and condition are blank initially (required); the rest have
     # valid initial values (operating_hours 5102, voltage 230.0, insulation_ok true).
     conn
-    |> visit("/")
+    |> visit_connected("/")
     |> fill_in("Serial number", with: "PX-2044")
     |> select("Condition", option: "worn")
     |> click_button("Save")
@@ -28,7 +57,7 @@ defmodule FormentationDemo.PumpInspectionBrowserTest do
 
   test "a pristine required field's error stays hidden until used or submitted", %{conn: conn} do
     conn
-    |> visit("/")
+    |> visit_connected("/")
     |> assert_has("form#asset-form")
     # pristine mount: the blank required serial_number shows no error
     |> refute_has("#asset_payload_serial_number_errors")
@@ -51,7 +80,7 @@ defmodule FormentationDemo.PumpInspectionBrowserTest do
     conn: conn
   } do
     conn
-    |> visit("/")
+    |> visit_connected("/")
     # operating_hours renders type="text" inputmode="numeric", so the browser accepts "51o2"
     |> fill_in("Operating hours", with: "51o2")
     # the decode fails and its error appears (also anchors the assertion to the live patch)
@@ -62,7 +91,7 @@ defmodule FormentationDemo.PumpInspectionBrowserTest do
 
   test "clicking an error-summary link focuses the offending control", %{conn: conn} do
     conn
-    |> visit("/")
+    |> visit_connected("/")
     |> assert_has("form#asset-form")
     # turn OFF native validation so the blank submit reaches the server-side summary
     |> uncheck("Native browser validation")

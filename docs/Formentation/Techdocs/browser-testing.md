@@ -13,7 +13,7 @@ status: current
 
 # Browser testing
 
-> [!note] As of 2026-07-24 · browser-test suite added
+> [!note] As of 2026-07-26 · browser-test suite added; LiveSocket join race fixed
 > Describes the opt-in Playwright suite as built: the harness, the config
 > posture, and what each of the four seed tests pins. This is additive to
 > [[test-and-verification-architecture|the test architecture]]'s mechanism
@@ -103,9 +103,14 @@ the two servers from colliding if both happen to run at once.
 
 The suite runs `async: true` and shares one demo server across its four
 tests, so under load a `fill_in` → `phx-change` → websocket → DOM patch
-round-trip can occasionally exceed PhoenixTest's default 2s assertion
-timeout; the `timeout: to_timeout(second: 5)` above absorbs that load-timing
-contention rather than pointing at a correctness race.
+round-trip can exceed PhoenixTest's default 2s assertion timeout; the
+`timeout: to_timeout(second: 5)` above absorbs that.
+
+This timeout was originally raised in the belief that the suite's
+intermittent failures were load-timing contention rather than a
+correctness race. That was wrong — see [[#Wait for the LiveSocket join before interacting|the join race below]],
+which no timeout can fix. The 5s value is still a reasonable default for
+genuine round-trip latency, but it is not what makes the suite reliable.
 
 ## Tag and runner — `browser: :chromium`, not bare `:browser`
 
@@ -207,6 +212,41 @@ the box before clicking Save — otherwise the click never leaves the
 browser. The toggle is also an exploration aid on its own: checking it back
 on shows native validation's browser-native error bubbles beside
 Formentation's accessible summary for direct comparison.
+
+## Wait for the LiveSocket join before interacting
+
+Every test enters through a `visit_connected/2` helper rather than
+`visit/2` directly, because `visit/2` returns on the page `load` event
+while LiveView attaches its client-side handlers only after the
+LiveSocket *joins* — strictly later.
+
+Interacting in that window is silently lost: `fill_in` types into the
+input, but no `phx-change` is pushed, so the server never sees an event
+and the DOM never patches. The symptom is a later assertion failing with
+`Could not find element`, which reads like a slow page but is not — the
+event is never coming, so no timeout rescues it. Raising the assertion
+timeout from 5s to 30s changed nothing except making failures take 30s.
+Diagnosis came from instrumenting the demo's `handle_event("validate", …)`:
+on a failing run the log showed the socket connected and **zero** handle-event
+lines.
+
+The helper waits on `.phx-connected`, LiveView's own join marker.
+Asserting `form#asset-form` does *not* work as a substitute — that element
+is in the static render and matches before the join, which is why tests
+that already did so still flaked. The join gets a longer (15s) timeout of
+its own because it is the one step that legitimately takes a while on a
+loaded machine; every later assertion keeps the default 5s so real
+regressions still fail fast.
+
+Measured on this suite, whole runs failed out of 8, with half the cores
+busy-looping to stand in for a loaded CI runner: **4/8 before, 0/8 after**;
+idle, 0/12 after. Under full CPU saturation the join itself starves and
+runs still fail — not a regime worth chasing, but the reason the timeout
+is generous rather than tight.
+
+This is also why the CI browser job is `continue-on-error: true`, and why
+an earlier attempt to fix the same flakiness by raising the timeout
+(“Raise browser-test assertion timeout to 5s”) could not have worked.
 
 ## Minor gotchas worth knowing
 
