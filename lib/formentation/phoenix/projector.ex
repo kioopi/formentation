@@ -2,24 +2,30 @@ defmodule Formentation.Phoenix.Projector do
   @moduledoc """
   Combines a compiled definition with a `%Phoenix.HTML.Form{}` into a
   `Formentation.Phoenix.RenderPlan` (the rendering boundary in
-  Planning/06-runtime-projection). Phoenix-generic: state is read only
-  through the Phoenix form conventions, so any `Phoenix.HTML.FormData`
-  implementation projects. Pure — same inputs, same plan.
+  Planning/06-runtime-projection). Two-part boundary: Phoenix form
+  conventions carry field-level mechanics, so any `Phoenix.HTML.FormData`
+  implementation still projects; the source's
+  `Formentation.Phoenix.StateView` (D-027) carries submission, issue
+  visibility, and non-field issues Phoenix cannot express. Pure — same
+  inputs, same plan.
 
   Spec: docs/superpowers/specs/2026-07-23-phase1-step6-projector-components-theme-design.md
+  Spec: docs/superpowers/specs/2026-07-25-runtime-state-view-contract-design.md
   """
 
-  alias Formentation.{Definition, Diagnostic, Form, Info, Node}
-  alias Formentation.Phoenix.{RenderNode, RenderPlan}
+  alias Formentation.{Definition, Diagnostic, Info, InstancePath, Node}
+  alias Formentation.Phoenix.{RenderNode, RenderPlan, StateView}
 
   @doc """
   Projects the whole definition against `form` into a render plan.
 
   The plan's root mirrors the compiled tree in declaration order; every
   field node arrives component-ready — resolved widget, Phoenix form
-  field, label, validations, and a `show_errors?` flag that already
-  folds usage and action (D-014). `plan.summary` is non-empty only after
-  a submit.
+  field, label, validations, and a `show_errors?` flag decided by the
+  source's `StateView` (D-027), falling back to the Phoenix
+  action/`used_input?` rule (D-014) only when the source has no opinion.
+  `plan.summary` is non-empty only once the source's `StateView` reports
+  semantic submission.
 
   ## Example
 
@@ -28,7 +34,7 @@ defmodule Formentation.Phoenix.Projector do
       ...>     %{kind: :object, properties: [{"email", %{kind: :string, role: :email}}]},
       ...>     adapter: Formentation.Source.Map
       ...>   )
-      iex> form = Phoenix.HTML.FormData.to_form(Formentation.Form.new(definition), as: "payload")
+      iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
       iex> plan = Formentation.Phoenix.Projector.project(definition, form)
       iex> [field] = plan.root.children
       iex> {field.widget, field.label, field.field.name}
@@ -36,8 +42,9 @@ defmodule Formentation.Phoenix.Projector do
   """
   @spec project(Definition.t(), Phoenix.HTML.Form.t()) :: RenderPlan.t()
   def project(%Definition{} = definition, %Phoenix.HTML.Form{} = form) do
-    {root, diagnostics} = project_group(Info.root(definition), form)
-    %RenderPlan{root: root, summary: summary(root, form), diagnostics: diagnostics}
+    ctx = context(definition, form, [])
+    {root, diagnostics} = project_group(Info.root(definition), form, ctx)
+    %RenderPlan{root: root, summary: summary(root, ctx), diagnostics: diagnostics}
   end
 
   @doc """
@@ -53,7 +60,7 @@ defmodule Formentation.Phoenix.Projector do
       ...>     %{kind: :object, properties: [{"email", %{kind: :string, role: :email}}]},
       ...>     adapter: Formentation.Source.Map
       ...>   )
-      iex> form = Phoenix.HTML.FormData.to_form(Formentation.Form.new(definition), [])
+      iex> form = Phoenix.HTML.FormData.to_form(%{}, [])
       iex> node = Formentation.Phoenix.Projector.project_at(definition, form, ["email"])
       iex> {node.widget, node.field.name}
       {:email_input, "email"}
@@ -70,9 +77,19 @@ defmodule Formentation.Phoenix.Projector do
         raise ArgumentError, "the node at #{inspect(segments)} is unsupported and cannot render"
 
       node ->
-        {render, _diagnostics} = project_node(node, descend(form, Enum.drop(segments, -1)))
+        parent = Enum.drop(segments, -1)
+        ctx = context(definition, form, parent)
+        {render, _diagnostics} = project_node(node, descend(form, parent), ctx)
         render
     end
+  end
+
+  # The projection cursor. `path` holds raw segments — an %InstancePath{}
+  # is built only where a path crosses into StateView — and `root_form`
+  # and `source` stay pinned to the form handed to project/2 or
+  # project_at/3, never a nested form built during traversal.
+  defp context(definition, form, path) do
+    %{definition: definition, root_form: form, source: form.source, path: path}
   end
 
   defp descend(form, segments) do
@@ -82,37 +99,38 @@ defmodule Formentation.Phoenix.Projector do
     end)
   end
 
-  defp project_group(%Node.Group{} = group, form) do
-    {children, diagnostics} = project_children(group.children, form)
+  defp project_group(%Node.Group{} = group, form, ctx) do
+    {children, diagnostics} = project_children(group.children, form, ctx)
     {%RenderNode.Group{legend: legend(group), children: children}, diagnostics}
   end
 
-  defp project_children(nodes, form) do
+  defp project_children(nodes, form, ctx) do
     {children, diagnostics} =
       Enum.map_reduce(nodes, [], fn node, acc ->
-        {child, diags} = project_node(node, form)
+        {child, diags} = project_node(node, form, ctx)
         {child, [diags | acc]}
       end)
 
     {Enum.reject(children, &is_nil/1), diagnostics |> Enum.reverse() |> List.flatten()}
   end
 
-  defp project_node(%Node.Field{hidden?: true, read_only?: true}, _form), do: {nil, []}
-  defp project_node(%Node.Field{} = node, form), do: project_field(node, form)
-  defp project_node(%Node.Unsupported{}, _form), do: {nil, []}
+  defp project_node(%Node.Field{hidden?: true, read_only?: true}, _form, _ctx), do: {nil, []}
+  defp project_node(%Node.Field{} = node, form, ctx), do: project_field(node, form, ctx)
+  defp project_node(%Node.Unsupported{}, _form, _ctx), do: {nil, []}
 
-  defp project_node(%Node.Group{nests_data?: false} = group, form) do
-    project_group(group, form)
+  defp project_node(%Node.Group{nests_data?: false} = group, form, ctx) do
+    project_group(group, form, ctx)
   end
 
-  defp project_node(%Node.Group{nests_data?: true} = group, form) do
+  defp project_node(%Node.Group{nests_data?: true} = group, form, ctx) do
     [nested] = Phoenix.HTML.FormData.to_form(form.source, form, group.name, [])
-    project_group(group, nested)
+    project_group(group, nested, %{ctx | path: ctx.path ++ [group.name]})
   end
 
-  defp project_field(%Node.Field{} = node, form) do
+  defp project_field(%Node.Field{} = node, form, ctx) do
     field = form[access_key(node.name)]
     {widget, diagnostics} = resolve_widget(node)
+    path = ctx.path ++ [node.name]
 
     {%RenderNode.Field{
        widget: widget,
@@ -122,7 +140,7 @@ defmodule Formentation.Phoenix.Projector do
        options: node.options,
        validations: Phoenix.HTML.Form.input_validations(form, field.field),
        errors: field.errors,
-       show_errors?: show_errors?(field, form),
+       show_errors?: show_errors?(field, ctx, path),
        read_only?: node.read_only?
      }, diagnostics}
   end
@@ -189,18 +207,31 @@ defmodule Formentation.Phoenix.Projector do
     name |> String.replace("_", " ") |> String.capitalize()
   end
 
-  # D-014: an issue renders when the form's action is submit or the
-  # field's usage is :used — computed here, once, the Phoenix way, so
-  # any FormData source gets the same rule and themes never see markers.
-  defp show_errors?(field, form) do
-    field.errors != [] and (form.action == :submit or Phoenix.Component.used_input?(field))
+  # D-014, now source-owned: the state view decides, and only falls back
+  # to the Phoenix-compatible default when it answers :default. Computed
+  # here, once, so themes never see markers or actions.
+  defp show_errors?(field, ctx, path) do
+    field.errors != [] and
+      visible?(ctx, path, fn -> submitted?(ctx) or Phoenix.Component.used_input?(field) end)
   end
 
-  defp summary(root, %Phoenix.HTML.Form{action: :submit} = form) do
-    field_entries(root) ++ object_entries(form.source)
+  defp visible?(ctx, path, default_fun) do
+    case StateView.issue_visibility(ctx.source, ctx.root_form, InstancePath.new!(path)) do
+      :show -> true
+      :hide -> false
+      :default -> default_fun.()
+    end
   end
 
-  defp summary(_root, _form), do: []
+  defp submitted?(ctx), do: StateView.submitted?(ctx.source, ctx.root_form)
+
+  defp summary(root, ctx) do
+    if submitted?(ctx) do
+      field_entries(root) ++ non_field_entries(ctx)
+    else
+      []
+    end
+  end
 
   defp field_entries(%RenderNode.Group{children: children}) do
     Enum.flat_map(children, &field_entries/1)
@@ -208,26 +239,52 @@ defmodule Formentation.Phoenix.Projector do
 
   defp field_entries(%RenderNode.Field{show_errors?: true} = node) do
     for {message, _opts} <- node.errors do
-      %{id: node.field.id, label: node.label, message: message}
+      summary_entry(node.field.id, node.label, message)
     end
   end
 
   defp field_entries(%RenderNode.Field{}), do: []
 
-  # Root and object-level issues never enter Phoenix's per-field errors
-  # (step-5 spec decision 7). When the source is a Formentation.Form we
-  # can reach them for the summary; other FormData sources degrade to
-  # the per-field entries above.
-  defp object_entries(%Form{} = form_state) do
-    form_state.issues
-    |> Enum.reject(fn {path, _issues} ->
-      match?(%Node.Field{}, Info.node_at(form_state.definition, path.segments))
-    end)
-    |> Enum.sort_by(fn {path, _issues} -> path.segments end)
-    |> Enum.flat_map(fn {_path, issues} ->
-      for issue <- issues, do: %{id: nil, label: nil, message: issue.message}
-    end)
+  # Root, group and unsupported-node issues never enter Phoenix's per-field
+  # error convention (step-5 spec decision 7), so they arrive normalized
+  # from the state view instead. Adapter order is authoritative — the
+  # projector filters but never reorders. A source with no enumeration
+  # capability degrades to the scalar entries above rather than guessing.
+  defp non_field_entries(ctx) do
+    case StateView.issues(ctx.source, ctx.root_form) do
+      :unavailable ->
+        []
+
+      {:ok, issues} ->
+        issues
+        |> Enum.filter(&non_field_visible?(ctx, &1))
+        |> Enum.map(&summary_entry(nil, summary_label(ctx, &1.path), &1.message))
+    end
   end
 
-  defp object_entries(_source), do: []
+  # Unlike visible?/3 (used for fields), :default counts as visible here:
+  # non_field_entries/1 only runs from summary/2 once submitted?(ctx) is
+  # already true, so the submission gate is already applied and there is
+  # no per-entry Phoenix default left to apply — only an explicit :hide
+  # suppresses an entry.
+  defp non_field_visible?(ctx, %StateView.Issue{path: path}) do
+    not field_path?(ctx, path) and
+      StateView.issue_visibility(ctx.source, ctx.root_form, path) != :hide
+  end
+
+  defp field_path?(ctx, %InstancePath{segments: segments}) do
+    match?(%Node.Field{}, Info.node_at(ctx.definition, segments))
+  end
+
+  # An unsupported node carries a name a reader can recognize, so its
+  # entry is worth labelling; root and group issues stay unlabelled, as
+  # they were before D-027.
+  defp summary_label(ctx, %InstancePath{segments: segments}) do
+    case Info.node_at(ctx.definition, segments) do
+      %Node.Unsupported{} -> humanize(List.last(segments))
+      _root_group_or_unknown -> nil
+    end
+  end
+
+  defp summary_entry(id, label, message), do: %{id: id, label: label, message: message}
 end

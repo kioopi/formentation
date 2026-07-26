@@ -89,6 +89,29 @@ The adapter should:
 
 See [[09-diagnostics-provenance-introspection#Submitted-instance issues|Submitted-instance issues]].
 
+## State view
+
+`%Phoenix.HTML.Form{}` carries values, names, IDs, input validations,
+per-field errors, and `used_input?/1` params — everything projection needs
+*except* three semantic facts an arbitrary `FormData` source cannot express
+through those conventions. `Formentation.Phoenix.StateView` fills that gap,
+dispatched as a protocol on `form.source`:
+
+- `submitted?/2` — the source's semantic submit state, not "`form.action`
+  equals a particular atom";
+- `issue_visibility/3` — a source-owned visibility policy for issues at one
+  absolute instance path, or `:default` to defer to the projector's
+  Phoenix-compatible rule;
+- `issues/2` — every issue the source can enumerate, normalized to
+  `path`/`message`, or `:unavailable` when the source has no enumeration
+  capability.
+
+`@fallback_to_any` means a source with no dedicated implementation still
+projects, through the conservative `Any` behaviour rather than a crash. No
+public function — `Projector.project/2`, `project_at/3`, or either
+component — takes an adapter argument; dispatch is entirely on
+`form.source`. See [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]].
+
 ## Component API
 
 A basic public component could be:

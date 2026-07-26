@@ -86,7 +86,20 @@
       # "zero Phoenix dependency").
       {"Formentation.*", ["Phoenix.*"], except: ["Formentation.Phoenix.*"]},
       # JSV never leaks past its swap point (D-008).
-      {"Formentation.*", ["JSV.*"], except: ["Formentation.JSONSchema.Validator"]}
+      {"Formentation.*", ["JSV.*"], except: ["Formentation.JSONSchema.Validator"]},
+      # The projector dispatches state-dependent decisions only through
+      # Formentation.Phoenix.StateView (D-027); it must never call into
+      # Formentation.Form directly. The {:phoenix, :core} layer dependency
+      # is sanctioned (the projector reads Definition/Info/Node freely), so
+      # no layer rule can express this narrower obligation — only a
+      # per-module call rule can. This closes the alias-evasion gap the
+      # projector_test.exs "architectural boundary" grep pin cannot see:
+      # `alias Formentation.{Form, ...}` (brace syntax) never produces the
+      # literal substring "Formentation.Form" the grep looks for, but Reach
+      # resolves calls against the call graph after alias resolution, so it
+      # catches a `Form.some_function/arity` call regardless of how the
+      # alias was spelled.
+      {"Formentation.Phoenix.Projector", ["Formentation.Form", "Formentation.Form.*"]}
     ]
   ],
   effects: [
@@ -134,14 +147,38 @@
       # The fixtures implement the extracted Formentation.Fixture
       # behaviour; reach's heuristic cannot see @behaviour declarations,
       # so it would keep proposing the extraction it already got.
-      ignore: [modules: ["Formentation.Fixtures.*"]]
+      #
+      # Formentation.Phoenix.StateView (D-027) is a defprotocol with
+      # multiple defimpl blocks (Any, Formentation.Form) sharing its
+      # callbacks by design — that is what a protocol is. Reach's
+      # macro-fact detection only recognizes @behaviour declarations,
+      # not defprotocol/defimpl, so it proposes an extraction the
+      # dispatch mechanism already provides.
+      ignore: [
+        modules: [
+          "Formentation.Fixtures.*",
+          "Formentation.Phoenix.StateView",
+          "Formentation.Phoenix.StateView.*"
+        ]
+      ]
     ]
   ],
   checks: [
     layer_coverage: [
       require_all_modules: true,
       forbid_multiple_matches: true,
-      ignore: ["Formentation.Fixture", "Formentation.Fixtures.*", "Formentation.HTMLAssertions"]
+      # test/support modules: on elixirc_paths(:test), so reach sees them
+      # when `mix ci` runs, but they are not library code and belong to no
+      # layer. Formentation.SourceFixture is the D-027 state-view contract
+      # proof; its two defimpl-generated modules need no entry, being
+      # covered already by the phoenix layer's FormData and
+      # Formentation.Phoenix.* patterns.
+      ignore: [
+        "Formentation.Fixture",
+        "Formentation.Fixtures.*",
+        "Formentation.HTMLAssertions",
+        "Formentation.SourceFixture"
+      ]
     ]
   ],
   tests: [

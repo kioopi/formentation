@@ -12,7 +12,7 @@ status: current
 
 # Rendering
 
-*As of 2026-07-24 (step 7 complete). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
+*As of 2026-07-25 (StateView protocol, D-027). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
 
 ## Projector data flow (`Formentation.Phoenix.Projector`)
 
@@ -61,12 +61,28 @@ One struct per node kind (D-015), mirroring `Formentation.Node`:
   `read_only?`.
 
 `show_errors?` is computed once, in the projector, so themes never
-inspect `_unused_` markers (D-014):
+inspect `_unused_` markers or `form.action` (D-014, D-027). The source's
+`StateView.issue_visibility/3` decides first; only a `:default` answer
+falls back to the Phoenix-generic rule:
 
 ```
 show_errors? = field.errors != [] and
-  (form.action == :submit or Phoenix.Component.used_input?(field))
+  case StateView.issue_visibility(form.source, form, path) do
+    :show -> true
+    :hide -> false
+    :default -> StateView.submitted?(form.source, form) or Phoenix.Component.used_input?(field)
+  end
 ```
+
+For a `%Formentation.Form{}` source this never reaches `:default` —
+`Formentation.Form` owns the complete D-014 policy and answers `:show`/`:hide`
+directly from `Form.show_issues?/2`, which reads *accumulated* usage rather
+than `used_input?/1`'s *current-params* view. The two agree on every normal
+LiveView round-trip and diverge when a later payload omits a path a prior
+one used — see [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]'s
+recorded behaviour change for the pinned example. Any other `FormData`
+source has no state view and falls back to `Any`, which always answers
+`:default` — reproducing the formula's right-hand side unchanged.
 
 ## Widget resolution
 
@@ -90,17 +106,25 @@ diagnostic on the plan.
 
 ## Error summary
 
-`plan.summary` is populated only when `form.action == :submit`; otherwise
-it is `[]`. It combines two sources:
+`plan.summary` is populated only when `StateView.submitted?/2` answers
+`true` for `form.source`; otherwise it is `[]`. For a `%Formentation.Form{}`
+source that means the last transition carried `event: :submit`
+(`Form.submitted?/1`); for any other source through the `Any` fallback it
+means `form.action == :submit`, the same rule as before D-027
+([[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]).
+It combines two sources:
 
 - **Field entries** — every rendered field with `show_errors?: true`
   contributes one entry per error message, linkable to `field.id`.
 - **Object entries** — root and object-level issues never appear in
-  Phoenix's per-field `field.errors` convention. When `form.source` is a
-  `%Formentation.Form{}`, the projector reads its `issues` directly for
-  entries with no matching field node (`id: nil`, no link target). For
-  any other `Phoenix.HTML.FormData` source, the summary degrades honestly
-  to the field entries only.
+  Phoenix's per-field `field.errors` convention. The projector asks the
+  source's `StateView.issues/2` for the complete, normalized, adapter-ordered
+  list and keeps the entries with no matching field node (`id: nil`, no
+  link target), filtered by `issue_visibility/3`. `Formentation.Form`
+  answers `{:ok, issues}`; a source with no enumeration capability answers
+  `:unavailable` and the summary degrades honestly to the field entries
+  only — the degradation is keyed on what `issues/2` reports, not on the
+  source's module.
 
 The summary renders at the top of `fields/1`'s own output, not the top
 of the page. When the payload form is embedded after hand-written
@@ -124,15 +148,19 @@ element, and names/ids work under a parent namespace such as
   data-nesting groups; presentational groups have no instance path and
   are not independently addressable).
 
-The projector reads state exclusively through Phoenix conventions —
-display values via the form field, errors via the already action-gated
-`field.errors`, usage via `Phoenix.Component.used_input?/1` — so any
-`Phoenix.HTML.FormData` implementation projects, not only
-`Formentation.Form`; an `AshPhoenix.Form` is just another implementation
-to project. The one deliberate exception is the error-summary's
-object-entries special case above, which degrades rather than requiring
-`Formentation.Form`. All of this lives in `lib/formentation/phoenix/`,
-behind the [[18-decisions#D-017 — Phoenix integration ships in-tree behind a namespace boundary|D-017]]/[[18-decisions#D-018 — Reach is the architecture gate|D-018]] directory boundary — [[18-decisions#D-019 — Projection is Phoenix-generic|D-019]].
+The projector reads display values, names, IDs, input validations, and
+per-field errors through Phoenix conventions, and the three semantic facts
+Phoenix cannot carry — submission, issue visibility, root/object issues —
+through `Formentation.Phoenix.StateView`, dispatched on `form.source` with
+`@fallback_to_any` — so any `Phoenix.HTML.FormData` implementation still
+projects, not only `Formentation.Form`; an `AshPhoenix.Form` is just
+another implementation to project, through the `Any` fallback until it
+gets a dedicated state view. Neither `Projector.project/2`/`project_at/3`
+nor either component takes an adapter argument — dispatch is entirely on
+`form.source`. All of this lives in `lib/formentation/phoenix/`, behind the
+[[18-decisions#D-017 — Phoenix integration ships in-tree behind a namespace boundary|D-017]]/[[18-decisions#D-018 — Reach is the architecture gate|D-018]] directory boundary —
+[[18-decisions#D-019 — Projection is Phoenix-generic|D-019]],
+[[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]].
 
 ## Reference theme (`Formentation.Phoenix.Theme.Reference`)
 

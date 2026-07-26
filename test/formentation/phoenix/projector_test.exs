@@ -314,44 +314,469 @@ defmodule Formentation.Phoenix.ProjectorTest do
     end
 
     test "object-level schema issues enrich the submit summary unlinked" do
-      # `address` is deliberately modeled with `oneOf` (unsupported by the
-      # JSON Schema adapter) rather than a plain `"type": "object"`: a
-      # supported nested object's children are always materialized present,
-      # so a `required` issue can never land on the group's own path. An
-      # Unsupported node is the one shape that can genuinely be missing —
-      # JSV files the `:required` issue at ["address"], and since that path
-      # doesn't resolve to a Node.Field, object_entries/1 folds it into the
-      # summary unlinked (no id, no label). Mirrors
-      # form_data_test.exs:234-269.
+      # `address` is a plain supported `"type": "object"`. Under D-026
+      # (issue #1) a required nested object with no content stays genuinely
+      # absent from the candidate, so JSV files the `:required` issue at the
+      # group's own path, ["address"]. That path resolves to a Group, not a
+      # Node.Field and not a Node.Unsupported, so the state view's
+      # normalized issue folds into the summary unlinked and unlabelled.
       schema = %{
         "type" => "object",
         "required" => ["address"],
         "properties" => %{
           "title" => %{"type" => "string"},
           "address" => %{
-            "oneOf" => [
-              %{"type" => "object", "properties" => %{"street" => %{"type" => "string"}}}
-            ]
+            "type" => "object",
+            "required" => ["street"],
+            # minLength 1 keeps the compile diagnostic-free: without it the
+            # compiler warns :required_permits_empty, and this test asserts
+            # a clean compile to prove no *unsupported* keyword is involved.
+            "properties" => %{"street" => %{"type" => "string", "minLength" => 1}}
           }
         }
       }
 
-      {:ok, definition, [diagnostic]} =
-        Formentation.compile(schema, adapter: Formentation.JSONSchema)
+      {:ok, definition, []} = Formentation.compile(schema, adapter: Formentation.JSONSchema)
 
-      assert diagnostic.code == :unsupported_keyword
+      form_state = Form.submit(Form.new(definition), %{"title" => "t"})
+      plan = Projector.project(definition, FormData.to_form(form_state, []))
+
+      assert [%{id: nil, label: nil, message: message}] = plan.summary
+      assert message =~ "required"
+    end
+  end
+
+  describe "source-neutral submission and visibility" do
+    defp scalar_definition do
+      compile!(%{
+        kind: :object,
+        properties: [{"operating_hours", %{kind: :integer, title: "Operating hours"}}]
+      })
+    end
+
+    # An unused marker makes the Phoenix default answer "hidden", so the
+    # only thing that can reveal the error is semantic submission.
+    defp unused_params, do: %{"operating_hours" => "51o2", "_unused_operating_hours" => ""}
+
+    defp fixture_form(overrides) do
+      source =
+        struct!(
+          %Formentation.SourceFixture{
+            params: unused_params(),
+            errors: [operating_hours: {"is invalid", []}],
+            action: :commit
+          },
+          overrides
+        )
+
+      Phoenix.HTML.FormData.to_form(source, [])
+    end
+
+    test "a source whose semantic submit is :commit reveals an unused field's error" do
+      plan = Projector.project(scalar_definition(), fixture_form(submitted?: true))
+
+      assert [%RenderNode.Field{show_errors?: true}] = plan.root.children
+      assert [%{label: "Operating hours", message: "is invalid"}] = plan.summary
+    end
+
+    test "the generic fallback does not treat :commit as submitted" do
+      form = %{
+        Phoenix.HTML.FormData.to_form(unused_params(), [])
+        | action: :commit,
+          errors: [operating_hours: {"is invalid", []}]
+      }
+
+      plan = Projector.project(scalar_definition(), form)
+
+      assert [%RenderNode.Field{show_errors?: false}] = plan.root.children
+      assert plan.summary == []
+    end
+
+    test ":show reveals a field error the Phoenix default would hide" do
+      form = fixture_form(visibility: %{["operating_hours"] => :show})
+
+      plan = Projector.project(scalar_definition(), form)
+
+      assert [%RenderNode.Field{show_errors?: true}] = plan.root.children
+    end
+
+    test ":hide suppresses a field error semantic submission would reveal" do
+      form =
+        fixture_form(submitted?: true, visibility: %{["operating_hours"] => :hide})
+
+      plan = Projector.project(scalar_definition(), form)
+
+      assert [%RenderNode.Field{show_errors?: false}] = plan.root.children
+      assert plan.summary == []
+    end
+
+    test "a source with no issue enumeration still projects fields and scalar summaries" do
+      plan = Projector.project(scalar_definition(), fixture_form(submitted?: true))
+
+      assert [%RenderNode.Field{}] = plan.root.children
+      assert [_] = plan.summary
+    end
+  end
+
+  describe "normalized non-field issues in the summary" do
+    alias Formentation.Phoenix.StateView
+
+    defp issue(segments, message) do
+      %StateView.Issue{
+        path: Formentation.InstancePath.new!(segments),
+        message: message
+      }
+    end
+
+    defp summary_form(issues, overrides \\ []) do
+      source =
+        struct!(
+          %Formentation.SourceFixture{
+            params: %{"operating_hours" => "1"},
+            action: :commit,
+            submitted?: true,
+            issues: {:ok, issues}
+          },
+          overrides
+        )
+
+      Phoenix.HTML.FormData.to_form(source, [])
+    end
+
+    test "a root issue appears once, unlinked, and never enters a field's errors" do
+      plan =
+        Projector.project(
+          scalar_definition(),
+          summary_form([issue([], "the whole form is wrong")])
+        )
+
+      assert [%{id: nil, label: nil, message: "the whole form is wrong"}] = plan.summary
+      assert [%RenderNode.Field{errors: []}] = plan.root.children
+    end
+
+    # Spec §7.3, source-neutrally: the supported-nested-object regression
+    # elsewhere in this file runs through %Formentation.Form{}, which owns
+    # both the group node and the issue. Here the definition is the only
+    # thing the source shares with the projector — an Ash- or Ecto-style
+    # adapter hands over a group-level issue through issues/2 alone, and
+    # it must still be rendered once, unlinked, without reaching the
+    # group's fields.
+    test "a nested-object issue appears once, unlinked, and leaves the group's fields alone" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"address", %{kind: :object, properties: [{"street", %{kind: :string}}]}}
+          ]
+        })
+
+      form =
+        summary_form([issue(["address"], "is incomplete")],
+          params: %{"address" => %{"street" => "Main"}}
+        )
+
+      plan = Projector.project(definition, form)
+
+      assert [%{id: nil, label: nil, message: "is incomplete"}] = plan.summary
+      assert [%RenderNode.Group{children: [street]}] = plan.root.children
+      assert %RenderNode.Field{errors: [], show_errors?: false} = street
+      assert street.field.name == "address[street]"
+      assert street.field.value == "Main"
+    end
+
+    # D-027: an unsupported node carries a name a reader can recognize, so
+    # its normalized issue is labelled from it (unlike the root/group case
+    # covered above, which stays unlabelled).
+    test "an unsupported node's issue is labelled with its humanized name" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [{"gadget", %{kind: :carousel}}, {"name", %{kind: :string}}]
+        })
+
+      plan =
+        Projector.project(
+          definition,
+          summary_form([issue(["gadget"], "cannot be repaired here")])
+        )
+
+      assert [%{id: nil, label: "Gadget", message: "cannot be repaired here"}] = plan.summary
+    end
+
+    test "an issue whose path resolves to a scalar field is not duplicated beside field.errors" do
+      form =
+        summary_form([issue(["operating_hours"], "is invalid")],
+          errors: [operating_hours: {"is invalid", []}]
+        )
+
+      plan = Projector.project(scalar_definition(), form)
+
+      assert [%RenderNode.Field{show_errors?: true, errors: [{"is invalid", []}]}] =
+               plan.root.children
+
+      assert [%{label: "Operating hours", message: "is invalid"}] = plan.summary
+    end
+
+    test "adapter order is preserved and multiple issues at one path stay distinct" do
+      issues = [issue(["b"], "second"), issue([], "first"), issue([], "third")]
+
+      plan = Projector.project(scalar_definition(), summary_form(issues))
+
+      assert Enum.map(plan.summary, & &1.message) == ["second", "first", "third"]
+    end
+
+    test "scalar entries precede normalized non-field entries" do
+      form =
+        summary_form([issue([], "root problem")],
+          errors: [operating_hours: {"is invalid", []}]
+        )
+
+      plan = Projector.project(scalar_definition(), form)
+
+      assert [
+               %{label: "Operating hours", message: "is invalid"},
+               %{id: nil, label: nil, message: "root problem"}
+             ] = plan.summary
+    end
+
+    test "a :hide answer omits a non-field issue from a submitted summary" do
+      form =
+        summary_form([issue(["b"], "hidden problem")], visibility: %{["b"] => :hide})
+
+      plan = Projector.project(scalar_definition(), form)
+
+      assert plan.summary == []
+    end
+
+    test "an unavailable enumeration yields scalar entries only" do
+      form =
+        summary_form([], issues: :unavailable, errors: [operating_hours: {"is invalid", []}])
+
+      plan = Projector.project(scalar_definition(), form)
+
+      assert [%{label: "Operating hours", message: "is invalid"}] = plan.summary
+    end
+
+    # Spec §7.2: the whole point of the contract — two sources sharing no
+    # internals, and disagreeing about which atom means "submitted", must
+    # produce identical projector-owned decisions once their state-view
+    # answers agree. Root/object issue association is covered separately:
+    # by the root-issue test above for the fixture, and by the D-026
+    # regression in projector_test for %Formentation.Form{}.
+    test "equivalent state-view answers produce equivalent projector decisions" do
+      definition = scalar_definition()
+
+      formentation_plan =
+        definition
+        |> Form.new()
+        |> Form.transition(%Formentation.Params{
+          values: %{"operating_hours" => "51o2"},
+          event: :submit
+        })
+        |> then(&Projector.project(definition, FormData.to_form(&1, [])))
+
+      # Whatever decode message Formentation produced, hand the same one to
+      # a source that calls its submit state :commit and enumerates nothing.
+      [%{message: decode_message}] = formentation_plan.summary
+
+      mirrored_plan =
+        Projector.project(
+          definition,
+          summary_form([], errors: [operating_hours: {decode_message, []}])
+        )
+
+      assert decisions(mirrored_plan) == decisions(formentation_plan)
+      assert decisions(formentation_plan).show_errors? == [true]
+    end
+
+    defp decisions(%RenderPlan{root: root, summary: summary}) do
+      %{
+        show_errors?: root |> flatten_fields() |> Enum.map(& &1.show_errors?),
+        summary: Enum.map(summary, &{&1.label, &1.message})
+      }
+    end
+  end
+
+  describe "nested paths reach the state view" do
+    test "a used, invalid nested field is visible on :change via the state view, not action" do
+      # Discriminates against a projector that computes the wrong path for
+      # a data-nesting group: Form.show_issues?/2 on :change only answers
+      # true when Info.node_at(definition, segments) resolves to the
+      # Node.Field AND its usage is :used. A path missing "address", in
+      # the wrong order, or omitting the group name entirely would miss
+      # the node and make this assertion fail.
+      #
+      # Uses the JSON Schema adapter, not Source.Map: the map adapter has
+      # no schema validator, so a minLength constraint would never fire —
+      # only decode failures surface issues there (see the file's earlier
+      # comment on `flat_definition`/`decode_error_form`).
+      schema = %{
+        "type" => "object",
+        "properties" => %{
+          "address" => %{
+            "type" => "object",
+            "properties" => %{"street" => %{"type" => "string", "minLength" => 4}}
+          }
+        }
+      }
+
+      {:ok, definition, []} = Formentation.compile(schema, adapter: Formentation.JSONSchema)
 
       form_state =
         Form.transition(Form.new(definition), %Formentation.Params{
-          values: %{"title" => "t"},
-          event: :submit
+          values: %{"address" => %{"street" => "ab"}},
+          event: :change
         })
 
       form = FormData.to_form(form_state, [])
       plan = Projector.project(definition, form)
 
-      assert [%{id: nil, label: nil, message: message}] = plan.summary
-      assert message =~ "required"
+      [address] = plan.root.children
+      [street] = address.children
+
+      assert street.errors != []
+      assert street.show_errors? == true
+    end
+  end
+
+  describe "absolute instance paths" do
+    defp nested_path_definition do
+      compile!(%{
+        kind: :object,
+        properties: [
+          {"title", %{kind: :string}},
+          {"address",
+           %{
+             kind: :object,
+             properties: [
+               {"street", %{kind: :string}},
+               {"geo", %{kind: :object, properties: [{"lat", %{kind: :number}}]}}
+             ]
+           }}
+        ]
+      })
+    end
+
+    test "a data-nesting group contributes its name to a child's path" do
+      definition = nested_path_definition()
+
+      form_state =
+        Form.transition(Form.new(definition), %Formentation.Params{
+          values: %{"title" => "t", "address" => %{"street" => "", "geo" => %{"lat" => "x"}}},
+          event: :submit
+        })
+
+      form = FormData.to_form(form_state, [])
+
+      # ["address", "geo", "lat"] is a decode failure; hiding exactly that
+      # path proves the projector reached it with its absolute segments.
+      plan = Projector.project(definition, form)
+      [_title, address] = plan.root.children
+      [_street, geo] = address.children
+      [lat] = geo.children
+
+      assert lat.field.name == "address[geo][lat]"
+      assert lat.errors != []
+      assert lat.show_errors?
+    end
+
+    test "a presentational group leaves the data path untouched" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [{"title", %{kind: :string, min_length: 4}}],
+          groups: [%{id: "panel", fields: ["title"]}]
+        })
+
+      form_state =
+        Form.transition(Form.new(definition), %Formentation.Params{
+          values: %{"title" => "ab"},
+          event: :submit
+        })
+
+      plan = Projector.project(definition, FormData.to_form(form_state, []))
+
+      # Whatever the group nesting looks like, the field's Phoenix name —
+      # which mirrors the data path — must not gain the group id.
+      names =
+        plan.root
+        |> flatten_fields()
+        |> Enum.map(& &1.field.name)
+
+      assert names == ["title"]
+    end
+
+    defp flatten_fields(%RenderNode.Group{children: children}),
+      do: Enum.flat_map(children, &flatten_fields/1)
+
+    defp flatten_fields(%RenderNode.Field{} = field), do: [field]
+  end
+
+  describe "architectural boundary" do
+    # `.reach.exs` permits phoenix -> core, so no layer rule can express
+    # "the projector knows nothing concrete about Formentation.Form".
+    # A source-text assertion states that obligation directly, and is the
+    # regression PR #13 must keep green when it rebases its blocker work
+    # into the Formentation.Form state view.
+    @projector_source File.read!("lib/formentation/phoenix/projector.ex")
+    # File.read!/1 above is not a Mix compile dependency by itself; it
+    # currently recompiles correctly only incidentally, via the
+    # `doctest Formentation.Phoenix.Projector` at the top of this file.
+    # This makes the recompilation guarantee explicit rather than
+    # incidental, so the pin can never validate a stale snapshot.
+    @external_resource "lib/formentation/phoenix/projector.ex"
+
+    test "the projector names no concrete runtime-state struct" do
+      refute @projector_source =~ "Formentation.Form"
+      refute @projector_source =~ "%Form{"
+      refute @projector_source =~ "SubmissionBlocker"
+    end
+
+    test "the projector never interprets the Phoenix action itself" do
+      refute @projector_source =~ "form.action"
+      refute @projector_source =~ "action: :submit"
+    end
+  end
+
+  describe "projection contract regressions" do
+    test "project_at/3 applies visibility using the same absolute path as project/2" do
+      # :change, not :submit: Form.show_issues?/2 short-circuits to true on
+      # :submit regardless of path, so that event can't discriminate a
+      # context built with the wrong (non-absolute) path — see "nested
+      # paths reach the state view" above for the same technique. On
+      # :change, visibility depends on Info.node_at(definition, segments)
+      # resolving to this exact Node.Field with :used usage; a project_at/3
+      # that dropped the parent segments from its path would land on an
+      # unknown path and answer :hide instead.
+      definition = nested_path_definition()
+
+      form_state =
+        Form.transition(Form.new(definition), %Formentation.Params{
+          values: %{"address" => %{"geo" => %{"lat" => "x"}}},
+          event: :change
+        })
+
+      form = FormData.to_form(form_state, [])
+
+      from_whole =
+        Projector.project(definition, form).root
+        |> flatten_fields()
+        |> Enum.find(&(&1.field.name == "address[geo][lat]"))
+
+      from_at = Projector.project_at(definition, form, ["address", "geo", "lat"])
+
+      assert from_at.show_errors? == from_whole.show_errors?
+      assert from_at.show_errors? == true
+      assert from_at.errors == from_whole.errors
+    end
+
+    test "project_at/3 raises for an unknown path" do
+      definition = nested_path_definition()
+      form = FormData.to_form(Form.new(definition), [])
+
+      assert_raise ArgumentError, ~r/no node at instance path/, fn ->
+        Projector.project_at(definition, form, ["nope"])
+      end
     end
   end
 end

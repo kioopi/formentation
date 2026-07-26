@@ -9,6 +9,7 @@ defmodule Formentation.Phoenix.UsedInputContractTest do
   import Phoenix.Component, only: [used_input?: 1]
 
   alias Formentation.{Form, Params}
+  alias Formentation.Phoenix.{Projector, RenderNode}
   alias Phoenix.HTML.FormData
 
   defp nested_definition do
@@ -100,6 +101,44 @@ defmodule Formentation.Phoenix.UsedInputContractTest do
     assert Form.show_issues?(form_state, ["address", "number"]) == false
   end
 
+  test "the projector's state-view visibility agrees with used_input? on every scalar after a single transition" do
+    # This proves agreement only for the single-transition case, where
+    # `form.usage` starts empty and the D-014 usage merge in
+    # `Form.transition/2` (`Map.merge(form.usage, normalized.usage)`) is
+    # therefore a no-op — accumulated usage and the current params' marker
+    # convention coincide. It is not a general proof: see "accumulated
+    # usage diverges from used_input? after a second transition" below for
+    # the case where a later transition omits a previously-used field and
+    # the two systems deliberately disagree.
+    form_state =
+      transitioned(%{
+        "title" => "",
+        "_unused_title" => "",
+        "address" => %{"street" => "s", "number" => "", "_unused_number" => ""}
+      })
+
+    form = FormData.to_form(form_state, [])
+    nested = hd(FormData.to_form(form_state, form, :address, []))
+
+    pairs = [
+      {form[:title], ["title"]},
+      {nested[:street], ["address", "street"]},
+      {nested[:number], ["address", "number"]}
+    ]
+
+    for {field, segments} <- pairs do
+      state_view_says =
+        Formentation.Phoenix.StateView.issue_visibility(
+          form_state,
+          form,
+          Formentation.InstancePath.new!(segments)
+        ) == :show
+
+      assert state_view_says == used_input?(field),
+             "state view and used_input?/1 disagree at #{inspect(segments)}"
+    end
+  end
+
   test "the group-node visibility gate is Formentation's, not Phoenix's" do
     # used_input? answers true for a group with a used child at :change,
     # but show_issues? gates group/root issues on submit — deliberate, so
@@ -111,5 +150,59 @@ defmodule Formentation.Phoenix.UsedInputContractTest do
 
     assert used_input?(form[:address]) == true
     assert Form.show_issues?(form_state, ["address"]) == false
+  end
+
+  test "accumulated usage diverges from used_input? after a second transition" do
+    # used_input?/1 reads only the CURRENT Phoenix params. Form.usage/2 is
+    # ACCUMULATED across transitions (Form.transition/2 merges usage:
+    # `Map.merge(form.usage, normalized.usage)`, never replaces it), so
+    # once a field has been used, it stays used even if a later
+    # transition's payload omits it entirely.
+    #
+    # This is a deliberate design decision, not a bug: Formentation.Form
+    # owns the complete D-014 visibility policy, and "the user has
+    # interacted with this field at some point" is what usage means (see
+    # `Form.usage/2`'s doc). The previous, used_input?-based rule would
+    # have HIDDEN this error at t2, because used_input? forgets a field
+    # the moment a payload stops mentioning it — even though the field
+    # was genuinely edited and genuinely fails validation. Do not change
+    # the implementation to restore that old behaviour.
+    schema = %{
+      "type" => "object",
+      "required" => ["title"],
+      "properties" => %{
+        "title" => %{"type" => "string", "minLength" => 4},
+        "other" => %{"type" => "string"}
+      }
+    }
+
+    {:ok, definition, []} = Formentation.compile(schema, adapter: Formentation.JSONSchema)
+
+    form_t1 =
+      Form.transition(Form.new(definition), %Params{
+        values: %{"title" => "ab", "other" => "x"},
+        event: :change
+      })
+
+    # t2's payload drops "title" entirely; only "other" changes.
+    form_t2 = Form.transition(form_t1, %Params{values: %{"other" => "y"}, event: :change})
+
+    phoenix_form_t2 = FormData.to_form(form_t2, [])
+
+    # used_input? forgets "title" was ever touched...
+    refute used_input?(phoenix_form_t2[:title])
+    # ...but Form.show_issues?/2 still shows it, because accumulated
+    # usage still says :used.
+    assert Form.show_issues?(form_t2, ["title"]) == true
+
+    # And the user-visible consequence, through the projector, is that
+    # the (now-:required, since "title" is absent from the candidate)
+    # error is shown.
+    plan = Projector.project(definition, phoenix_form_t2)
+
+    title_node =
+      Enum.find(plan.root.children, &match?(%RenderNode.Field{field: %{field: :title}}, &1))
+
+    assert %RenderNode.Field{show_errors?: true} = title_node
   end
 end

@@ -232,36 +232,30 @@ defmodule Formentation.Phoenix.FormDataTest do
     end
 
     test "a missing required nested object stays out of the parent's errors" do
-      # `address` is deliberately modeled with `oneOf` (unsupported by the
-      # JSON Schema adapter, hence a compile-time diagnostic) rather than a
-      # plain `"type": "object"`: Formentation's `Node.Group` children are
-      # always materialized present (defaulting to `%{}`), so a *supported*
-      # nested object can never actually be "missing" for `required` to
-      # catch. An unsupported node is the one shape where the candidate can
-      # genuinely omit the key, which is what reproduces the leak this test
-      # pins — JSV still validates the raw schema and files the `:required`
-      # issue at the group's own path, `["address"]`.
+      # `address` is a plain supported `"type": "object"`. Under D-026
+      # (issue #1) a required nested object with no content is genuinely
+      # absent from the candidate rather than materialized as `%{}`, so
+      # JSV files the `:required` issue at the group's own path,
+      # ["address"] — which must not leak into the parent's scalar errors.
       schema = %{
         "type" => "object",
         "required" => ["address"],
         "properties" => %{
           "title" => %{"type" => "string"},
           "address" => %{
-            "oneOf" => [
-              %{"type" => "object", "properties" => %{"street" => %{"type" => "string"}}}
-            ]
+            "type" => "object",
+            "required" => ["street"],
+            # minLength 1 keeps the compile diagnostic-free: without it the
+            # compiler warns :required_permits_empty, and this test asserts
+            # a clean compile to prove no *unsupported* keyword is involved.
+            "properties" => %{"street" => %{"type" => "string", "minLength" => 1}}
           }
         }
       }
 
-      {:ok, definition, [diagnostic]} =
-        Formentation.compile(schema, adapter: Formentation.JSONSchema)
+      {:ok, definition, []} = Formentation.compile(schema, adapter: Formentation.JSONSchema)
 
-      assert diagnostic.code == :unsupported_keyword
-
-      form_state =
-        Form.transition(Form.new(definition), %Params{values: %{"title" => "t"}, event: :submit})
-
+      form_state = Form.submit(Form.new(definition), %{"title" => "t"})
       form = FormData.to_form(form_state, [])
 
       assert form.errors == []

@@ -12,7 +12,7 @@ status: current
 
 # End-to-end data flow
 
-> [!note] As of 2026-07-24 · step 7 complete
+> [!note] As of 2026-07-25 · StateView protocol (D-027)
 > Follows one form through every layer that exists today, and stops
 > where the built system stops. Each layer has its own deep-dive note;
 > this one is about the **joins between them** — what crosses each
@@ -119,8 +119,9 @@ becomes `asset[payload][serial_number]` and every id
 
 ## 4 · `%Phoenix.HTML.Form{}` → `RenderPlan`
 
-**Crosses:** the definition (for structure and semantics) *and* the
-Phoenix form (for values, errors, usage). **Comes back:** a
+**Crosses:** the definition (for structure and semantics), the Phoenix
+form (for values, errors, per-field usage), and `form.source` (for the
+three semantic facts Phoenix cannot carry). **Comes back:** a
 `%RenderPlan{}`.
 
 [[rendering|The projector]] walks the definition in declaration order and
@@ -134,12 +135,20 @@ takes both: the definition knows `last_service` is a date; the form knows
 its current value is `"2026-06-30"`; only together do they make a
 `:date_input` render node.
 
-The projector reads the form **only through Phoenix conventions**, which
-is what makes it generic over any `FormData` implementation rather than
-coupled to `Formentation.Form`
-([[18-decisions#D-019 — Projection is Phoenix-generic|D-019]]). The one
-deliberate exception is the error summary's object-level entries, which
-degrade to field entries for other sources.
+The projector reads field mechanics — values, names, IDs, input
+validations, per-field errors — **only through Phoenix conventions**,
+which is what makes it generic over any `FormData` implementation rather
+than coupled to `Formentation.Form`
+([[18-decisions#D-019 — Projection is Phoenix-generic|D-019]]). Three
+facts Phoenix cannot express — whether the source considers the form
+submitted, a source-owned issue-visibility policy, and root/object-level
+issues — dispatch through `Formentation.Phoenix.StateView` on
+`form.source` instead, falling back to the conservative `Any` behaviour
+for a source with no dedicated implementation
+([[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]).
+`Formentation.Form` implements `StateView` completely; the error
+summary's object-level entries come from its `issues/2`, and degrade to
+field entries only for a source whose state view reports `:unavailable`.
 
 ## 5 · `RenderPlan` → HTML
 
