@@ -12,10 +12,10 @@ status: current
 
 > [!note] As of 2026-07-22 · `node-per-kind-complete`
 > Describes the addressing types as built. The origin *model* that
-> `JSONPointer` feeds is deferred to [[diagnostics-and-origins|Diagnostics
-> and origins]]; node shapes and the two group flavors to
-> [[definition-and-node|Definition and Node]]. This note stays on the
-> addressing types themselves.
+> `JSONPointer` feeds is deferred to
+> [[diagnostics-and-origins|Diagnostics and origins]]; node shapes and the
+> two group flavors to [[definition-and-node|Definition and Node]]. This
+> note stays on the addressing types themselves.
 
 A single node lives in several spaces at once: where it sits in the form's
 *structure*, what stable *handle* names it, where its value lands in

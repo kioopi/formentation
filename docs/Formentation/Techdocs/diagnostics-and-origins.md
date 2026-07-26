@@ -46,8 +46,9 @@ Conflating them is the mistake the split prevents: a schema author's
 mistake ("this `type` is outside the supported subset") must never reach
 an end user's screen, and an end user's mistake ("this field is
 required") must never be reported as a compiler warning. `Issue` and its
-visibility rules belong to [[form-state-and-transitions|the state
-layer]]; this note covers `Diagnostic`.
+visibility rules belong to
+[[form-state-and-transitions|the state layer]]; this note covers
+`Diagnostic`.
 
 ```elixir
 %Formentation.Diagnostic{
@@ -197,11 +198,12 @@ Three properties hold across the model:
 - **Overrides replace, not append.** A `fields.*.help` hint overriding a
   schema `description` replaces the origin entry too — origins describe
   the *winning* value, never the history of how it was decided. Recording
-  that history is the [[09-diagnostics-provenance-introspection|`Decision`
-  model]], deferred to Phase 2.
+  that history is the
+  [[09-diagnostics-provenance-introspection|`Decision` model]], deferred
+  to Phase 2.
 - **Origins are the sanctioned differential difference.** The
-  [[source-adapters#The differential-equivalence property|differential
-  property]] asserts that both adapters produce Info-equivalent trees,
+  [[source-adapters#The differential-equivalence property|differential property]]
+  asserts that both adapters produce Info-equivalent trees,
   with origins as the *only* permitted divergence. Provenance is
   therefore precisely the part of a node that is allowed to know which
   vocabulary it came from — everything else must not.

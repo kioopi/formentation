@@ -16,9 +16,10 @@ status: current
 
 `Formentation.JSONSchema` compiles a **decoded** draft 2020-12 schema
 document — the map you get from `JSON.decode!/1`, with string keys — into
-the same kind of definition the [[declaring-with-the-map-source|map
-source]] produces. Presentation intent that JSON Schema has no vocabulary
-for is supplied separately, as a **UI-hints** document.
+the same kind of definition the
+[[declaring-with-the-map-source|map source]] produces. Presentation intent
+that JSON Schema has no vocabulary for is supplied separately, as a
+**UI-hints** document.
 
 ```elixir
 schema = "schema.json" |> File.read!() |> JSON.decode!()
@@ -106,8 +107,8 @@ transitions rather than dropped.
 `else`, `arrays`, `patternProperties`, `additionalProperties`,
 `dependentSchemas`, and every other composition or conditional keyword.
 Numeric `enum`s and non-string `const`s are rejected as well —
-[[18-decisions#D-005 — Scalar enums are fields, not choice nodes|option
-sets are string-only]] for now.
+[[18-decisions#D-005 — Scalar enums are fields, not choice nodes|option sets are string-only]]
+for now.
 
 A non-object root, a `$schema` that is not 2020-12, or a document that
 fails the metaschema are **errors**: `compile/2` returns
@@ -270,8 +271,7 @@ Enum.map(diagnostics, &{&1.severity, &1.code, &1.message})
 ```
 
 Codes specific to this source, beyond the shared ones described on
-[[declaring-with-the-map-source#Reading diagnostics|the map source
-page]]:
+[[declaring-with-the-map-source#Reading diagnostics|the map source page]]:
 
 - `:unsupported_type` — a property type outside the subset (warning), or
   a non-object root (error).

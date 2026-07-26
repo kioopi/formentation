@@ -123,8 +123,8 @@ validation.
 ## Usage stays Phoenix's to answer
 
 `form.params` is the byte-identical `phoenix_params` view produced by
-[[form-state-and-transitions#Transport normalization|transport
-normalization]], specifically so that `Phoenix.Component.used_input?/1`
+[[form-state-and-transitions#Transport normalization|transport normalization]],
+specifically so that `Phoenix.Component.used_input?/1`
 keeps working against a Formentation form with no special-casing. A
 contract test pins Formentation's usage answer against Phoenix's for the
 same params, so the two can never quietly diverge
