@@ -8,6 +8,13 @@
       "skillPath": "skills/json-canvas/SKILL.md",
       "computedHash": "56cbac74a93e4fba97f4d44bccfdeaae89e545b223f47df392c7705e01e6c543"
     },
+    "jujutsu": {
+      "source": ".claude/skills/jujutsu",
+      "sourceUrl": ".claude/skills/jujutsu",
+      "sourceType": "local",
+      "skillPath": "SKILL.md",
+      "computedHash": "32229804ee7b30f090529abac1db2990d8457d02b547d2db6439814670be000f"
+    },
     "obsidian-bases": {
       "source": "git@github.com:kepano/obsidian-skills.git",
       "sourceUrl": "git@github.com:kepano/obsidian-skills.git",
