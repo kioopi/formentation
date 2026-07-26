@@ -2,11 +2,15 @@ defmodule Formentation.Phoenix.Projector do
   @moduledoc """
   Combines a compiled definition with a `%Phoenix.HTML.Form{}` into a
   `Formentation.Phoenix.RenderPlan` (the rendering boundary in
-  Planning/06-runtime-projection). Phoenix-generic: state is read only
-  through the Phoenix form conventions, so any `Phoenix.HTML.FormData`
-  implementation projects. Pure — same inputs, same plan.
+  Planning/06-runtime-projection). Two-part boundary: Phoenix form
+  conventions carry field-level mechanics, so any `Phoenix.HTML.FormData`
+  implementation still projects; the source's
+  `Formentation.Phoenix.StateView` (D-027) carries submission, issue
+  visibility, and non-field issues Phoenix cannot express. Pure — same
+  inputs, same plan.
 
   Spec: docs/superpowers/specs/2026-07-23-phase1-step6-projector-components-theme-design.md
+  Spec: docs/superpowers/specs/2026-07-25-runtime-state-view-contract-design.md
   """
 
   alias Formentation.{Definition, Diagnostic, Info, InstancePath, Node}
@@ -258,6 +262,11 @@ defmodule Formentation.Phoenix.Projector do
     end
   end
 
+  # Unlike visible?/3 (used for fields), :default counts as visible here:
+  # non_field_entries/1 only runs from summary/2 once submitted?(ctx) is
+  # already true, so the submission gate is already applied and there is
+  # no per-entry Phoenix default left to apply — only an explicit :hide
+  # suppresses an entry.
   defp non_field_visible?(ctx, %StateView.Issue{path: path}) do
     not field_path?(ctx, path) and
       StateView.issue_visibility(ctx.source, ctx.root_form, path) != :hide

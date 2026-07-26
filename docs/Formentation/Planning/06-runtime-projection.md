@@ -43,7 +43,7 @@ The result is either a render plan with warnings or a structured projection erro
 
 ## Projection algorithm
 
-1. Establish a runtime cursor containing the semantic node, instance path, form field, current value, ancestors, and context.
+1. Establish a runtime cursor containing the semantic node, instance path, form field, current value, ancestors, and context, plus the **root** Phoenix form and the **root** state source handed to the projector (never a nested form built during traversal). The instance path is always absolute — presentational grouping is transparent to it and never alters it ([[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]).
 2. Evaluate visibility and branch predicates using the current decoded value and validator adapter.
 3. Materialize concrete children for groups and collections.
 4. Resolve runtime presentation decisions that legitimately depend on value or context.

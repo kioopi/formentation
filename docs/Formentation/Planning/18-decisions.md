@@ -202,6 +202,8 @@ Kept deliberately small for Phase 1: the transition envelope grows only `event: 
 
 **Consequences.** An `AshPhoenix.Form` is just another `FormData` implementation to project ([[phase-5-ash-integration|Phase 5]]). Projection tests build a form and assert the plan — no HEEx involved — keeping the layers separable. The projector lives behind the D-017/D-018 directory boundary, so core still compiles without Phoenix by boundary, not packaging.
 
+Amended by [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]: the boundary is two-part, not one. Phoenix form conventions carry field-level mechanics; `Formentation.Phoenix.StateView` carries the minimal semantic facts Phoenix cannot express. "Phoenix-generic" means any FormData source projects — through the `Any` fallback when it has no state view — not that every fact comes from `%Phoenix.HTML.Form{}`.
+
 ## D-020 — The reference theme is a markup set, not a contract
 
 *2026-07-23*
@@ -279,6 +281,56 @@ unproven).
 **Decision.** Nested data-nesting objects use content-derived presence during replace transitions. The object is emitted only when recursive materialization leaves at least one declared or preserved key; presence is decided after declared-child materialization and original unknown/unsupported preservation have run. Requiredness affects validation only and never manufactures instance data. Survivors: `{:set, v}` children, `:keep`'d originals, original unknown keys, original `Node.Unsupported` values, and `{:set, ""}` strings ([[#D-010 — Empty-string, null, and absent-key decode policies|D-010]]). Non-survivors: `required?`, the compiled group node, a raw nested params map, and submitted (not original) unknown keys. `Form` gains an internal `:absent | {:present, map()}` materialization result; the root is always a map. Phase 1 does not represent intentional empty-object presence; originally-present non-object values (`nil`, `"invalid"`) at a group path are dropped when no child survives. The JSON Schema validator is unchanged. Links: [[#D-009 — Form state separates transport from operation|D-009]], [[#D-012 — Schema validation defers while any decode fails|D-012]], [[#D-014 — Usage is a first-class interaction axis|D-014]], [[#D-016 — Participation is definition-driven, not transport-driven|D-016]].
 
 **Consequences.** Presence is semantic state, not an artifact of the compiled tree. The internal presence result is the extension point that future collections, branches, and group-level presence transport must preserve or deliberately supersede — an empty object cannot be represented until such a signal exists. A required-but-absent object now reports `required` at its own path (hidden until submit under [[#D-014 — Usage is a first-class interaction axis|D-014]]) instead of leaking a child-level requirement.
+
+## D-027 — Projection reads semantic state through a StateView protocol
+
+*2026-07-25*
+
+`%Phoenix.HTML.Form{}` stays the primary projection boundary: values, names,
+IDs, input validations, per-field errors, `used_input?/1` params, and nested
+forms all come from Phoenix. Three facts it cannot carry — whether an
+arbitrary action means *submitted*, a source-owned issue-visibility policy,
+and root/object issues that deliberately stay out of Phoenix's per-field
+convention — dispatch through `Formentation.Phoenix.StateView` on
+`form.source`.
+
+The protocol is read-only and projection-focused: three callbacks
+(`submitted?/2`, `issue_visibility/3`, `issues/2`), no decoding, mutation,
+validation, LiveView events, branch transitions or collection operations.
+`@fallback_to_any` keeps arbitrary `Phoenix.HTML.FormData` sources working
+with the conservative behaviour the projector had before: `:submit` alone
+means submitted, visibility defers to the Phoenix default, and issue
+enumeration reports `:unavailable` rather than guessing.
+
+Adapters normalize to `StateView.Issue` (`path` plus displayable `message`)
+rather than manufacturing `%Formentation.Issue{}`, because external sources
+own their error representations. Consequence: `Formentation.Phoenix.Projector`
+names no concrete runtime-state struct and never interprets `form.action`
+itself, so an Ash or Ecto adapter supplies a FormData view plus a state view
+and the projector is unchanged.
+
+> [!warning] Behaviour change: field-error visibility no longer comes from `used_input?/1`
+> For a `%Formentation.Form{}` source, field-error visibility now comes from
+> `Form.show_issues?/2` (via `StateView.issue_visibility/3`) instead of
+> `Phoenix.Component.used_input?/1`. The two read different state:
+> `used_input?/1` reads the *current* `form.params`, while `Form.usage`
+> accumulates across transitions (`Map.merge`, never replace —
+> `Form.transition/2`, `lib/formentation/form.ex:196`). They agree whenever a
+> payload mentions every declared path — the normal LiveView round-trip,
+> which is why the whole suite and all 6 browser tests stay green — and
+> diverge when a payload *omits* a path entirely (an embedding host plucking
+> a subtree, a partial change, a field removed from the DOM). Verified:
+>
+> ```
+> t1  values %{"title" => "ab", "other" => "x"}  → used_input?=true   usage=:used  show_issues?=true   [:minLength]
+> t2  values %{"other" => "y"}                   → used_input?=false  usage=:used  show_issues?=true   [:required]
+> ```
+>
+> At t2 the old rule *hid* the `:required` error; the new rule *shows* it.
+> This is intended, not a regression: `Formentation.Form` owns the complete
+> D-014 visibility policy, and accumulated usage genuinely means "the user
+> has interacted with this field" (see `Form.usage/2`'s own `@doc`). Pinned
+> by `test/formentation/phoenix/used_input_contract_test.exs`.
 
 ## Related notes
 
