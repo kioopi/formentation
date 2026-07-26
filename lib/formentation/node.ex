@@ -14,17 +14,14 @@ defmodule Formentation.Node do
   """
 
   alias Formentation.Node.{Field, Group, Unsupported}
+  alias Formentation.Origin
 
   @typedoc """
   One provenance tag (D-003): which source vocabulary contributed a node
   property, and where in that source. A node's `origins` list pairs the
   property it explains with one of these.
   """
-  @type origin ::
-          {:map_source, [atom() | String.t()]}
-          | {:json_schema, String.t()}
-          | {:ui_hints, String.t()}
-          | {:inference, atom()}
+  @type origin :: Origin.t()
 
   @typedoc "Any compiled node."
   @type t :: Field.t() | Group.t() | Unsupported.t()

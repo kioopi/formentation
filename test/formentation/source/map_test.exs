@@ -1,7 +1,7 @@
 defmodule Formentation.Source.MapTest do
   use ExUnit.Case, async: true
 
-  alias Formentation.{Info, Node}
+  alias Formentation.{Info, Node, Presentation, Semantic, TemplatePath}
 
   defp compile!(declaration, opts \\ []) do
     {:ok, definition, _diagnostics} =
@@ -17,6 +17,36 @@ defmodule Formentation.Source.MapTest do
       assert %Node.Group{nests_data?: true, id: "/"} = Info.root(definition)
       assert [%Node.Field{name: "name", id: "/name"}] = Info.fields(definition)
       assert Info.diagnostics(definition) == []
+    end
+
+    test "also emits native semantic and presentation roots" do
+      definition = compile!(%{kind: :object, properties: [{"name", %{kind: :string}}]})
+
+      assert %Semantic.Object{
+               id: "/",
+               template_path: %TemplatePath{segments: []},
+               children: [
+                 %Semantic.Field{
+                   id: "/name",
+                   name: "name",
+                   value_type: :string,
+                   template_path: %TemplatePath{segments: ["name"]}
+                 }
+               ]
+             } = definition.semantic
+
+      assert %Presentation.Object{
+               semantic_id: "/",
+               children: [
+                 %Presentation.Field{
+                   id: "layout:field:/name",
+                   semantic_id: "/name",
+                   label: "Name"
+                 }
+               ]
+             } = definition.presentation
+
+      assert definition.semantic_index.by_id["/name"].node == hd(definition.semantic.children)
     end
 
     test "node/2 finds nodes by id and node_at/2 by instance path" do
@@ -250,6 +280,57 @@ defmodule Formentation.Source.MapTest do
       assert Info.node_at(definition, ["serial_number"]).constraints == %{min_length: 4}
       assert Info.node_at(definition, ["operating_hours"]).constraints == %{min: 0}
     end
+
+    test "native facts and origins are split between semantic and presentation storage" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"mode",
+             %{
+               kind: :string,
+               title: "Mode",
+               help: "Choose carefully.",
+               one_of: ["auto", "manual"],
+               widget: :radio,
+               hidden: true,
+               read_only: true
+             }}
+          ]
+        })
+
+      assert %Semantic.Field{
+               options: ["auto", "manual"],
+               read_only?: true,
+               origins: semantic_origins
+             } = hd(definition.semantic.children)
+
+      assert semantic_origins[:options] == {:map_source, [:properties, "mode", :one_of]}
+      assert semantic_origins[:read_only] == {:map_source, [:properties, "mode", :read_only]}
+      refute Keyword.has_key?(semantic_origins, :label)
+      refute Keyword.has_key?(semantic_origins, :help)
+      refute Keyword.has_key?(semantic_origins, :widget)
+      refute Keyword.has_key?(semantic_origins, :hidden)
+
+      assert %Presentation.Object{
+               children: [
+                 %Presentation.Field{
+                   label: "Mode",
+                   help: "Choose carefully.",
+                   widget: :radio,
+                   hidden?: true,
+                   origins: presentation_origins
+                 }
+               ]
+             } = definition.presentation
+
+      assert presentation_origins[:label] == {:map_source, [:properties, "mode", :title]}
+      assert presentation_origins[:help] == {:map_source, [:properties, "mode", :help]}
+      assert presentation_origins[:widget] == {:map_source, [:properties, "mode", :widget]}
+      assert presentation_origins[:hidden] == {:map_source, [:properties, "mode", :hidden]}
+      refute Keyword.has_key?(presentation_origins, :read_only)
+      refute Keyword.has_key?(presentation_origins, :options)
+    end
   end
 
   describe "presentation groups" do
@@ -280,6 +361,34 @@ defmodule Formentation.Source.MapTest do
              } = group
 
       assert group.template_path.segments == []
+    end
+
+    test "native presentation groups only rearrange layout children" do
+      definition = compile!(grouped_declaration())
+
+      assert %Semantic.Object{
+               children: [
+                 %Semantic.Field{name: "serial_number"},
+                 %Semantic.Field{name: "voltage"},
+                 %Semantic.Field{name: "insulation_ok"},
+                 %Semantic.Field{name: "notes"}
+               ]
+             } = definition.semantic
+
+      assert %Presentation.Object{
+               children: [
+                 %Presentation.Field{semantic_id: "/serial_number"},
+                 %Presentation.Group{
+                   id: "/#electrical",
+                   label: "Electrical",
+                   children: [
+                     %Presentation.Field{semantic_id: "/voltage"},
+                     %Presentation.Field{semantic_id: "/insulation_ok"}
+                   ]
+                 },
+                 %Presentation.Field{semantic_id: "/notes"}
+               ]
+             } = definition.presentation
     end
 
     test "members stay reachable by flat instance path and know their group" do
@@ -320,6 +429,46 @@ defmodule Formentation.Source.MapTest do
 
       assert [%Formentation.Diagnostic{severity: :warning, code: :unknown_group_field}] =
                Info.diagnostics(definition)
+    end
+
+    test "a group naming a known unsupported occurrence does not create a presentation reference" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [{"legacy", %{kind: :file}}, {"name", %{kind: :string}}],
+          groups: [%{id: "main", fields: ["legacy", "name"]}]
+        })
+
+      assert [%Semantic.Unsupported{name: "legacy"}, %Semantic.Field{name: "name"}] =
+               definition.semantic.children
+
+      assert %Presentation.Object{
+               children: [
+                 %Presentation.Group{
+                   children: [%Presentation.Field{semantic_id: "/name"}]
+                 }
+               ]
+             } = definition.presentation
+
+      refute Enum.any?(Info.diagnostics(definition), &(&1.code == :unknown_group_field))
+    end
+
+    test "native presentation grouping handles escaped semantic ids without parsing" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [{"a/b#c", %{kind: :string}}, {"other", %{kind: :string}}],
+          groups: [%{id: "main", fields: ["a/b#c"]}]
+        })
+
+      assert %Presentation.Object{
+               children: [
+                 %Presentation.Group{
+                   children: [%Presentation.Field{semantic_id: "/a~1b~2c"}]
+                 },
+                 %Presentation.Field{semantic_id: "/other"}
+               ]
+             } = definition.presentation
     end
 
     test "a group with no known members emits diagnostics but no node" do
