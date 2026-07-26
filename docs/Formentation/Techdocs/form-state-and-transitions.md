@@ -12,10 +12,11 @@ status: current
 
 # Form state and transitions
 
-> [!note] As of 2026-07-25 · content-derived nested-object presence (D-026)
+> [!note] As of 2026-07-26 · content-derived nested-object presence (D-026); derived submission status (D-028)
 > Describes the runtime state layer as built: `Formentation.Form`,
 > `Formentation.Transport`, and `Formentation.Codec` — now including the
-> `validate/2`/`submit/2` LiveView entry points. This layer has **no
+> `validate/2`/`submit/2` LiveView entry points and the derived
+> `submission_status/1`/`submission_blockers/1` pair. This layer has **no
 > Phoenix dependency** and is fully usable from IEx. How the state is
 > handed to Phoenix is [[phoenix-form-data|a separate note]]; how it
 > becomes HTML is [[rendering|Rendering]].
@@ -278,6 +279,69 @@ Storing everything unconditionally is what keeps this a *policy* rather
 than a data loss: a different presentation layer can choose differently
 without the state layer having thrown information away.
 
+## Submission status is derived, not stored
+
+`Formentation.Form.submission_status/1` and
+`Formentation.Form.submission_blockers/1` answer a question `issues/1`
+alone cannot: given the current candidate and its validation issues, can
+this form actually submit — and if not, exactly why? Both are computed
+fresh on every call; nothing new lives on the `%Form{}` struct
+([[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]).
+
+`submission_status/1` returns one of, in precedence order:
+
+1. **`:undecodable`** — the candidate is `:none` because some field
+   failed to decode
+   ([[18-decisions#D-012 — Schema validation defers while any decode fails|D-012]]);
+   classification defers entirely, exactly like validation does.
+2. **`{:blocked, [SubmissionBlocker.t()]}`** — at least one
+   [[definition-and-node#Unsupported nodes are a preserve-only capability|preserve-only node]]
+   is concretely implicated. Blockers win over ordinary issues in this
+   precedence, but nothing is discarded: `issues/1` still returns every
+   issue, blocker-owned or not.
+3. **`{:invalid, [Issue.t()]}`** — no blockers, but issues remain,
+   ordered by instance path.
+4. **`:ready`** — no blockers, no issues.
+
+A `Formentation.SubmissionBlocker` relates one unsupported node to a
+concrete, observed problem. `submission_blockers/1` walks every
+unsupported node from `Info.unsupported_nodes_with_paths/1` and
+classifies each against the materialized candidate and `form.issues`:
+
+- **`:unsupported_required`** — the node is `required?: true` and its
+  name is absent from its own (present) parent object in the candidate.
+  An inactive parent — an absent optional ancestor object,
+  [[18-decisions#D-026 — Content-derived presence for nested objects|D-026]]
+  — makes the child inactive too, so a required-but-inactive child is
+  never blamed.
+- **`:unsupported_invalid`** — the node owns one or more `source:
+  :validation` issues at or below its own instance path. Ownership is
+  segment-wise via `Formentation.InstancePath.ancestor_or_self?/2`,
+  never a string-prefix test: `["tag"]` is not an ancestor of
+  `["tags"]`. When both apply, `:unsupported_required` wins the code;
+  owned issues ride along either way in the blocker's `issues` field.
+- **The causal limit.** Ownership only ever looks *at or below* the
+  unsupported path. An issue at an ancestor of the unsupported node, or
+  on an unrelated sibling, stays an ordinary `{:invalid, _}` issue —
+  attributing it to the unsupported node would require validator
+  metadata ("which property caused this instance-level failure?")
+  Formentation does not have. Root and cross-field issues are never
+  causally assigned to a preserve-only node on a guess.
+- **The validation-less fallback.** A map-source definition carries no
+  `Formentation.ValidationPlan`
+  ([[18-decisions#D-025 — Instance validation dispatches through a source-neutral behaviour|D-025]]),
+  so `:unsupported_invalid` can never fire there — there is no validator
+  to have filed the issue. A missing required preserve-only value is
+  still directly observable from the candidate, though, so
+  `:unsupported_required` still fires, with `issues: []`.
+
+A blocker's `path` is the *unsupported node's own* instance path, not
+necessarily a deeper underlying issue's path; `node_id` is copied from
+`Formentation.Node.Unsupported.id` so tooling can relate a blocker back
+to the compiled definition without parsing paths. On submit,
+`Formentation.Phoenix.Projector` turns blockers into capability entries
+in the error summary — see [[rendering#Error summary|Rendering]].
+
 ## Read surface
 
 Consumers never pattern-match the per-path maps. `Form.field/2` assembles
@@ -310,6 +374,7 @@ global defaults, and extensibility is [[phase-3-extensibility|Phase 3]].
 | Transport normalization | `Formentation.Transport` | `lib/formentation/transport.ex` |
 | Scalar codecs | `Formentation.Codec` | `lib/formentation/codec.ex` |
 | Runtime issue | `Formentation.Issue` | `lib/formentation/issue.ex` |
+| Derived submission blocker | `Formentation.SubmissionBlocker` | `lib/formentation/submission_blocker.ex` |
 
 ## Related notes
 

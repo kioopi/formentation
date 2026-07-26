@@ -12,7 +12,7 @@ status: current
 
 # Declaring a form with JSON Schema
 
-*Covers Formentation as of 2026-07-23.*
+*Covers Formentation as of 2026-07-26.*
 
 `Formentation.JSONSchema` compiles a **decoded** draft 2020-12 schema
 document — the map you get from `JSON.decode!/1`, with string keys — into
@@ -112,6 +112,20 @@ sets are string-only]] for now.
 A non-object root, a `$schema` that is not 2020-12, or a document that
 fails the metaschema are **errors**: `compile/2` returns
 `{:error, diagnostics}` and there is no definition.
+
+> [!important] Unsupported declarations are preserve-only, not editable
+> A property using an unsupported keyword compiles to
+> `Formentation.Node.Unsupported`. Its original value survives every
+> replace transition untouched — that preservation is the whole reason
+> an edit form does not silently delete data it cannot represent — but
+> the form can never decode, replace, or render it. Submitted params for
+> that key are simply **never consulted**; they are not an escape hatch
+> around the missing keyword, however plausible-looking the posted
+> value is. If the property is `required` and currently absent from
+> your data, or the preserved value currently fails your schema, the
+> form becomes concretely non-submittable — see how that is detected and
+> surfaced in
+> [[form-state-and-transitions#Submission status is derived, not stored|Techdocs/Form state and transitions]].
 
 > [!warning] Property order is not preserved
 > JSON object keys are unordered by specification, so the adapter walks

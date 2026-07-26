@@ -12,7 +12,7 @@ status: current
 
 # Rendering
 
-*As of 2026-07-25 (StateView protocol, D-027). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
+*As of 2026-07-26 (StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
 
 ## Projector data flow (`Formentation.Phoenix.Projector`)
 
@@ -125,6 +125,30 @@ It combines two sources:
   `:unavailable` and the summary degrades honestly to the field entries
   only — the degradation is keyed on what `issues/2` reports, not on the
   source's module.
+
+An entry whose path resolves to a `Node.Unsupported` is the one object
+entry the projector labels, humanizing the node's last path segment; root
+and group entries stay unlabelled.
+
+### Where submission blockers enter
+
+Capability explanations are not a projector concept. The
+`%Formentation.Form{}` state view translates each
+`Formentation.SubmissionBlocker` from `Form.submission_blockers/1` into one
+normalized `StateView.Issue` at the owning unsupported node's path, whose
+message is the blocker's source-neutral capability text with the owned
+validation messages appended after `"Validation: "` when there are any. It
+then drops the issues that blocker already speaks for, so they are not
+enumerated a second time as bare lines. Blockers lead the enumeration;
+everything else follows in path order
+([[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]],
+[[form-state-and-transitions#Submission status is derived, not stored|Form state and transitions]]).
+
+By the time the list reaches the projector it is ordinary normalized
+issues, so the object-entry rule above renders them unchanged — including
+the humanized label, which the unsupported-node case already earns. A
+source with different semantics (Ash, Ecto) can produce equivalent entries
+without the projector learning anything new.
 
 The summary renders at the top of `fields/1`'s own output, not the top
 of the page. When the payload form is embedded after hand-written

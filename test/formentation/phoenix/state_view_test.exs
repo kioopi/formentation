@@ -3,7 +3,7 @@ defmodule Formentation.Phoenix.StateViewTest do
 
   doctest Formentation.Phoenix.StateView
 
-  alias Formentation.{Form, Params}
+  alias Formentation.{Form, Params, SubmissionBlocker}
   alias Formentation.InstancePath
   alias Formentation.Phoenix.StateView
 
@@ -146,6 +146,16 @@ defmodule Formentation.Phoenix.StateViewTest do
       assert {:ok, ^issues} = StateView.issues(form_state, form)
     end
 
+    # `address_definition/0` declares no unsupported node, so the sort above
+    # sees the whole list. Once a blocker exists the guarantee is narrower —
+    # blockers first, then this path sort — which the blocker describe below
+    # pins directly.
+    test "the path sort above is the whole order only while nothing is blocked" do
+      {form_state, _form} = form_pair(Form.submit(Form.new(address_definition()), %{}))
+
+      assert Form.submission_blockers(form_state) == []
+    end
+
     defp code_definition do
       schema = %{
         "type" => "object",
@@ -185,6 +195,146 @@ defmodule Formentation.Phoenix.StateViewTest do
         |> Enum.map(& &1.message)
 
       assert normalized_messages_at_path == raw_messages_at_path
+    end
+  end
+
+  # D-028: a submission blocker is a *derived* fact about what this form
+  # can repair, not an authoritative issue, so it has no place on
+  # Formentation.Form's issue list. The state view is where it becomes
+  # something projection can render — which keeps the translation (and
+  # its English wording) out of the source-neutral projector entirely.
+  describe "Formentation.Form submission blockers in issues/2" do
+    defp blocked_pair(schema, data, params) do
+      {:ok, definition, _diagnostics} =
+        Formentation.compile(schema, adapter: Formentation.JSONSchema)
+
+      form_state = definition |> Form.new(data) |> Form.submit(params)
+      {form_state, Phoenix.HTML.FormData.to_form(form_state, [])}
+    end
+
+    defp messages_at(issues, segments) do
+      issues
+      |> Enum.filter(&(&1.path.segments == segments))
+      |> Enum.map(& &1.message)
+    end
+
+    # `oneOf` compiles to a preserve-only Node.Unsupported, and the property
+    # is required and absent — so JSV files a bare `required` issue at the
+    # same path the blocker owns. Exactly one entry may survive.
+    defp required_unsupported_pair do
+      blocked_pair(
+        %{
+          "type" => "object",
+          "required" => ["address"],
+          "properties" => %{
+            "address" => %{"oneOf" => [%{"type" => "string"}, %{"type" => "object"}]}
+          }
+        },
+        %{},
+        %{}
+      )
+    end
+
+    # The validator's own "required" wording is appended rather than
+    # dropped even though the capability sentence already says the property
+    # cannot be supplied: suppression exists to remove a *separate,
+    # unlabelled* summary line, not to hide the reason. Unpinned before
+    # D-028 — the projector-era test only matched `=~ "unsupported"`.
+    test "a required unsupported property becomes one issue carrying the capability message" do
+      {form_state, form} = required_unsupported_pair()
+
+      assert [%SubmissionBlocker{code: :unsupported_required, message: capability, issues: owned}] =
+               Form.submission_blockers(form_state)
+
+      assert {:ok, issues} = StateView.issues(form_state, form)
+
+      detail = Enum.map_join(owned, "; ", & &1.message)
+      assert messages_at(issues, ["address"]) == [capability <> " Validation: " <> detail]
+    end
+
+    test "the bare validation issue a blocker owns is not enumerated beside it" do
+      {form_state, form} = required_unsupported_pair()
+
+      # Guard the fixture: without an owned issue this proves no suppression.
+      assert [%SubmissionBlocker{issues: [_ | _]}] = Form.submission_blockers(form_state)
+
+      assert {:ok, issues} = StateView.issues(form_state, form)
+      assert [_only_one] = messages_at(issues, ["address"])
+    end
+
+    test "an invalid preserved property appends the validation reason it cannot repair" do
+      {form_state, form} =
+        blocked_pair(
+          %{
+            "type" => "object",
+            "properties" => %{
+              "tags" => %{"type" => "array", "items" => %{"type" => "integer"}}
+            }
+          },
+          %{"tags" => ["x"]},
+          %{}
+        )
+
+      assert [%SubmissionBlocker{code: :unsupported_invalid, message: capability, issues: owned}] =
+               Form.submission_blockers(form_state)
+
+      assert {:ok, issues} = StateView.issues(form_state, form)
+
+      detail = Enum.map_join(owned, "; ", & &1.message)
+      assert messages_at(issues, ["tags"]) == [capability <> " Validation: " <> detail]
+    end
+
+    test "a validation-less source's blocker carries the capability message alone" do
+      {:ok, definition, _diagnostics} =
+        Formentation.compile(
+          %{
+            kind: :object,
+            required: ["attachment"],
+            properties: [{"attachment", %{kind: :file}}]
+          },
+          adapter: Formentation.Source.Map
+        )
+
+      form_state = definition |> Form.new(%{}) |> Form.submit(%{})
+      form = Phoenix.HTML.FormData.to_form(form_state, [])
+
+      assert [%SubmissionBlocker{issues: [], message: capability}] =
+               Form.submission_blockers(form_state)
+
+      assert {:ok, issues} = StateView.issues(form_state, form)
+      assert messages_at(issues, ["attachment"]) == [capability]
+      refute capability =~ "Validation"
+    end
+
+    test "unrelated issues survive, and every blocker precedes the path-sorted rest" do
+      # "address" sorts before "tags", so a plain path sort over the merged
+      # list would put the ordinary group issue first. Blockers come first.
+      {form_state, form} =
+        blocked_pair(
+          %{
+            "type" => "object",
+            "required" => ["address", "tags"],
+            "properties" => %{
+              "address" => %{
+                "type" => "object",
+                "required" => ["street"],
+                "properties" => %{"street" => %{"type" => "string", "minLength" => 1}}
+              },
+              "tags" => %{"type" => "array", "items" => %{"type" => "integer"}}
+            }
+          },
+          %{"tags" => ["x"]},
+          %{}
+        )
+
+      assert [%SubmissionBlocker{path: %InstancePath{segments: ["tags"]}}] =
+               Form.submission_blockers(form_state)
+
+      assert {:ok, issues} = StateView.issues(form_state, form)
+
+      assert [["tags"] | rest] = Enum.map(issues, & &1.path.segments)
+      assert ["address"] in rest
+      assert rest == Enum.sort(rest)
     end
   end
 

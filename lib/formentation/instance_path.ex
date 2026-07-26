@@ -28,6 +28,28 @@ defmodule Formentation.InstancePath do
     %__MODULE__{segments: segments}
   end
 
+  @doc """
+  Whether `ancestor` is equal to or a strict ancestor of `descendant`,
+  compared segment by segment. Never a string prefix — `["tag"]` is not
+  an ancestor of `["tags"]`, and the integer `0` is not the string `"0"`.
+
+      iex> Formentation.InstancePath.ancestor_or_self?(
+      ...>   Formentation.InstancePath.new!(["tags"]),
+      ...>   Formentation.InstancePath.new!(["tags", 0])
+      ...> )
+      true
+
+      iex> Formentation.InstancePath.ancestor_or_self?(
+      ...>   Formentation.InstancePath.new!(["tag"]),
+      ...>   Formentation.InstancePath.new!(["tags"])
+      ...> )
+      false
+  """
+  @spec ancestor_or_self?(t(), t()) :: boolean()
+  def ancestor_or_self?(%__MODULE__{segments: ancestor}, %__MODULE__{segments: descendant}) do
+    List.starts_with?(descendant, ancestor)
+  end
+
   defp validate_segment!(segment) when is_binary(segment), do: :ok
   defp validate_segment!(segment) when is_integer(segment) and segment >= 0, do: :ok
 

@@ -12,7 +12,7 @@ status: current
 
 # Declaring a form with the map source
 
-*Covers Formentation as of 2026-07-23.*
+*Covers Formentation as of 2026-07-26.*
 
 `Formentation.Source.Map` takes a plain Elixir map. It has no
 dependencies, no separate hints document, and no schema validation — you
@@ -100,6 +100,24 @@ and an unsupported node, and the rest of the form still works:
 The value at such a key is *preserved* through transitions rather than
 dropped, so a form that renders half a JSON document will not silently
 delete the other half.
+
+> [!important] Unsupported declarations are preserve-only, not editable
+> A property with an unrecognised `:kind` compiles to
+> `Formentation.Node.Unsupported`. Its original value survives every
+> replace transition untouched — the preservation path that keeps an
+> edit form from silently deleting data it cannot represent — but the
+> form can never decode, replace, or render it, and submitted params for
+> that key are never consulted; they are not an escape hatch.
+>
+> The map source attaches **no validator**, so a preserved opaque value
+> can never be *declared* invalid — there is no `:unsupported_invalid`
+> blocker without a `Formentation.ValidationPlan`
+> ([[declaring-with-json-schema|the JSON Schema source]] is the one that
+> can make that call). A `required: true` property that is unsupported
+> still concretely blocks submission the moment the original data is
+> missing it, though — see
+> [[form-state-and-transitions#Submission status is derived, not stored|Techdocs/Form state and transitions]]
+> for how that surfaces.
 
 ### Labels are inferred when you omit them
 

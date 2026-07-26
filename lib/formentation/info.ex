@@ -33,6 +33,33 @@ defmodule Formentation.Info do
   defp field?(_node), do: false
 
   @doc """
+  Every unsupported (preserve-only) node in the tree, in declaration
+  order, descending through presentation and data-nesting groups alike.
+  `[]` when none exist. Each node is preserve-only; `required?: true`
+  flags a likely creation-form risk but does not prove any instance is
+  blocked — the runtime submission-status functions on `Formentation.Form`
+  decide that.
+
+      iex> {:ok, definition, _} =
+      ...>   Formentation.compile(
+      ...>     %{kind: :object, properties: [{"attachment", %{kind: :file}}]},
+      ...>     adapter: Formentation.Source.Map
+      ...>   )
+      iex> definition |> Formentation.Info.unsupported_nodes() |> Enum.map(& &1.name)
+      ["attachment"]
+  """
+  @spec unsupported_nodes(Definition.t()) :: [Node.Unsupported.t()]
+  def unsupported_nodes(%Definition{} = definition) do
+    definition |> unsupported_nodes_with_paths() |> Enum.map(fn {_path, node} -> node end)
+  end
+
+  @doc false
+  @spec unsupported_nodes_with_paths(Definition.t()) :: [{InstancePath.t(), Node.Unsupported.t()}]
+  def unsupported_nodes_with_paths(%Definition{root: root}) do
+    collect_unsupported(root, [])
+  end
+
+  @doc """
   The node with the given ID (`Formentation.NodeId` vocabulary), or
   `nil` when no node carries it.
   """
@@ -109,4 +136,25 @@ defmodule Formentation.Info do
   end
 
   defp data_children(_leaf), do: []
+
+  # Mirrors Form.field_entries/3: iterate children, add a segment only for
+  # data-nesting groups, look through presentation groups. `reversed_prefix`
+  # is nearest-first; the path is reversed once at the leaf.
+  defp collect_unsupported(%Node.Group{children: children}, reversed_prefix) do
+    Enum.flat_map(children, fn
+      %Node.Unsupported{name: name} = child ->
+        [{InstancePath.new!(Enum.reverse([name | reversed_prefix])), child}]
+
+      %Node.Group{nests_data?: false} = child ->
+        collect_unsupported(child, reversed_prefix)
+
+      %Node.Group{nests_data?: true, name: name} = child ->
+        collect_unsupported(child, [name | reversed_prefix])
+
+      %Node.Field{} ->
+        []
+    end)
+  end
+
+  defp collect_unsupported(_leaf, _reversed_prefix), do: []
 end
