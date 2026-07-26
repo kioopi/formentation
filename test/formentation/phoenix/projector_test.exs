@@ -454,6 +454,36 @@ defmodule Formentation.Phoenix.ProjectorTest do
       assert [%RenderNode.Field{errors: []}] = plan.root.children
     end
 
+    # Spec §7.3, source-neutrally: the supported-nested-object regression
+    # elsewhere in this file runs through %Formentation.Form{}, which owns
+    # both the group node and the issue. Here the definition is the only
+    # thing the source shares with the projector — an Ash- or Ecto-style
+    # adapter hands over a group-level issue through issues/2 alone, and
+    # it must still be rendered once, unlinked, without reaching the
+    # group's fields.
+    test "a nested-object issue appears once, unlinked, and leaves the group's fields alone" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"address", %{kind: :object, properties: [{"street", %{kind: :string}}]}}
+          ]
+        })
+
+      form =
+        summary_form([issue(["address"], "is incomplete")],
+          params: %{"address" => %{"street" => "Main"}}
+        )
+
+      plan = Projector.project(definition, form)
+
+      assert [%{id: nil, label: nil, message: "is incomplete"}] = plan.summary
+      assert [%RenderNode.Group{children: [street]}] = plan.root.children
+      assert %RenderNode.Field{errors: [], show_errors?: false} = street
+      assert street.field.name == "address[street]"
+      assert street.field.value == "Main"
+    end
+
     # D-027: an unsupported node carries a name a reader can recognize, so
     # its normalized issue is labelled from it (unlike the root/group case
     # covered above, which stays unlabelled).

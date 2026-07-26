@@ -228,12 +228,24 @@ defmodule Formentation.Phoenix.StateViewTest do
       assert form[:a].errors == [{"is invalid", []}]
     end
 
-    test "refuses nested access, which it does not model" do
-      source = %Formentation.SourceFixture{}
+    test "nests wherever its params hold a map" do
+      source = %Formentation.SourceFixture{params: %{"address" => %{"street" => "Main"}}}
       form = Phoenix.HTML.FormData.to_form(source, as: "payload")
 
-      assert_raise ArgumentError, ~r/declares no nested objects/, fn ->
-        Phoenix.HTML.FormData.to_form(source, form, :address, [])
+      assert [nested] = Phoenix.HTML.FormData.to_form(source, form, :address, [])
+      assert nested.name == "payload[address]"
+      assert nested.id == "payload_address"
+      assert nested[:street].value == "Main"
+    end
+
+    test "refuses nested access where its params hold no map" do
+      source = %Formentation.SourceFixture{params: %{"a" => "typed"}}
+      form = Phoenix.HTML.FormData.to_form(source, as: "payload")
+
+      for field <- [:a, :address] do
+        assert_raise ArgumentError, ~r/nests only where its params hold a map/, fn ->
+          Phoenix.HTML.FormData.to_form(source, form, field, [])
+        end
       end
     end
   end
