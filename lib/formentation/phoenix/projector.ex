@@ -22,8 +22,8 @@ defmodule Formentation.Phoenix.Projector do
   The plan's root mirrors the compiled tree in declaration order; every
   field node arrives component-ready — resolved widget, Phoenix form
   field, label, validations, and a `show_errors?` flag decided by the
-  source's `StateView` (D-014), falling back to the Phoenix
-  action/`used_input?` rule only when the source has no opinion.
+  source's `StateView` (D-027), falling back to the Phoenix
+  action/`used_input?` rule (D-014) only when the source has no opinion.
   `plan.summary` is non-empty only once the source's `StateView` reports
   semantic submission.
 
