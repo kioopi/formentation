@@ -16,6 +16,7 @@
       "Formentation.Form",
       "Formentation.Form.*",
       "Formentation.Info",
+      "Formentation.Info.*",
       "Formentation.InstancePath",
       "Formentation.Issue",
       "Formentation.JSONPointer",

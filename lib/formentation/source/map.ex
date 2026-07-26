@@ -96,17 +96,45 @@ defmodule Formentation.Source.Map do
   end
 
   defp compile_properties(properties, required, ctx) do
-    properties
-    |> Enum.reduce_while({:ok, [], ctx}, fn {prop_name, spec}, {:ok, acc, ctx} ->
+    with :ok <- reject_duplicate_properties(properties, ctx),
+         {:ok, nodes, ctx} <- compile_properties_in_order(properties, required, ctx) do
+      {:ok, Enum.reverse(nodes), ctx}
+    end
+  end
+
+  defp compile_properties_in_order(properties, required, ctx) do
+    Enum.reduce_while(properties, {:ok, [], ctx}, fn {prop_name, spec}, {:ok, acc, ctx} ->
       case compile_property(prop_name, spec, prop_name in required, ctx) do
         {:ok, node, ctx} -> {:cont, {:ok, [node | acc], ctx}}
         {:error, diagnostic} -> {:halt, {:error, diagnostic}}
       end
     end)
-    |> case do
-      {:ok, nodes, ctx} -> {:ok, Enum.reverse(nodes), ctx}
-      {:error, diagnostic} -> {:error, diagnostic}
+  end
+
+  defp reject_duplicate_properties(properties, ctx) do
+    {_seen, duplicate} =
+      Enum.reduce_while(properties, {MapSet.new(), nil}, fn {name, _spec}, {seen, nil} ->
+        if MapSet.member?(seen, name) do
+          {:halt, {seen, name}}
+        else
+          {:cont, {MapSet.put(seen, name), nil}}
+        end
+      end)
+
+    case duplicate do
+      nil -> :ok
+      name -> {:error, duplicate_property(name, ctx)}
     end
+  end
+
+  defp duplicate_property(name, ctx) do
+    %Diagnostic{
+      severity: :error,
+      code: :duplicate_property,
+      message: "duplicate property #{inspect(name)}",
+      origin: {:map_source, ctx.source_path ++ [:properties, name]},
+      template_path: TemplatePath.child(ctx.template_path, name)
+    }
   end
 
   defp fetch_list(declaration, key, ctx) do

@@ -99,6 +99,15 @@ defmodule Formentation.InfoTest do
     assert Info.origins(definition(), ["missing"]) == []
   end
 
+  test "semantic_kind/2 classifies paths without accepting presentation group IDs" do
+    assert Info.semantic_kind(definition(), []) == :object
+    assert Info.semantic_kind(definition(), ["name"]) == :field
+    assert Info.semantic_kind(definition(), ["electrical"]) == :object
+    assert Info.semantic_kind(definition(), ["electrical", "legacy"]) == :unsupported
+    assert Info.semantic_kind(definition(), ["electrical", "power"]) == nil
+    assert Info.semantic_kind(definition(), ["missing"]) == nil
+  end
+
   test "unsupported_nodes/1 returns unsupported nodes in declaration order" do
     assert ["gadget", "legacy"] ==
              definition() |> Info.unsupported_nodes() |> Enum.map(& &1.name) |> Enum.sort()
@@ -180,6 +189,53 @@ defmodule Formentation.InfoTest do
 
     assert ["a", "b"] == definition |> Info.fields() |> Enum.map(& &1.name)
     assert ["legacy", "gadget"] == definition |> Info.unsupported_nodes() |> Enum.map(& &1.name)
+  end
+
+  test "semantic_kind/2 raises on ambiguous hand-built paths without changing node_at/2" do
+    first = %Node.Group{
+      id: "/a",
+      name: "a",
+      nests_data?: true,
+      template_path: %TemplatePath{segments: ["a"]},
+      children: [
+        %Node.Field{
+          id: "/a/x",
+          name: "x",
+          value_type: :string,
+          template_path: %TemplatePath{segments: ["a", "x"]}
+        }
+      ]
+    }
+
+    second = %Node.Group{
+      id: "/a",
+      name: "a",
+      nests_data?: true,
+      template_path: %TemplatePath{segments: ["a"]},
+      children: [
+        %Node.Field{
+          id: "/a/y",
+          name: "y",
+          value_type: :string,
+          template_path: %TemplatePath{segments: ["a", "y"]}
+        }
+      ]
+    }
+
+    root = %Node.Group{
+      id: "/",
+      nests_data?: true,
+      template_path: %TemplatePath{segments: []},
+      children: [first, second]
+    }
+
+    definition = %Definition{root: root}
+
+    assert Info.node_at(definition, ["a", "y"]) == nil
+
+    assert_raise ArgumentError, ~r/ambiguous semantic path \["a", "y"\]/, fn ->
+      Info.semantic_kind(definition, ["a", "y"])
+    end
   end
 
   test "semantic entries expose object boundaries and computed paths" do

@@ -82,6 +82,41 @@ defmodule Formentation.Phoenix.ComponentsTest do
       find_one(doc, "a[href='#payload_operating_hours']")
     end
 
+    test "renders reordered groups in presentation order without changing names" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"a", %{kind: :string}},
+            {"b", %{kind: :string}},
+            {"c", %{kind: :string}},
+            {"d", %{kind: :string}}
+          ],
+          groups: [%{id: "late", title: "Late", fields: ["d", "b"]}]
+        })
+
+      doc =
+        definition
+        |> Form.new()
+        |> FormData.to_form(as: "payload", id: "payload")
+        |> then(&render_fields(definition, &1))
+        |> parse!()
+
+      names =
+        doc
+        |> Floki.find("input")
+        |> Enum.map(fn input -> input |> Floki.attribute("name") |> List.first() end)
+
+      ids =
+        doc
+        |> Floki.find("input")
+        |> Enum.map(fn input -> input |> Floki.attribute("id") |> List.first() end)
+
+      assert names == ["payload[a]", "payload[d]", "payload[b]", "payload[c]"]
+      assert ids == ["payload_a", "payload_d", "payload_b", "payload_c"]
+      refute Enum.any?(names, &String.contains?(&1, "late"))
+    end
+
     test "before any action there is no summary and no visible error" do
       definition = nested_definition()
       form = FormData.to_form(Form.new(definition), [])

@@ -16,6 +16,15 @@ defmodule Formentation.Phoenix.BoundaryTest do
     assert offenders == []
   end
 
+  test "Phoenix integration does not branch on the mixed data-nesting flag" do
+    offenders =
+      for file <- Path.wildcard(Path.join(@lib, "formentation/phoenix/**/*.ex")),
+          file |> File.read!() |> String.contains?("nests_data?"),
+          do: Path.relative_to(file, @lib)
+
+    assert offenders == []
+  end
+
   defp references_phoenix?(file) do
     {:ok, ast} = file |> File.read!() |> Code.string_to_quoted()
 

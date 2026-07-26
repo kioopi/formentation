@@ -51,6 +51,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
       plan = Projector.project(definition, form)
 
       assert %RenderPlan{root: %RenderNode.Group{} = root, summary: [], diagnostics: []} = plan
+      assert root.legend == "/"
 
       assert [%RenderNode.Field{} = serial, %RenderNode.Field{}, %RenderNode.Field{} = notes] =
                root.children
@@ -158,6 +159,46 @@ defmodule Formentation.Phoenix.ProjectorTest do
   end
 
   describe "groups and non-rendering nodes" do
+    test "presentation order can differ from semantic declaration order" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [{"a", %{kind: :string}}, {"c", %{kind: :string}}],
+          groups: [%{id: "reordered", fields: ["c", "a"]}]
+        })
+
+      form = FormData.to_form(Form.new(definition), [])
+      plan = Projector.project(definition, form)
+
+      assert definition |> Formentation.Info.fields() |> Enum.map(& &1.name) == ["a", "c"]
+      assert plan.root |> flatten_fields() |> Enum.map(& &1.field.name) == ["c", "a"]
+    end
+
+    test "non-adjacent grouped members keep current layout placement and group order" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"a", %{kind: :string}},
+            {"b", %{kind: :string}},
+            {"c", %{kind: :string}},
+            {"d", %{kind: :string}}
+          ],
+          groups: [%{id: "late", title: "Late", fields: ["d", "b"]}]
+        })
+
+      form = FormData.to_form(Form.new(definition), [])
+      plan = Projector.project(definition, form)
+
+      assert [
+               %RenderNode.Field{field: %{name: "a"}},
+               %RenderNode.Group{legend: "Late", children: grouped},
+               %RenderNode.Field{field: %{name: "c"}}
+             ] = plan.root.children
+
+      assert Enum.map(grouped, & &1.field.name) == ["d", "b"]
+    end
+
     test "a presentational group nests render nodes without name nesting" do
       definition =
         compile!(%{
@@ -202,6 +243,38 @@ defmodule Formentation.Phoenix.ProjectorTest do
       assert [%RenderNode.Field{} = street] = address.children
       assert street.field.name == "payload[address][street]"
       assert street.field.value == "Elm"
+    end
+
+    test "a nested object inside a presentation group still descends semantically" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"title", %{kind: :string}},
+            {"details",
+             %{
+               kind: :object,
+               title: "Details",
+               properties: [{"width", %{kind: :integer}}]
+             }}
+          ],
+          groups: [%{id: "main", title: "Main", fields: ["details", "title"]}]
+        })
+
+      form =
+        FormData.to_form(
+          Form.new(definition, %{"title" => "Pump", "details" => %{"width" => 12}}),
+          as: "payload"
+        )
+
+      assert [%RenderNode.Group{legend: "Main", children: [details, title]}] =
+               Projector.project(definition, form).root.children
+
+      assert %RenderNode.Group{legend: "Details", children: [width]} = details
+      assert width.field.name == "payload[details][width]"
+      assert width.field.value == "12"
+      assert title.field.name == "payload[title]"
+      assert title.field.value == "Pump"
     end
 
     test "unsupported nodes and hidden read-only fields render nothing" do
@@ -252,6 +325,36 @@ defmodule Formentation.Phoenix.ProjectorTest do
       assert %RenderNode.Field{} = street
       assert street.field.name == "payload[address][street]"
       assert street.field.value == "Elm"
+    end
+
+    test "a grouped scalar path projects without requiring its group location" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [{"title", %{kind: :string}}],
+          groups: [%{id: "main", fields: ["title"]}]
+        })
+
+      form = FormData.to_form(Form.new(definition, %{"title" => "Pump"}), as: "payload")
+
+      assert %RenderNode.Field{field: field} = Projector.project_at(definition, form, ["title"])
+      assert field.name == "payload[title]"
+      assert field.value == "Pump"
+    end
+
+    test "a presentation group id is not a semantic subtree" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [{"title", %{kind: :string}}],
+          groups: [%{id: "main", fields: ["title"]}]
+        })
+
+      form = FormData.to_form(Form.new(definition), [])
+
+      assert_raise ArgumentError, ~r/no node at instance path/, fn ->
+        Projector.project_at(definition, form, ["main"])
+      end
     end
 
     test "an unsupported node's path raises" do
@@ -811,9 +914,55 @@ defmodule Formentation.Phoenix.ProjectorTest do
       refute @projector_source =~ "form.action"
       refute @projector_source =~ "action: :submit"
     end
+
+    test "the projector does not discover presentation from mixed storage" do
+      refute @projector_source =~ "Info.root("
+      refute @projector_source =~ ~r/\bdefinition\.root\b|%Definition\{root:/
+      refute @projector_source =~ "nests_data?"
+      refute @projector_source =~ "%Node.Group"
+    end
   end
 
   describe "projection contract regressions" do
+    test "project_at/3 descends from the root form for a nested scalar" do
+      schema = %{
+        "type" => "object",
+        "properties" => %{
+          "address" => %{
+            "type" => "object",
+            "properties" => %{"street" => %{"type" => "string", "minLength" => 4}}
+          }
+        }
+      }
+
+      {:ok, definition, []} = Formentation.compile(schema, adapter: Formentation.JSONSchema)
+
+      form_state =
+        Form.transition(
+          Form.new(definition, %{"address" => %{"street" => "Elm"}}),
+          %Formentation.Params{
+            values: %{"address" => %{"street" => "ab"}},
+            event: :change
+          }
+        )
+
+      form = FormData.to_form(form_state, as: "payload", id: "payload")
+
+      from_whole =
+        Projector.project(definition, form).root
+        |> flatten_fields()
+        |> Enum.find(&(&1.field.name == "payload[address][street]"))
+
+      from_at = Projector.project_at(definition, form, ["address", "street"])
+
+      assert from_at.field.name == "payload[address][street]"
+      assert from_at.field.id == "payload_address_street"
+      assert from_at.field.value == "ab"
+      assert from_at.errors == from_whole.errors
+      assert from_at.show_errors? == from_whole.show_errors?
+      assert from_at.show_errors? == true
+    end
+
     test "project_at/3 applies visibility using the same absolute path as project/2" do
       # :change, not :submit: Form.show_issues?/2 short-circuits to true on
       # :submit regardless of path, so that event can't discriminate a

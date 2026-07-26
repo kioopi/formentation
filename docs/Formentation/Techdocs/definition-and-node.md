@@ -10,7 +10,7 @@ status: current
 
 # Definition and Node
 
-*As of 2026-07-26 (source-neutral validation dispatch; unsupported-node capability query, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]).*
+*As of 2026-07-26 (presentation traversal query seam, [[18-decisions#D-031 — Phoenix preparation consumes presentation descriptors|D-031]]; source-neutral validation dispatch; unsupported-node capability query, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]).*
 
 `Formentation.Definition` is the compiler's product and the system's
 common language: an immutable, source-independent tree of semantic
@@ -32,7 +32,9 @@ produced.
 
 `root` holds the current mixed node tree directly. `Formentation.Info`
 keeps compatibility access to that tree through `root/1` and `node/2`,
-but its semantic queries use a layout-transparent semantic traversal.
+but its semantic queries use a layout-transparent semantic traversal, and
+its presentation queries expose typed layout descriptors rather than raw
+mixed nodes.
 `validation` is an optional `Formentation.ValidationPlan`
 — an executable module (implementing `Formentation.Validation`) paired
 with the opaque artifact that module owns; `nil` when the source provides
@@ -60,6 +62,29 @@ evidence assigned before presentation grouping. It preserves semantic
 declaration order while the mixed tree can still move children beneath
 layout groups. It is not a stable representation contract; the split
 Definition storage work owns its removal.
+
+## Presentation traversal descriptors
+
+`Formentation.Info.presentation_root/1` and
+`Formentation.Info.presentation_at/2` are the current presentation-query
+seam. They are compatibility queries over the mixed tree, not a second
+stored tree and not the future native presentation storage. They return
+typed descriptors under `Formentation.Info.Presentation`:
+
+- `Object` — root or nested semantic-object layout boundary, carrying a
+  normalized `InstancePath`.
+- `Field` — scalar field reference, carrying a normalized `InstancePath`
+  plus presentation-owned label, help, widget hint, hidden intent, and
+  origins.
+- `Group` — presentation-only grouping, carrying layout identity and
+  children but no semantic path.
+
+Presentation groups never add instance-path segments. A nested object
+`details` contributes `["details"]`; a presentation group such as
+`technical` inside it does not, so a field remains
+`["details", "width"]`, never `["details", "technical", "width"]`.
+`presentation_at/2` accepts only semantic root/object/field paths and
+distinguishes `:not_found` from `:unsupported`.
 
 ## Unsupported nodes are a preserve-only capability
 

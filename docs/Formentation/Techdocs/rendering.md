@@ -12,7 +12,7 @@ status: current
 
 # Rendering
 
-*As of 2026-07-26 (StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
+*As of 2026-07-26 (presentation traversal query seam, [[18-decisions#D-031 — Phoenix preparation consumes presentation descriptors|D-031]]; StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
 
 ## Projector data flow (`Formentation.Phoenix.Projector`)
 
@@ -24,22 +24,33 @@ projects the single subtree at an instance path (a field or a
 data-nesting group), returning `nil` when the node deliberately renders
 nothing, and raising for an unknown or unsupported path.
 
-The walk mirrors the compiled tree in declaration order (ordering was
-already resolved at compile time; the projector adds none):
+The walk consumes `Formentation.Info.presentation_root/1` and
+`presentation_at/2`, not `Definition.root`. Those queries return typed
+presentation descriptors:
 
-- **Fields** resolve a widget (table below), a label (`node.label`,
-  falling back to the humanized field name), and `show_errors?`.
-- **Presentational groups** (`nests_data?: false`, D-006) project their
-  children under the *same* Phoenix form — a fieldset never introduces
-  name nesting.
-- **Data-nesting groups** project children under a nested form the
-  projector materializes directly via
-  `Phoenix.HTML.FormData.to_form/4` — never `<.inputs_for>`. Nothing
-  injects `_persistent_id` this way, which settles the rendering half of
-  that open question (the transport-side handling stays open for step 7)
-  — [[18-decisions#D-019 — Projection is Phoenix-generic|D-019]].
-- **Unsupported nodes**, and fields that are both `hidden?` and
-  `read_only?` (D-016), project to nothing.
+- **Object descriptors** carry a semantic `InstancePath` and form a
+  layout boundary for the root or a nested data object.
+- **Group descriptors** carry presentation layout identity only. They
+  project their children under the same Phoenix form; a fieldset never
+  introduces name nesting.
+- **Field descriptors** carry a semantic `InstancePath` plus presentation
+  facts such as label, help, hidden-control intent, and widget hint.
+
+The projector resolves semantic facts by asking `Info` at each descriptor's
+path. This keeps declaration order and layout order as separate contracts:
+for example, semantic fields can enumerate as `["a", "c"]` while a
+presentation group renders them as `["c", "a"]`. Unsupported nodes do not
+appear in renderable presentation traversal; their semantic paths still
+classify as unsupported so `project_at/3` and summary labelling preserve
+their existing behaviour.
+
+Nested object descriptors cause exactly one
+`Phoenix.HTML.FormData.to_form/4` descent for their semantic segment —
+never `<.inputs_for>` and never a presentation-group id. Nothing injects
+`_persistent_id` this way, which settles the rendering half of that open
+question (the transport-side handling stays open for step 7) —
+[[18-decisions#D-019 — Projection is Phoenix-generic|D-019]]. Fields that
+are both presentation-hidden and semantically read-only project to nothing.
 
 ## `RenderPlan` and render-node shapes
 

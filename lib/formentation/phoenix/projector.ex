@@ -14,13 +14,15 @@ defmodule Formentation.Phoenix.Projector do
   """
 
   alias Formentation.{Definition, Diagnostic, Info, InstancePath, Node}
+  alias Formentation.Info.Presentation
   alias Formentation.Phoenix.{RenderNode, RenderPlan, StateView}
 
   @doc """
   Projects the whole definition against `form` into a render plan.
 
-  The plan's root mirrors the compiled tree in declaration order; every
-  field node arrives component-ready — resolved widget, Phoenix form
+  The plan's root follows deterministic presentation/layout order, which
+  may differ from semantic declaration order. Every field node arrives
+  component-ready — resolved widget, Phoenix form
   field, label, validations, and a `show_errors?` flag decided by the
   source's `StateView` (D-027), falling back to the Phoenix
   action/`used_input?` rule (D-014) only when the source has no opinion.
@@ -42,8 +44,8 @@ defmodule Formentation.Phoenix.Projector do
   """
   @spec project(Definition.t(), Phoenix.HTML.Form.t()) :: RenderPlan.t()
   def project(%Definition{} = definition, %Phoenix.HTML.Form{} = form) do
-    ctx = context(definition, form, [])
-    {root, diagnostics} = project_group(Info.root(definition), form, ctx)
+    ctx = context(definition, form, [], Info.semantic_node_index(definition))
+    {root, diagnostics} = project_descriptor(Info.presentation_root(definition), form, ctx)
     %RenderPlan{root: root, summary: summary(root, ctx), diagnostics: diagnostics}
   end
 
@@ -69,17 +71,19 @@ defmodule Formentation.Phoenix.Projector do
           RenderNode.t() | nil
   def project_at(%Definition{} = definition, %Phoenix.HTML.Form{} = form, segments)
       when is_list(segments) do
-    case Info.node_at(definition, segments) do
-      nil ->
+    %InstancePath{segments: segments} = InstancePath.new!(segments)
+
+    case Info.presentation_at(definition, segments) do
+      :not_found ->
         raise ArgumentError, "no node at instance path #{inspect(segments)}"
 
-      %Node.Unsupported{} ->
+      :unsupported ->
         raise ArgumentError, "the node at #{inspect(segments)} is unsupported and cannot render"
 
-      node ->
-        parent = Enum.drop(segments, -1)
-        ctx = context(definition, form, parent)
-        {render, _diagnostics} = project_node(node, descend(form, parent), ctx)
+      {:ok, descriptor} ->
+        parent = descriptor_parent_path(descriptor)
+        ctx = context(definition, form, parent, Info.semantic_node_index(definition))
+        {render, _diagnostics} = project_descriptor(descriptor, descend(form, parent), ctx)
         render
     end
   end
@@ -88,8 +92,14 @@ defmodule Formentation.Phoenix.Projector do
   # is built only where a path crosses into StateView — and `root_form`
   # and `source` stay pinned to the form handed to project/2 or
   # project_at/3, never a nested form built during traversal.
-  defp context(definition, form, path) do
-    %{definition: definition, root_form: form, source: form.source, path: path}
+  defp context(definition, form, path, semantic_nodes) do
+    %{
+      definition: definition,
+      root_form: form,
+      source: form.source,
+      path: path,
+      semantic_nodes: semantic_nodes
+    }
   end
 
   defp descend(form, segments) do
@@ -99,44 +109,67 @@ defmodule Formentation.Phoenix.Projector do
     end)
   end
 
-  defp project_group(%Node.Group{} = group, form, ctx) do
-    {children, diagnostics} = project_children(group.children, form, ctx)
-    {%RenderNode.Group{legend: legend(group), children: children}, diagnostics}
+  defp project_descriptor(%Presentation.Object{semantic_path: path} = object, form, ctx) do
+    {form, ctx} = object_context(object, path.segments, form, ctx)
+    {children, diagnostics} = project_children(object.children, form, ctx)
+    {%RenderNode.Group{legend: object_legend(object), children: children}, diagnostics}
   end
 
-  defp project_children(nodes, form, ctx) do
+  defp project_descriptor(%Presentation.Group{} = group, form, ctx) do
+    {children, diagnostics} = project_children(group.children, form, ctx)
+    {%RenderNode.Group{legend: group_legend(group), children: children}, diagnostics}
+  end
+
+  defp project_descriptor(%Presentation.Field{} = field, form, ctx) do
+    case Map.fetch(ctx.semantic_nodes, field.semantic_path) do
+      {:ok, %Node.Field{} = node} -> project_field(field, node, form, ctx)
+      {:ok, other} -> invariant!("field descriptor resolved to #{inspect(other)}")
+      :error -> invariant!("field descriptor resolved to no semantic occurrence")
+    end
+  end
+
+  defp object_context(_object, path, form, %{path: path} = ctx), do: {form, ctx}
+
+  defp object_context(_object, path, form, ctx) do
+    if Enum.drop(path, -1) == ctx.path and length(path) == length(ctx.path) + 1 do
+      [nested] = Phoenix.HTML.FormData.to_form(form.source, form, List.last(path), [])
+      {nested, %{ctx | path: path}}
+    else
+      invariant!(
+        "object descriptor path #{inspect(path)} is not a direct child of " <>
+          "projection path #{inspect(ctx.path)}"
+      )
+    end
+  end
+
+  defp project_children(descriptors, form, ctx) do
     {children, diagnostics} =
-      Enum.map_reduce(nodes, [], fn node, acc ->
-        {child, diags} = project_node(node, form, ctx)
+      Enum.map_reduce(descriptors, [], fn descriptor, acc ->
+        {child, diags} = project_descriptor(descriptor, form, ctx)
         {child, [diags | acc]}
       end)
 
     {Enum.reject(children, &is_nil/1), diagnostics |> Enum.reverse() |> List.flatten()}
   end
 
-  defp project_node(%Node.Field{hidden?: true, read_only?: true}, _form, _ctx), do: {nil, []}
-  defp project_node(%Node.Field{} = node, form, ctx), do: project_field(node, form, ctx)
-  defp project_node(%Node.Unsupported{}, _form, _ctx), do: {nil, []}
+  defp project_field(
+         %Presentation.Field{hidden?: true},
+         %Node.Field{read_only?: true},
+         _form,
+         _ctx
+       ),
+       do: {nil, []}
 
-  defp project_node(%Node.Group{nests_data?: false} = group, form, ctx) do
-    project_group(group, form, ctx)
-  end
-
-  defp project_node(%Node.Group{nests_data?: true} = group, form, ctx) do
-    [nested] = Phoenix.HTML.FormData.to_form(form.source, form, group.name, [])
-    project_group(group, nested, %{ctx | path: ctx.path ++ [group.name]})
-  end
-
-  defp project_field(%Node.Field{} = node, form, ctx) do
+  defp project_field(%Presentation.Field{} = presentation, %Node.Field{} = node, form, ctx) do
     field = form[access_key(node.name)]
-    {widget, diagnostics} = resolve_widget(node)
-    path = ctx.path ++ [node.name]
+    {widget, diagnostics} = resolve_widget(presentation, node)
+    path = presentation.semantic_path.segments
 
     {%RenderNode.Field{
        widget: widget,
        field: field,
-       label: node.label || humanize(node.name),
-       help: node.help,
+       label: presentation.label || humanize(node.name),
+       help: presentation.help,
        options: node.options,
        validations: Phoenix.HTML.Form.input_validations(form, field.field),
        errors: field.errors,
@@ -146,17 +179,17 @@ defmodule Formentation.Phoenix.Projector do
   end
 
   # Spec order: hidden -> hint -> options -> boolean -> number -> role -> text.
-  defp resolve_widget(%Node.Field{hidden?: true}), do: {:hidden_input, []}
-  defp resolve_widget(%Node.Field{widget: nil} = node), do: {infer_widget(node), []}
+  defp resolve_widget(%Presentation.Field{hidden?: true}, _node), do: {:hidden_input, []}
+  defp resolve_widget(%Presentation.Field{widget: nil}, node), do: {infer_widget(node), []}
 
-  defp resolve_widget(%Node.Field{widget: hint} = node) do
+  defp resolve_widget(%Presentation.Field{widget: hint}, node) do
     case hinted_widget(hint, node) do
       {:ok, widget} ->
         {widget, []}
 
       :fallback ->
         widget = infer_widget(node)
-        {widget, [fallback_diagnostic(node, widget)]}
+        {widget, [fallback_diagnostic(hint, node, widget)]}
     end
   end
 
@@ -178,20 +211,39 @@ defmodule Formentation.Phoenix.Projector do
   defp infer_widget(%Node.Field{role: :uri}), do: :url_input
   defp infer_widget(%Node.Field{}), do: :text_input
 
-  defp fallback_diagnostic(node, widget) do
+  defp fallback_diagnostic(hint, node, widget) do
     %Diagnostic{
       severity: :warning,
       code: :widget_fallback,
       message:
-        "widget #{inspect(node.widget)} cannot render field #{inspect(node.name)}; " <>
+        "widget #{inspect(hint)} cannot render field #{inspect(node.name)}; " <>
           "falling back to #{inspect(widget)}",
       template_path: node.template_path
     }
   end
 
-  defp legend(%Node.Group{label: label, name: name, id: id}) do
-    label || humanize(name || id)
+  defp object_legend(%Presentation.Object{label: label, semantic_path: %{segments: []}} = object) do
+    label || object.id
   end
+
+  defp object_legend(%Presentation.Object{label: label, semantic_path: path}) do
+    label || humanize(List.last(path.segments))
+  end
+
+  defp group_legend(%Presentation.Group{label: label, id: id}) do
+    label || humanize(id)
+  end
+
+  defp descriptor_parent_path(%Presentation.Field{semantic_path: path}) do
+    Enum.drop(path.segments, -1)
+  end
+
+  defp descriptor_parent_path(%Presentation.Object{semantic_path: path}) do
+    Enum.drop(path.segments, -1)
+  end
+
+  defp invariant!(message),
+    do: raise(ArgumentError, "invalid presentation descriptor: " <> message)
 
   # Mirrors the FormData error_key convention (step-5 spec decision 4):
   # errors key by existing atom, so field access must use the atom when
@@ -273,16 +325,16 @@ defmodule Formentation.Phoenix.Projector do
   end
 
   defp field_path?(ctx, %InstancePath{segments: segments}) do
-    match?(%Node.Field{}, Info.node_at(ctx.definition, segments))
+    Info.semantic_kind(ctx.definition, segments) == :field
   end
 
   # An unsupported node carries a name a reader can recognize, so its
   # entry is worth labelling; root and group issues stay unlabelled, as
   # they were before D-027.
   defp summary_label(ctx, %InstancePath{segments: segments}) do
-    case Info.node_at(ctx.definition, segments) do
-      %Node.Unsupported{} -> humanize(List.last(segments))
-      _root_group_or_unknown -> nil
+    case Info.semantic_kind(ctx.definition, segments) do
+      :unsupported -> humanize(List.last(segments))
+      _root_object_or_unknown -> nil
     end
   end
 

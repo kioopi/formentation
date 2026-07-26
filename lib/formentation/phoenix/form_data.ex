@@ -39,14 +39,14 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
     key = field_to_string(field)
     path = path_of(form) ++ [key]
 
-    case Info.node_at(form_state.definition, path) do
-      %Node.Group{nests_data?: true} -> [nested_form(form_state, form, key, path, opts)]
+    case Info.semantic_kind(form_state.definition, path) do
+      :object -> [nested_form(form_state, form, key, path, opts)]
       other -> raise_not_nested!(field, other)
     end
   end
 
-  defp raise_not_nested!(field, node) do
-    kind = if node, do: inspect(node.__struct__), else: "no node"
+  defp raise_not_nested!(field, kind) do
+    kind = if kind, do: inspect(kind), else: "no node"
 
     raise ArgumentError,
           "inputs_for is only supported for data-nesting objects; " <>
@@ -214,7 +214,7 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
   defp field_child?(form_state, path, object_path, depth) do
     length(path.segments) == depth and
       Enum.take(path.segments, depth - 1) == object_path and
-      match?(%Node.Field{}, Info.node_at(form_state.definition, path.segments))
+      Info.semantic_kind(form_state.definition, path.segments) == :field
   end
 
   # Spec decision 4: phoenix_html matches error keys against the field
