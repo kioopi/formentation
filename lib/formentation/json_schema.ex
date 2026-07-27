@@ -17,10 +17,13 @@ defmodule Formentation.JSONSchema do
     JSONPointer,
     Node,
     NodeId,
+    Presentation,
+    Semantic,
     TemplatePath,
     ValidationPlan
   }
 
+  alias Formentation.Definition.Finalizer
   alias Formentation.JSONSchema.Validator
   alias Formentation.Source.Shared
 
@@ -101,7 +104,7 @@ defmodule Formentation.JSONSchema do
   end
 
   defp walk(schema, opts) do
-    Shared.compile_impl(schema, opts, &compile_object/3)
+    Shared.compile_compiled_impl(schema, opts, &compile_object/3)
   end
 
   defp check_shape(schema) when is_map(schema), do: :ok
@@ -190,19 +193,41 @@ defmodule Formentation.JSONSchema do
       properties = Map.get(schema, "properties", %{})
 
       with {:ok, children, ctx} <- compile_properties(properties, required, ctx) do
-        children = Shared.stamp_declaration_order(children)
+        legacy_children = children |> Enum.map(& &1.legacy) |> Shared.stamp_declaration_order()
         {label, label_origin} = resolve_label(schema, name, ctx.source_path)
         {help, help_origin} = resolve_help(schema, ctx.source_path)
 
-        node =
-          Shared.create_group_node(name, children, ctx,
+        presentation_origins = Shared.origin_entries(label: label_origin, help: help_origin)
+
+        legacy =
+          Shared.create_group_node(name, legacy_children, ctx,
             label: label,
             label_origin: label_origin,
             help: help,
             help_origin: help_origin
           )
 
-        {:ok, node, ctx}
+        semantic =
+          Semantic.Object.new(name, ctx.template_path, Enum.map(children, & &1.semantic),
+            origins: []
+          )
+
+        presentation =
+          Presentation.Object.new(
+            semantic.id,
+            children |> Enum.map(& &1.presentation) |> Enum.reject(&is_nil/1),
+            id: Presentation.object_id(semantic.id),
+            label: label,
+            help: help,
+            origins: presentation_origins
+          )
+
+        {:ok,
+         %Shared.Compiled{
+           legacy: %{legacy | children: legacy_children},
+           semantic: semantic,
+           presentation: presentation
+         }, ctx}
       end
     end
   end
@@ -250,7 +275,7 @@ defmodule Formentation.JSONSchema do
     |> Enum.sort()
     |> Enum.reduce_while({:ok, [], ctx}, fn name, {:ok, acc, ctx} ->
       case compile_property(name, Map.fetch!(properties, name), name in required, ctx) do
-        {:ok, node, ctx} -> {:cont, {:ok, [node | acc], ctx}}
+        {:ok, %Shared.Compiled{} = compiled, ctx} -> {:cont, {:ok, [compiled | acc], ctx}}
         {:error, diagnostic} -> {:halt, {:error, diagnostic}}
       end
     end)
@@ -268,9 +293,9 @@ defmodule Formentation.JSONSchema do
         source_path: ctx.source_path ++ ["properties", name]
     }
 
-    with {:ok, node, child_ctx} <- compile_object(schema, name, child_ctx) do
-      {:ok, %{node | required?: required?},
-       %{ctx | diagnostics: child_ctx.diagnostics, nodes_left: child_ctx.nodes_left}}
+    with {:ok, %Shared.Compiled{} = compiled, child_ctx} <-
+           compile_object(schema, name, child_ctx) do
+      Shared.require_compiled_object(compiled, child_ctx, ctx, required?)
     end
   end
 
@@ -339,7 +364,17 @@ defmodule Formentation.JSONSchema do
       {default, default_origin, ctx} =
         resolve_default(schema, name, source_path, template_path, ctx)
 
-      node = %Node.Field{
+      origins =
+        Shared.origin_entries(
+          label: label_origin,
+          role: role_origin,
+          help: help_origin,
+          options: options_origin(schema, source_path),
+          examples: examples_origin,
+          default: default_origin
+        )
+
+      legacy = %Node.Field{
         id: NodeId.from_path(template_path),
         name: name,
         label: label,
@@ -352,18 +387,32 @@ defmodule Formentation.JSONSchema do
         default: default,
         examples: examples,
         constraints: constraints(schema),
-        origins:
-          Shared.origin_entries(
-            label: label_origin,
-            role: role_origin,
-            help: help_origin,
-            options: options_origin(schema, source_path),
-            examples: examples_origin,
-            default: default_origin
-          )
+        origins: origins
       }
 
-      {:ok, node, ctx}
+      semantic =
+        Semantic.Field.new(
+          name,
+          template_path,
+          Map.fetch!(@value_types, Map.fetch!(schema, "type")),
+          role: role,
+          required?: required?,
+          options: option_set(schema),
+          default: default,
+          examples: examples,
+          constraints: constraints(schema),
+          origins: semantic_origins(origins)
+        )
+
+      presentation =
+        Presentation.Field.new(semantic.id,
+          id: Presentation.field_id(semantic.id),
+          label: label,
+          help: help,
+          origins: presentation_origins(origins)
+        )
+
+      {:ok, %Shared.Compiled{legacy: legacy, semantic: semantic, presentation: presentation}, ctx}
     end
   end
 
@@ -375,13 +424,19 @@ defmodule Formentation.JSONSchema do
       origin_suffix = if code == :unsupported_type, do: ["type"], else: []
       origin = {:json_schema, JSONPointer.join(source_path ++ origin_suffix)}
 
-      node = %Node.Unsupported{
+      legacy = %Node.Unsupported{
         id: NodeId.from_path(template_path),
         name: name,
         required?: required?,
         template_path: template_path,
         origins: Shared.origin_entries(kind: origin)
       }
+
+      semantic =
+        Semantic.Unsupported.new(name, template_path,
+          required?: required?,
+          origins: legacy.origins
+        )
 
       diagnostic = %Diagnostic{
         severity: :warning,
@@ -391,7 +446,8 @@ defmodule Formentation.JSONSchema do
         template_path: template_path
       }
 
-      {:ok, node, %{ctx | diagnostics: [diagnostic | ctx.diagnostics]}}
+      {:ok, %Shared.Compiled{legacy: legacy, semantic: semantic, presentation: nil},
+       %{ctx | diagnostics: [diagnostic | ctx.diagnostics]}}
     end
   end
 
@@ -480,7 +536,16 @@ defmodule Formentation.JSONSchema do
 
   defp options_origin(_schema, _source_path), do: nil
 
-  defp apply_hints(%Definition{root: root} = definition, ui) do
+  @semantic_origin_keys [:role, :options, :examples, :default, :read_only]
+  @presentation_origin_keys [:label, :help, :widget, :hidden]
+
+  defp semantic_origins(origins), do: Shared.fact_origins(origins, @semantic_origin_keys)
+  defp presentation_origins(origins), do: Shared.fact_origins(origins, @presentation_origin_keys)
+
+  defp apply_hints(
+         %Definition{root: root, semantic: semantic, presentation: presentation} = definition,
+         ui
+       ) do
     {children, field_warnings} =
       apply_field_hints(root.children, Map.get(ui, "fields", %{}))
 
@@ -490,7 +555,26 @@ defmodule Formentation.JSONSchema do
     {children, order_warnings} = apply_order(children, Map.get(ui, "order"))
 
     diagnostics = definition.diagnostics ++ field_warnings ++ group_warnings ++ order_warnings
-    definition = %{definition | root: %{root | children: children}, diagnostics: diagnostics}
+    semantic = apply_native_semantic_field_hints(semantic, Map.get(ui, "fields", %{}))
+
+    presentation =
+      presentation
+      |> apply_native_presentation_field_hints(Map.get(ui, "fields", %{}), semantic)
+      |> apply_native_group_hints(Map.get(ui, "groups", []), semantic)
+      |> apply_native_order(Map.get(ui, "order"), semantic)
+
+    {:ok, native_definition} =
+      Finalizer.finalize(semantic, presentation, diagnostics: diagnostics)
+
+    definition = %{
+      definition
+      | root: %{root | children: children},
+        semantic: native_definition.semantic,
+        semantic_index: native_definition.semantic_index,
+        presentation: native_definition.presentation,
+        diagnostics: diagnostics
+    }
+
     {:ok, definition, diagnostics}
   end
 
@@ -662,5 +746,183 @@ defmodule Formentation.JSONSchema do
       origin: {:ui_hints, "/order"},
       template_path: %TemplatePath{segments: []}
     }
+  end
+
+  defp apply_native_semantic_field_hints(%Semantic.Object{} = semantic, fields) do
+    children =
+      Enum.map(semantic.children, fn
+        %Semantic.Field{name: name} = field ->
+          case Map.get(fields, name) do
+            %{"read_only" => value} when is_boolean(value) ->
+              pointer = JSONPointer.join(["fields", name, "read_only"])
+
+              %{
+                field
+                | read_only?: value,
+                  origins: field.origins ++ [read_only: {:ui_hints, pointer}]
+              }
+
+            _hint_or_missing ->
+              field
+          end
+
+        child ->
+          child
+      end)
+
+    %{semantic | children: children}
+  end
+
+  defp apply_native_presentation_field_hints(
+         %Presentation.Object{} = presentation,
+         fields,
+         semantic
+       ) do
+    field_ids_by_name =
+      semantic.children
+      |> Enum.filter(&match?(%Semantic.Field{}, &1))
+      |> Map.new(&{&1.name, &1.id})
+
+    children =
+      Enum.map(presentation.children, fn
+        %Presentation.Field{semantic_id: semantic_id} = field ->
+          apply_native_presentation_field_hint(field, semantic_id, field_ids_by_name, fields)
+
+        child ->
+          child
+      end)
+
+    %{presentation | children: children}
+  end
+
+  defp apply_native_presentation_field_hint(field, semantic_id, field_ids_by_name, fields) do
+    case Enum.find(field_ids_by_name, fn {_name, id} -> id == semantic_id end) do
+      {name, ^semantic_id} -> maybe_apply_native_presentation_field_hint(field, name, fields)
+      nil -> field
+    end
+  end
+
+  defp maybe_apply_native_presentation_field_hint(field, name, fields) do
+    case Map.get(fields, name) do
+      hint when is_map(hint) -> apply_native_presentation_field_hint(field, name, hint)
+      _missing_or_non_field -> field
+    end
+  end
+
+  defp apply_native_presentation_field_hint(field, name, hint) do
+    field
+    |> apply_native_widget(name, hint)
+    |> apply_native_help(name, hint)
+    |> apply_native_hidden(name, hint)
+  end
+
+  defp apply_native_widget(field, name, %{"widget" => widget})
+       when is_map_key(@widgets, widget) do
+    pointer = JSONPointer.join(["fields", name, "widget"])
+
+    %{
+      field
+      | widget: Map.fetch!(@widgets, widget),
+        origins: field.origins ++ [widget: {:ui_hints, pointer}]
+    }
+  end
+
+  defp apply_native_widget(field, _name, _hint), do: field
+
+  defp apply_native_help(field, name, %{"help" => help}) when is_binary(help) do
+    pointer = JSONPointer.join(["fields", name, "help"])
+    origins = Keyword.delete(field.origins, :help) ++ [help: {:ui_hints, pointer}]
+    %{field | help: help, origins: origins}
+  end
+
+  defp apply_native_help(field, _name, _hint), do: field
+
+  defp apply_native_hidden(field, name, %{"hidden" => value}) when is_boolean(value) do
+    pointer = JSONPointer.join(["fields", name, "hidden"])
+    %{field | hidden?: value, origins: field.origins ++ [hidden: {:ui_hints, pointer}]}
+  end
+
+  defp apply_native_hidden(field, _name, _hint), do: field
+
+  defp apply_native_group_hints(%Presentation.Object{} = presentation, groups, semantic) do
+    {children, _index} =
+      Enum.reduce(groups, {presentation.children, 0}, fn group, {children, index} ->
+        spec = %Shared.PresentationGroupSpec{
+          id: Map.fetch!(group, "id"),
+          label: group["title"],
+          label_origin: group_label_origin(group, index),
+          fields: Map.fetch!(group, "fields")
+        }
+
+        {attach_native_group(children, semantic, spec), index + 1}
+      end)
+
+    %{presentation | children: children}
+  end
+
+  defp attach_native_group(
+         children,
+         semantic,
+         %Shared.PresentationGroupSpec{fields: fields} = spec
+       ) do
+    fields = Enum.uniq(fields)
+    by_name = presentation_children_by_name(children, semantic)
+
+    members =
+      fields
+      |> Enum.filter(&is_map_key(by_name, &1))
+      |> Enum.map(&Map.fetch!(by_name, &1))
+
+    place_native_group(children, spec, members)
+  end
+
+  defp place_native_group(children, _spec, []), do: children
+
+  defp place_native_group(children, %Shared.PresentationGroupSpec{id: id} = spec, members) do
+    group =
+      Presentation.Group.new(id, members,
+        layout_id: NodeId.group(%TemplatePath{segments: []}, id),
+        label: spec.label,
+        origins: Shared.origin_entries(label: spec.label_origin)
+      )
+
+    member_ids = MapSet.new(members, & &1.semantic_id)
+    first_index = Enum.find_index(children, &(Shared.presentation_reference_id(&1) in member_ids))
+
+    children
+    |> Enum.reject(&(Shared.presentation_reference_id(&1) in member_ids))
+    |> List.insert_at(first_index, group)
+  end
+
+  defp apply_native_order(%Presentation.Object{} = presentation, nil, _semantic), do: presentation
+
+  defp apply_native_order(%Presentation.Object{} = presentation, order, semantic)
+       when is_list(order) do
+    {matched, _unknown} =
+      Enum.reduce(order, {[], []}, fn entry, {matched, unknown} ->
+        case Enum.find(presentation.children, &native_order_match?(&1, entry, semantic)) do
+          nil -> {matched, [entry | unknown]}
+          child -> {[child | matched], unknown}
+        end
+      end)
+
+    matched = matched |> Enum.reverse() |> Enum.uniq()
+    %{presentation | children: matched ++ Enum.reject(presentation.children, &(&1 in matched))}
+  end
+
+  defp presentation_children_by_name(children, semantic) do
+    by_id = Map.new(semantic.children, &{&1.id, &1.name})
+
+    children
+    |> Enum.filter(&Shared.presentation_reference_id/1)
+    |> Map.new(fn child -> {Map.fetch!(by_id, child.semantic_id), child} end)
+  end
+
+  defp native_order_match?(%Presentation.Group{id: id}, entry, _semantic),
+    do: id == NodeId.group(%TemplatePath{segments: []}, entry)
+
+  defp native_order_match?(child, entry, semantic) do
+    name_by_id = Map.new(semantic.children, &{&1.id, &1.name})
+    Map.get(name_by_id, Shared.presentation_reference_id(child)) == entry
   end
 end

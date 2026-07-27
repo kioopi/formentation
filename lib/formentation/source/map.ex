@@ -10,21 +10,8 @@ defmodule Formentation.Source.Map do
 
   @behaviour Formentation.Source
 
-  alias Formentation.{Definition, Diagnostic, Node, NodeId, Presentation, Semantic, TemplatePath}
-  alias Formentation.Definition.Finalizer
+  alias Formentation.{Diagnostic, Node, NodeId, Presentation, Semantic, TemplatePath}
   alias Formentation.Source.Shared
-
-  defmodule Compiled do
-    @moduledoc false
-
-    defstruct [:legacy, :semantic, :presentation]
-  end
-
-  defmodule PresentationGroupSpec do
-    @moduledoc false
-
-    defstruct [:id, :label, :label_origin, :fields]
-  end
 
   @scalar_kinds [:string, :integer, :number, :boolean]
 
@@ -43,31 +30,7 @@ defmodule Formentation.Source.Map do
   """
   @impl true
   def compile(declaration, opts \\ []) do
-    ctx = %Shared.Context{
-      max_depth: Keyword.get(opts, :max_depth, 16),
-      nodes_left: Keyword.get(opts, :max_nodes, 1_000)
-    }
-
-    case compile_object(declaration, nil, ctx) do
-      {:ok, %Compiled{} = compiled, ctx} ->
-        {:ok, %Definition{} = legacy_definition, diagnostics} =
-          Shared.finalize_legacy(compiled.legacy, ctx)
-
-        {:ok, native_definition} =
-          Finalizer.finalize(compiled.semantic, compiled.presentation, diagnostics: diagnostics)
-
-        definition = %Definition{
-          legacy_definition
-          | semantic: native_definition.semantic,
-            semantic_index: native_definition.semantic_index,
-            presentation: native_definition.presentation
-        }
-
-        {:ok, definition, diagnostics}
-
-      {:error, %Diagnostic{} = diagnostic} ->
-        {:error, [diagnostic]}
-    end
+    Shared.compile_compiled_impl(declaration, opts, &compile_object/3)
   end
 
   defp compile_object(%{kind: :object} = declaration, name, ctx) do
@@ -110,7 +73,7 @@ defmodule Formentation.Source.Map do
           origins: presentation_origins
         )
 
-      {:ok, %Compiled{legacy: legacy, semantic: semantic, presentation: presentation}, ctx}
+      {:ok, %Shared.Compiled{legacy: legacy, semantic: semantic, presentation: presentation}, ctx}
     end
   end
 
@@ -236,13 +199,8 @@ defmodule Formentation.Source.Map do
         source_path: ctx.source_path ++ [:properties, name]
     }
 
-    with {:ok, %Compiled{} = compiled, child_ctx} <- compile_object(spec, name, child_ctx) do
-      {:ok,
-       %Compiled{
-         compiled
-         | legacy: %{compiled.legacy | required?: required?},
-           semantic: %{compiled.semantic | required?: required?}
-       }, %{ctx | diagnostics: child_ctx.diagnostics, nodes_left: child_ctx.nodes_left}}
+    with {:ok, %Shared.Compiled{} = compiled, child_ctx} <- compile_object(spec, name, child_ctx) do
+      Shared.require_compiled_object(compiled, child_ctx, ctx, required?)
     end
   end
 
@@ -277,7 +235,7 @@ defmodule Formentation.Source.Map do
         template_path: template_path
       }
 
-      {:ok, %Compiled{legacy: legacy, semantic: semantic, presentation: nil},
+      {:ok, %Shared.Compiled{legacy: legacy, semantic: semantic, presentation: nil},
        %{ctx | diagnostics: [diagnostic | ctx.diagnostics]}}
     end
   end
@@ -358,7 +316,7 @@ defmodule Formentation.Source.Map do
           origins: presentation_origins(origins)
         )
 
-      {:ok, %Compiled{legacy: legacy, semantic: semantic, presentation: presentation}, ctx}
+      {:ok, %Shared.Compiled{legacy: legacy, semantic: semantic, presentation: presentation}, ctx}
     end
   end
 
@@ -473,12 +431,8 @@ defmodule Formentation.Source.Map do
   @semantic_origin_keys [:role, :options, :examples, :default, :read_only]
   @presentation_origin_keys [:label, :widget, :help, :hidden]
 
-  defp semantic_origins(origins), do: filter_origins(origins, @semantic_origin_keys)
-  defp presentation_origins(origins), do: filter_origins(origins, @presentation_origin_keys)
-
-  defp filter_origins(origins, allowed_keys) do
-    Enum.filter(origins, fn {key, _origin} -> key in allowed_keys end)
-  end
+  defp semantic_origins(origins), do: Shared.fact_origins(origins, @semantic_origin_keys)
+  defp presentation_origins(origins), do: Shared.fact_origins(origins, @presentation_origin_keys)
 
   defp attach_groups(children, groups, ctx) do
     Enum.reduce(groups, {children, ctx}, &attach_group/2)
@@ -506,7 +460,7 @@ defmodule Formentation.Source.Map do
        ) do
     {label, label_origin} = group_label(group, ctx.source_path)
 
-    spec = %PresentationGroupSpec{
+    spec = %Shared.PresentationGroupSpec{
       id: id,
       label: label,
       label_origin: label_origin,
@@ -522,7 +476,7 @@ defmodule Formentation.Source.Map do
   defp attach_presentation_group(
          children,
          compiled_children,
-         %PresentationGroupSpec{fields: field_names} = spec,
+         %Shared.PresentationGroupSpec{fields: field_names} = spec,
          template_path
        ) do
     field_names = Enum.uniq(field_names)
@@ -543,7 +497,7 @@ defmodule Formentation.Source.Map do
 
   defp place_presentation_group(
          children,
-         %PresentationGroupSpec{id: id} = spec,
+         %Shared.PresentationGroupSpec{id: id} = spec,
          members,
          template_path
        ) do
@@ -555,16 +509,12 @@ defmodule Formentation.Source.Map do
       )
 
     member_ids = MapSet.new(members, & &1.semantic_id)
-    first_index = Enum.find_index(children, &(presentation_reference_id(&1) in member_ids))
+    first_index = Enum.find_index(children, &(Shared.presentation_reference_id(&1) in member_ids))
 
     children
-    |> Enum.reject(&(presentation_reference_id(&1) in member_ids))
+    |> Enum.reject(&(Shared.presentation_reference_id(&1) in member_ids))
     |> List.insert_at(first_index, group)
   end
-
-  defp presentation_reference_id(%Presentation.Field{semantic_id: semantic_id}), do: semantic_id
-  defp presentation_reference_id(%Presentation.Object{semantic_id: semantic_id}), do: semantic_id
-  defp presentation_reference_id(%Presentation.Group{}), do: nil
 
   defp group_label(%{id: id, title: title}, source_path) when is_binary(title) do
     {title, {:map_source, source_path ++ [:groups, id, :title]}}
