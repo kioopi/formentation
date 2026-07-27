@@ -75,7 +75,7 @@ because a control that blanks itself when the entry is rejected is
 actively hostile. For a read-only field it returns the original data
 regardless of what was submitted
 ([[18-decisions#D-016 — Participation is definition-driven, not transport-driven|D-016]]).
-A path that resolves to no `Node.Field` falls back to Phoenix's ordinary
+A path that resolves to no `Semantic.Field` falls back to Phoenix's ordinary
 params-then-data lookup.
 
 ## Errors — three deliberate constraints
@@ -88,7 +88,7 @@ unconditionally. A pristine form never shows errors even though the state
 layer may already hold issues from initial validation.
 
 **Direct scalar children only.** Each form level projects the issues of
-its own immediate `Node.Field` children. An issue whose path names a
+its own immediate `Semantic.Field` children. An issue whose path names a
 *group* — a missing required nested object, say — is object-level and
 stays out of `form.errors` entirely, because Phoenix's per-field
 convention has nowhere to put it. Those issues are read directly from

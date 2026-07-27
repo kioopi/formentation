@@ -104,7 +104,7 @@ carries a malformed `:ui` map, or is not an object schema. These fire
 **3. Out-of-subset constructs** — `:unsupported_type` (at a property),
 `:unsupported_kind`, `:unsupported_keyword`. Warnings. The declaration is
 valid but says something the pinned subset does not translate. The
-property becomes a `Node.Unsupported` and the rest of the form compiles
+property becomes a `Semantic.Unsupported` and the rest of the form compiles
 around it. `:unsupported_keyword` also covers annotations that are
 recognised but deliberately dropped, such as an explicit null `default`.
 
@@ -226,7 +226,7 @@ is [[phase-2-compiler-diagnostics|Phase 2]] territory.
 | --- | --- | --- |
 | Compile-time diagnostic | `Formentation.Diagnostic` | `lib/formentation/diagnostic.ex` |
 | Runtime issue | `Formentation.Issue` | `lib/formentation/issue.ex` |
-| Origin tag type | `Formentation.Node` | `lib/formentation/node.ex` |
+| Origin struct | `Formentation.Origin` | `lib/formentation/origin.ex` |
 | Guards · policy pass · `origin_entries/1` | `Formentation.Source.Shared` | `lib/formentation/source/shared.ex` |
 | Metaschema translation | `Formentation.JSONSchema.Validator` | `lib/formentation/json_schema/validator.ex` |
 | Projection-time diagnostic | `Formentation.Phoenix.Projector` | `lib/formentation/phoenix/projector.ex` |

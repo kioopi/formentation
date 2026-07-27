@@ -280,7 +280,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
     end
 
     test "unsupported nodes and hidden read-only fields render nothing" do
-      # %{kind: :carousel} compiles to Node.Unsupported with an
+      # %{kind: :carousel} compiles to Semantic.Unsupported with an
       # :unsupported_kind warning (see map_test.exs) — the projector
       # must skip it without schema text leaking into markup.
       definition =
@@ -422,8 +422,8 @@ defmodule Formentation.Phoenix.ProjectorTest do
       # `address` is a plain supported `"type": "object"`. Under D-026
       # (issue #1) a required nested object with no content stays genuinely
       # absent from the candidate, so JSV files the `:required` issue at the
-      # group's own path, ["address"]. That path resolves to a Group, not a
-      # Node.Field and not a Node.Unsupported, so the state view's
+      # object's own path, ["address"]. That path resolves to a Semantic.Object,
+      # not a Semantic.Field and not a Semantic.Unsupported, so the state view's
       # normalized issue folds into the summary unlinked and unlabelled.
       schema = %{
         "type" => "object",
@@ -782,7 +782,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
       # Discriminates against a projector that computes the wrong path for
       # a data-nesting group: Form.show_issues?/2 on :change only answers
       # true when Info.node_at(definition, segments) resolves to the
-      # Node.Field AND its usage is :used. A path missing "address", in
+      # Semantic.Field AND its usage is :used. A path missing "address", in
       # the wrong order, or omitting the group name entirely would miss
       # the node and make this assertion fail.
       #
@@ -971,7 +971,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
       # context built with the wrong (non-absolute) path — see "nested
       # paths reach the state view" above for the same technique. On
       # :change, visibility depends on Info.node_at(definition, segments)
-      # resolving to this exact Node.Field with :used usage; a project_at/3
+      # resolving to this exact Semantic.Field with :used usage; a project_at/3
       # that dropped the parent segments from its path would land on an
       # unknown path and answer :hide instead.
       definition = nested_path_definition()

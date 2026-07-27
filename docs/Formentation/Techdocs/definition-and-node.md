@@ -8,7 +8,7 @@ tags:
 status: current
 ---
 
-# Definition and Node
+# Definition
 
 *As of 2026-07-27 (native semantic/presentation storage for the built-in
 sources and native-backed semantic/presentation query seams, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]).*
@@ -29,8 +29,7 @@ produced.
   semantic_index: %Formentation.Semantic.Index{...},
   presentation: %Formentation.Presentation.Object{...},
   validation: %Formentation.ValidationPlan{} | nil,
-  diagnostics: [%Formentation.Diagnostic{...}],
-  root: %Formentation.Node.Group{...} | nil
+  diagnostics: [%Formentation.Diagnostic{...}]
 }
 ```
 
@@ -52,12 +51,6 @@ supported semantic tree.
 template path. It is derived during finalization and lets runtime consumers
 resolve presentation references without re-walking the semantic tree for every
 field.
-
-`root` is still present as a temporary compatibility tree while the mixed
-representation is being deleted. The built-in map and JSON Schema adapters
-populate both representations during the transition, but native semantic and
-presentation storage are the authoritative structures for the new query seams.
-Native-only definitions can already finalize with `root: nil`.
 
 `validation` is an optional `Formentation.ValidationPlan`
 — an executable module (implementing `Formentation.Validation`) paired
@@ -90,51 +83,12 @@ it exists and resolve semantic IDs through `semantic_index`. Their public
 descriptor contract is unchanged: object and field descriptors expose computed
 semantic `InstancePath`s, and presentation groups expose layout identity only.
 
-## Legacy mixed node structs
-
-The mixed `Formentation.Node.*` structs remain as a compatibility surface until
-the final deletion slice removes `Definition.root`:
-
-```elixir
-%Formentation.Definition{
-  format_version: 3,
-  root: %Formentation.Node.Group{...},
-  semantic: %Formentation.Semantic.Object{...},
-  presentation: %Formentation.Presentation.Object{...},
-  validation: %Formentation.ValidationPlan{} | nil
-}
-```
-
-### One struct per node kind (D-015)
-
-Each node kind is its own struct; the struct name is the tag. The
-shape of each struct documents its invariants — there is no `kind`
-field and no unused-nil fields.
-
-| Struct | Enforced keys | Own fields beyond the shared set |
-| --- | --- | --- |
-| `Node.Field` | `id`, `name`, `value_type`, `template_path` | `role`, `value_type`, `widget`, `group`, `options`, `default`, `examples`, `constraints`, `label`, `help`, `hidden?`, `read_only?` |
-| `Node.Group` | `id`, `template_path`, `nests_data?` | `nests_data?`, `children`, `label`, `help` |
-| `Node.Unsupported` | `id`, `name`, `template_path` | — |
-
-Shared by all kinds: `id`, `name`, `template_path`, `required?`,
-`origins`. `Formentation.Node` itself is a vocabulary module: the
-`t()` union and the `origin()` provenance tag type
-([[diagnostics-and-origins|Diagnostics and origins]]).
-
-The node structs also carry temporary, internal `declaration_order`
-evidence assigned before presentation grouping. It preserves semantic
-declaration order while the mixed tree can still move children beneath
-layout groups. It is not a stable representation contract; the split
-Definition storage work owns its removal.
-
 ## Presentation traversal descriptors
 
 `Formentation.Info.presentation_root/1` and
-`Formentation.Info.presentation_at/2` are the current presentation-query
-seam. They are compatibility queries over the mixed tree, not a second
-stored tree and not the future native presentation storage. They return
-typed descriptors under `Formentation.Info.Presentation`:
+`Formentation.Info.presentation_at/2` are the presentation-query seam.
+They read the native presentation tree and semantic index, then return typed
+descriptors under `Formentation.Info.Presentation`:
 
 - `Object` — root or nested semantic-object layout boundary, carrying a
   normalized `InstancePath`.
@@ -153,7 +107,7 @@ distinguishes `:not_found` from `:unsupported`.
 
 ## Unsupported nodes are a preserve-only capability
 
-`Node.Unsupported` records a declared construct the compiler cannot
+`Semantic.Unsupported` records a declared construct the compiler cannot
 interpret — an array, a `$ref`, an unrecognised map-source `:kind` —
 without discarding it: the node keeps its place in the tree, and its
 value survives materialization untouched (D-009). The struct carries
@@ -163,7 +117,7 @@ were needed to add runtime blocking, only a query.
 
 `Formentation.Info.unsupported_nodes/1` enumerates every unsupported
 node in a definition, in declaration order, descending through
-data-nesting groups and looking through presentation-only groups — the
+semantic objects — the
 *static*, definition-level capability question ("which declared constructs
 can this form never edit?"), answerable before any instance exists and independent of
 whether any concrete instance currently has trouble at that node.
@@ -173,39 +127,23 @@ is a separate, runtime-derived question — see
 
 ## Participation flags (D-016)
 
-`hidden?` and `read_only?` sit on `Node.Field` rather than on any
-runtime structure, which is the whole point of
+`read_only?` sits on `Semantic.Field`, while `hidden?` sits on
+`Presentation.Field`. Neither belongs to runtime form state, which is the
+point of
 [[18-decisions#D-016 — Participation is definition-driven, not transport-driven|D-016]]:
 whether a field participates in a submission is a *declared* fact, not
 something inferred from what the browser happened to send. A hidden
 field decodes normally and merely renders as a hidden input; a
 read-only field is excluded from the replace scope entirely — the
 submitted value is discarded and the original is kept. Both layers
-downstream read these flags rather than re-deriving the intent:
+downstream read these declared facts rather than re-deriving the intent:
 [[form-state-and-transitions|the state layer]] for the decode
 operation, [[rendering|the projector]] for the widget and control
 attributes.
 
-Only groups have `children` — a field is a leaf by construction, and a
-group cannot carry a `value_type`. The splitting rule, recorded in
-[[18-decisions#D-015 — One struct per node kind|D-015]]:
-a kind gets its own struct when its *shape* differs, not when its
-values differ. Scalar fields are one struct; future kinds with new
-shapes (`:collection`, `:choice`) will be new structs.
-
-## The two Group flavors (D-006)
-
-`nests_data?` is an enforced key — every construction site declares
-which flavor it builds:
-
-- **Data-nesting** (`nests_data?: true`): an object-like container; it
-  contributes a segment to instance paths and its `name` is a data key.
-- **Presentational** (`nests_data?: false`): a fieldset over flat data;
-  transparent to instance paths (`Info.node_at/2` looks through it),
-  `name` is `nil`, and its id carries a `#group-id` suffix.
-
-Whether these two flavors deserve separate structs is an open question
-([[16-open-questions|open questions]]).
+Only semantic objects and presentation containers have `children`. A semantic
+field is a leaf by construction, and presentation group membership is layout
+containment, never a field attribute.
 
 ## Related notes
 

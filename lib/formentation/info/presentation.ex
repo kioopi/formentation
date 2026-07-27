@@ -3,11 +3,11 @@ defmodule Formentation.Info.Presentation do
   Typed presentation traversal descriptors returned by `Formentation.Info`.
 
   These structs describe the current layout query contract over a compiled
-  definition. They are descriptors, not stored definition state: the current
-  implementation derives them from the compatibility mixed tree on demand.
+  definition. They are descriptors over native presentation storage, not the
+  stored presentation structs themselves.
   """
 
-  alias Formentation.{Definition, InstancePath, Node, Semantic}
+  alias Formentation.{Definition, InstancePath, Origin, Semantic}
   alias Formentation.Presentation, as: Layout
 
   defmodule Object do
@@ -26,7 +26,7 @@ defmodule Formentation.Info.Presentation do
             semantic_path: InstancePath.t(),
             label: String.t() | nil,
             help: String.t() | nil,
-            origins: [{atom(), Node.origin()}],
+            origins: [{atom(), Origin.t()}],
             children: [Formentation.Info.Presentation.descriptor()]
           }
   end
@@ -43,7 +43,7 @@ defmodule Formentation.Info.Presentation do
             help: String.t() | nil,
             widget: atom() | nil,
             hidden?: boolean(),
-            origins: [{atom(), Node.origin()}]
+            origins: [{atom(), Origin.t()}]
           }
   end
 
@@ -62,7 +62,7 @@ defmodule Formentation.Info.Presentation do
             id: String.t(),
             label: String.t() | nil,
             help: String.t() | nil,
-            origins: [{atom(), Node.origin()}],
+            origins: [{atom(), Origin.t()}],
             children: [Formentation.Info.Presentation.descriptor()]
           }
   end
@@ -75,10 +75,8 @@ defmodule Formentation.Info.Presentation do
     object(root, definition)
   end
 
-  def root(%Definition{} = definition) do
-    definition
-    |> Semantic.root()
-    |> object(definition)
+  def root(%Definition{presentation: nil}) do
+    missing_presentation_storage!()
   end
 
   @spec at(Definition.t(), [InstancePath.segment()]) :: lookup_result()
@@ -92,17 +90,8 @@ defmodule Formentation.Info.Presentation do
     end
   end
 
-  defp descriptor(
-         %Semantic.Entry{kind: :object} = entry,
-         %Definition{presentation: nil} = definition
-       ),
-       do: object(entry, definition)
-
   defp descriptor(%Semantic.Entry{kind: :object} = entry, definition),
     do: definition |> layout_by_semantic_id!(entry.node.id) |> object(definition)
-
-  defp descriptor(%Semantic.Entry{kind: :field} = entry, %Definition{presentation: nil}),
-    do: field(entry)
 
   defp descriptor(%Semantic.Entry{kind: :field} = entry, definition),
     do: definition |> layout_by_semantic_id!(entry.node.id) |> field(definition)
@@ -120,69 +109,11 @@ defmodule Formentation.Info.Presentation do
     }
   end
 
-  defp object(
-         %Semantic.Entry{kind: :object, node: node, instance_path: path} = entry,
-         _definition
-       ) do
-    %Object{
-      semantic_path: path,
-      id: node.id,
-      label: node.label,
-      help: node.help,
-      origins: node.origins,
-      children: object_children(node.children, semantic_index(entry))
-    }
-  end
-
   defp object_children(nodes, %Definition{} = definition) do
     nodes
     |> Enum.map(&layout_descriptor(&1, definition))
     |> Enum.reject(&is_nil/1)
   end
-
-  defp object_children(nodes, semantic_index) do
-    nodes
-    |> Enum.map(&layout_descriptor(&1, semantic_index))
-    |> Enum.reject(&is_nil/1)
-  end
-
-  defp layout_descriptor(%Node.Group{nests_data?: true} = node, semantic_index) do
-    entry = unique_child!(semantic_index, node.name, :object)
-
-    %Object{
-      id: node.id,
-      semantic_path: entry.instance_path,
-      label: node.label,
-      help: node.help,
-      origins: node.origins,
-      children: object_children(node.children, semantic_index(entry))
-    }
-  end
-
-  defp layout_descriptor(%Node.Group{nests_data?: false} = node, semantic_index) do
-    %Group{
-      id: node.id,
-      label: node.label,
-      help: node.help,
-      origins: node.origins,
-      children: object_children(node.children, semantic_index)
-    }
-  end
-
-  defp layout_descriptor(%Node.Field{} = node, semantic_index) do
-    entry = unique_child!(semantic_index, node.name, :field)
-
-    %Field{
-      semantic_path: entry.instance_path,
-      label: node.label,
-      help: node.help,
-      widget: node.widget,
-      hidden?: node.hidden?,
-      origins: node.origins
-    }
-  end
-
-  defp layout_descriptor(%Node.Unsupported{}, _semantic_index), do: nil
 
   defp layout_descriptor(%Layout.Object{} = object, definition), do: object(object, definition)
 
@@ -198,17 +129,6 @@ defmodule Formentation.Info.Presentation do
 
   defp layout_descriptor(%Layout.Field{} = field, definition), do: field(field, definition)
 
-  defp field(%Semantic.Entry{kind: :field, node: node, instance_path: path}) do
-    %Field{
-      semantic_path: path,
-      label: node.label,
-      help: node.help,
-      widget: node.widget,
-      hidden?: node.hidden?,
-      origins: node.origins
-    }
-  end
-
   defp field(%Layout.Field{} = field, definition) do
     entry = semantic_entry_by_id!(definition, field.semantic_id, :field)
 
@@ -223,13 +143,13 @@ defmodule Formentation.Info.Presentation do
   end
 
   defp semantic_entry_by_id!(
-         %Definition{semantic_index: %{by_id: by_id}} = definition,
+         %Definition{semantic_index: %{by_id: by_id}},
          semantic_id,
          expected_kind
        ) do
     case Map.fetch(by_id, semantic_id) do
       {:ok, %{kind: ^expected_kind, node: node}} ->
-        Semantic.find(definition, node.template_path.segments)
+        semantic_entry(expected_kind, node)
 
       {:ok, %{kind: found_kind, node: node}} ->
         wrong_kind_reference!(node.template_path.segments, expected_kind, found_kind)
@@ -241,11 +161,29 @@ defmodule Formentation.Info.Presentation do
     end
   end
 
+  defp semantic_entry(kind, %{name: name, template_path: template_path} = node) do
+    %Semantic.Entry{
+      kind: kind,
+      name: name,
+      node: node,
+      instance_path: InstancePath.new!(template_path.segments),
+      template_path: template_path
+    }
+  end
+
   defp layout_by_semantic_id!(%Definition{presentation: %Layout.Object{} = root}, semantic_id) do
     find_layout_by_semantic_id(root, semantic_id) ||
       raise ArgumentError,
             "invalid presentation reference #{inspect(semantic_id)}: expected exactly one " <>
               "presentation descriptor, found none"
+  end
+
+  defp layout_by_semantic_id!(%Definition{presentation: nil}, _semantic_id) do
+    missing_presentation_storage!()
+  end
+
+  defp missing_presentation_storage! do
+    raise ArgumentError, "invalid presentation query: definition has no presentation storage"
   end
 
   defp find_layout_by_semantic_id(%Layout.Object{semantic_id: semantic_id} = object, semantic_id),
@@ -273,47 +211,14 @@ defmodule Formentation.Info.Presentation do
       :not_found -> {:error, :not_found}
       {:ok, %Semantic.Entry{kind: :unsupported}} -> {:error, :unsupported}
       {:ok, %Semantic.Entry{} = entry} -> {:ok, entry}
-      {:ambiguous, count} -> ambiguous_reference!(segments, count, nil)
+      {:ambiguous, count} -> ambiguous_reference!(segments, count)
     end
   end
 
-  defp semantic_index(%Semantic.Entry{kind: :object} = entry) do
-    entry
-    |> Semantic.direct_children()
-    |> Enum.group_by(& &1.name)
-  end
-
-  defp unique_child!(semantic_index, name, expected_kind) do
-    case Map.get(semantic_index, name, []) do
-      [%Semantic.Entry{kind: ^expected_kind} = entry] ->
-        entry
-
-      [%Semantic.Entry{kind: found_kind, instance_path: path}] ->
-        wrong_kind_reference!(path.segments, expected_kind, found_kind)
-
-      matches ->
-        path =
-          matches
-          |> List.first()
-          |> semantic_path_for_error(name)
-
-        ambiguous_reference!(path, length(matches), expected_kind)
-    end
-  end
-
-  defp semantic_path_for_error(nil, name), do: [name]
-  defp semantic_path_for_error(%Semantic.Entry{instance_path: path}, _name), do: path.segments
-
-  defp ambiguous_reference!(segments, count, expected_kind) do
-    expected =
-      case expected_kind do
-        nil -> "one semantic occurrence"
-        kind -> "one #{kind} occurrence"
-      end
-
+  defp ambiguous_reference!(segments, count) do
     raise ArgumentError,
           "invalid presentation reference #{inspect(segments)}: expected exactly " <>
-            "#{expected}, found #{count}"
+            "one semantic occurrence, found #{count}"
   end
 
   defp wrong_kind_reference!(segments, expected_kind, found_kind) do

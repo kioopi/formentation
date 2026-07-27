@@ -7,8 +7,8 @@ defmodule Formentation.Info do
   Semantic queries such as `fields/1`, `node_at/2`, `required?/2`, and
   unsupported-node enumeration are transparent to presentation-only groups
   and use semantic declaration order, which can differ from layout order.
-  `root/1` and `node/2` remain compatibility access to the current mixed
-  tree until the definition storage split lands.
+  `root/1` and `node/2` expose native semantic and presentation storage
+  without making callers pattern match definition internals.
 
   ## Example
 
@@ -23,19 +23,15 @@ defmodule Formentation.Info do
       false
   """
 
-  alias Formentation.{Definition, Diagnostic, InstancePath, Node, Semantic}
+  alias Formentation.{Definition, Diagnostic, InstancePath, Origin, Semantic}
   alias Formentation.Info.Presentation
 
-  @doc "The root group of the definition tree."
-  @spec root(Definition.t()) :: Node.t()
-  def root(%Definition{root: root}), do: root
+  @doc "The root semantic object of the definition tree."
+  @spec root(Definition.t()) :: Semantic.Object.t()
+  def root(%Definition{semantic: root}), do: root
 
   @doc "Every scalar field, in semantic declaration order independent of presentation layout."
-  @spec fields(Definition.t()) :: [Semantic.Field.t() | Node.Field.t()]
-  def fields(%Definition{root: %Node.Group{} = root}) do
-    %Definition{root: root} |> Semantic.fields() |> Enum.map(& &1.node)
-  end
-
+  @spec fields(Definition.t()) :: [Semantic.Field.t()]
   def fields(%Definition{} = definition) do
     definition |> Semantic.fields() |> Enum.map(& &1.node)
   end
@@ -57,21 +53,15 @@ defmodule Formentation.Info do
       iex> definition |> Formentation.Info.unsupported_nodes() |> Enum.map(& &1.name)
       ["attachment"]
   """
-  @spec unsupported_nodes(Definition.t()) :: [Semantic.Unsupported.t() | Node.Unsupported.t()]
+  @spec unsupported_nodes(Definition.t()) :: [Semantic.Unsupported.t()]
   def unsupported_nodes(%Definition{} = definition) do
     definition |> unsupported_nodes_with_paths() |> Enum.map(fn {_path, node} -> node end)
   end
 
   @doc false
   @spec unsupported_nodes_with_paths(Definition.t()) :: [
-          {InstancePath.t(), Semantic.Unsupported.t() | Node.Unsupported.t()}
+          {InstancePath.t(), Semantic.Unsupported.t()}
         ]
-  def unsupported_nodes_with_paths(%Definition{root: %Node.Group{} = root}) do
-    %Definition{root: root}
-    |> Semantic.unsupported()
-    |> Enum.map(fn entry -> {entry.instance_path, entry.node} end)
-  end
-
   def unsupported_nodes_with_paths(%Definition{} = definition) do
     definition
     |> Semantic.unsupported()
@@ -79,12 +69,27 @@ defmodule Formentation.Info do
   end
 
   @doc """
-  The node with the given ID (`Formentation.NodeId` vocabulary), or
-  `nil` when no node carries it.
+  The semantic or presentation node with the given ID, or `nil` when no node
+  carries it.
+
+  Semantic IDs are resolved through the definition's semantic index first.
+  Presentation layout IDs are resolved only when no semantic occurrence uses
+  the same ID.
   """
-  @spec node(Definition.t(), String.t()) :: Node.t() | nil
-  def node(%Definition{root: root}, id) when is_binary(id) do
-    root |> walk() |> Enum.find(&(&1.id == id))
+  @spec node(Definition.t(), String.t()) ::
+          Semantic.Object.t()
+          | Semantic.Field.t()
+          | Semantic.Unsupported.t()
+          | Formentation.Presentation.Object.t()
+          | Formentation.Presentation.Field.t()
+          | Formentation.Presentation.Group.t()
+          | nil
+  def node(%Definition{semantic_index: %{by_id: by_id}, presentation: presentation}, id)
+      when is_binary(id) do
+    case Map.fetch(by_id, id) do
+      {:ok, %{node: node}} -> node
+      :error -> find_presentation_node(presentation, id)
+    end
   end
 
   @doc """
@@ -93,16 +98,7 @@ defmodule Formentation.Info do
   `ArgumentError` on invalid segments.
   """
   @spec node_at(Definition.t(), [InstancePath.segment()]) ::
-          Semantic.Object.t() | Semantic.Field.t() | Semantic.Unsupported.t() | Node.t() | nil
-  def node_at(%Definition{root: %Node.Group{} = root}, segments) when is_list(segments) do
-    %InstancePath{segments: segments} = InstancePath.new!(segments)
-
-    case Semantic.find(%Definition{root: root}, segments) do
-      nil -> nil
-      entry -> entry.node
-    end
-  end
-
+          Semantic.Object.t() | Semantic.Field.t() | Semantic.Unsupported.t() | nil
   def node_at(%Definition{} = definition, segments) when is_list(segments) do
     %InstancePath{segments: segments} = InstancePath.new!(segments)
 
@@ -134,7 +130,9 @@ defmodule Formentation.Info do
   end
 
   @doc false
-  @spec semantic_node_index(Definition.t()) :: %{InstancePath.t() => Node.t()}
+  @spec semantic_node_index(Definition.t()) :: %{
+          InstancePath.t() => Semantic.Object.t() | Semantic.Field.t() | Semantic.Unsupported.t()
+        }
   def semantic_node_index(%Definition{} = definition) do
     definition
     |> Semantic.root()
@@ -187,14 +185,29 @@ defmodule Formentation.Info do
   def diagnostics(%Definition{diagnostics: diagnostics}), do: diagnostics
 
   @doc """
-  The provenance list of the node at `path` — `[]` when the path names
-  nothing.
+  The merged semantic and presentation provenance for the occurrence at
+  `path` — `[]` when the path names nothing.
+
+  Semantic facts and presentation facts intentionally live on separate stored
+  nodes. This query returns one list for callers that care about the public
+  fact surface rather than the storage boundary; presentation-origin keys
+  override semantic-origin keys if the same key appears on both sides.
   """
-  @spec origins(Definition.t(), [InstancePath.segment()]) :: [{atom(), Node.origin()}]
+  @spec origins(Definition.t(), [InstancePath.segment()]) :: [{atom(), Origin.t()}]
   def origins(definition, path) do
     case node_at(definition, path) do
       nil -> []
-      node -> node.origins
+      node -> Keyword.merge(node.origins, presentation_origins(definition, path))
+    end
+  end
+
+  defp presentation_origins(%Definition{presentation: nil}, _path), do: []
+
+  defp presentation_origins(definition, path) do
+    case Presentation.at(definition, path) do
+      {:ok, descriptor} -> descriptor.origins
+      :unsupported -> []
+      :not_found -> []
     end
   end
 
@@ -206,7 +219,6 @@ defmodule Formentation.Info do
   def role(definition, path) do
     case node_at(definition, path) do
       %Semantic.Field{role: role} -> role
-      %Node.Field{role: role} -> role
       _group_unsupported_or_missing -> nil
     end
   end
@@ -217,9 +229,13 @@ defmodule Formentation.Info do
     match?(%{required?: true}, node_at(definition, path))
   end
 
-  defp walk(%Node.Group{children: children} = node) do
-    [node | Enum.flat_map(children, &walk/1)]
+  defp find_presentation_node(nil, _id), do: nil
+
+  defp find_presentation_node(%{id: id} = node, id), do: node
+
+  defp find_presentation_node(%{children: children}, id) do
+    Enum.find_value(children, &find_presentation_node(&1, id))
   end
 
-  defp walk(leaf), do: [leaf]
+  defp find_presentation_node(_leaf, _id), do: nil
 end

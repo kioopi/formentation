@@ -103,7 +103,7 @@ delete the other half.
 
 > [!important] Unsupported declarations are preserve-only, not editable
 > A property with an unrecognised `:kind` compiles to
-> `Formentation.Node.Unsupported`. Its original value survives every
+> `Formentation.Semantic.Unsupported`. Its original value survives every
 > replace transition untouched — the preservation path that keeps an
 > edit form from silently deleting data it cannot represent — but the
 > form can never decode, replace, or render it, and submitted params for
@@ -277,7 +277,9 @@ payload, and a nested object when the data really is nested.
 
 The group node takes the position of its **first member** in render
 order, and the members move with it. A member name that does not exist
-produces an `:unknown_group_field` warning and is ignored.
+produces an `:unknown_group_field` warning and is ignored. Preserve-only
+unsupported properties remain in the semantic definition, but they do not
+create renderable group members.
 
 ## Reading diagnostics
 

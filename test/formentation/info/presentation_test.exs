@@ -1,9 +1,10 @@
 defmodule Formentation.Info.PresentationTest do
   use ExUnit.Case, async: true
 
-  alias Formentation.Info
+  alias Formentation.{Definition, Info, TemplatePath}
   alias Formentation.Info.Presentation
-  alias Formentation.Node
+  alias Formentation.Presentation, as: Layout
+  alias Formentation.Semantic
 
   defp compile!(declaration) do
     {:ok, definition, _diagnostics} =
@@ -15,6 +16,14 @@ defmodule Formentation.Info.PresentationTest do
   defp paths(%Presentation.Object{children: children}), do: Enum.flat_map(children, &paths/1)
   defp paths(%Presentation.Group{children: children}), do: Enum.flat_map(children, &paths/1)
   defp paths(%Presentation.Field{semantic_path: path}), do: [path.segments]
+
+  defp malformed_definition(semantic, presentation, by_id \\ %{}) do
+    %Definition{
+      semantic: semantic,
+      semantic_index: %Semantic.Index{by_id: by_id},
+      presentation: presentation
+    }
+  end
 
   test "ungrouped root layout follows declaration order and is deterministic" do
     definition =
@@ -127,7 +136,7 @@ defmodule Formentation.Info.PresentationTest do
               hidden?: true
             }} = Info.presentation_at(definition, ["mode"])
 
-    assert %Node.Field{options: ["auto", "manual"], read_only?: true, value_type: :string} =
+    assert %Semantic.Field{options: ["auto", "manual"], read_only?: true, value_type: :string} =
              Info.node_at(definition, ["mode"])
   end
 
@@ -156,11 +165,11 @@ defmodule Formentation.Info.PresentationTest do
            ]
 
     for {:object, path} <- refs do
-      assert match?(%Node.Group{}, Info.node_at(definition, path))
+      assert match?(%Semantic.Object{}, Info.node_at(definition, path))
     end
 
     for {:field, path} <- refs do
-      assert match?(%Node.Field{}, Info.node_at(definition, path))
+      assert match?(%Semantic.Field{}, Info.node_at(definition, path))
     end
   end
 
@@ -196,6 +205,115 @@ defmodule Formentation.Info.PresentationTest do
     assert Info.presentation_at(definition, ["details", "attachment"]) == :unsupported
     assert Info.presentation_at(definition, ["main"]) == :not_found
     assert Info.presentation_at(definition, ["details", "technical"]) == :not_found
+  end
+
+  test "presentation_root/1 raises when the root semantic reference has the wrong kind" do
+    semantic = Semantic.Object.new(nil, %TemplatePath{segments: []}, [])
+    presentation = Layout.Object.new("/", [])
+
+    definition =
+      malformed_definition(semantic, presentation, %{
+        "/" => %{kind: :field, node: semantic}
+      })
+
+    assert_raise ArgumentError,
+                 ~r/invalid presentation reference \[\]: expected a object occurrence, found field/,
+                 fn ->
+                   Info.presentation_root(definition)
+                 end
+  end
+
+  test "presentation_root/1 raises when the root semantic reference is missing" do
+    semantic = Semantic.Object.new(nil, %TemplatePath{segments: []}, [])
+    presentation = Layout.Object.new("/", [])
+    definition = malformed_definition(semantic, presentation)
+
+    assert_raise ArgumentError,
+                 ~r/invalid presentation reference "\/": expected a object occurrence, found none/,
+                 fn ->
+                   Info.presentation_root(definition)
+                 end
+  end
+
+  test "presentation_root/1 raises clearly when presentation storage is missing" do
+    definition =
+      malformed_definition(Semantic.Object.new(nil, %TemplatePath{segments: []}, []), nil)
+
+    assert_raise ArgumentError,
+                 "invalid presentation query: definition has no presentation storage",
+                 fn ->
+                   Info.presentation_root(definition)
+                 end
+  end
+
+  test "presentation_at/2 raises when a semantic occurrence has no layout descriptor" do
+    field = Semantic.Field.new("name", %TemplatePath{segments: ["name"]}, :string)
+    semantic = Semantic.Object.new(nil, %TemplatePath{segments: []}, [field])
+    presentation = Layout.Object.new("/", [])
+
+    definition =
+      malformed_definition(semantic, presentation, %{
+        "/" => %{kind: :object, node: semantic},
+        "/name" => %{kind: :field, node: field}
+      })
+
+    assert_raise ArgumentError,
+                 ~r/invalid presentation reference "\/name": expected exactly one presentation descriptor, found none/,
+                 fn ->
+                   Info.presentation_at(definition, ["name"])
+                 end
+  end
+
+  test "presentation_at/2 raises clearly when presentation storage is missing" do
+    field = Semantic.Field.new("name", %TemplatePath{segments: ["name"]}, :string)
+
+    definition =
+      malformed_definition(
+        Semantic.Object.new(nil, %TemplatePath{segments: []}, [field]),
+        nil,
+        %{"/name" => %{kind: :field, node: field}}
+      )
+
+    assert_raise ArgumentError,
+                 "invalid presentation query: definition has no presentation storage",
+                 fn ->
+                   Info.presentation_at(definition, ["name"])
+                 end
+  end
+
+  test "presentation_root/1 builds semantic paths from the semantic index entry" do
+    semantic = Semantic.Object.new(nil, %TemplatePath{segments: []}, [])
+    field = Semantic.Field.new("name", %TemplatePath{segments: ["name"]}, :string)
+
+    definition =
+      malformed_definition(
+        semantic,
+        Layout.Object.new("/", [Layout.Field.new("/name")]),
+        %{
+          "/" => %{kind: :object, node: semantic},
+          "/name" => %{kind: :field, node: field}
+        }
+      )
+
+    assert %Presentation.Object{
+             children: [%Presentation.Field{semantic_path: %{segments: ["name"]}}]
+           } = Info.presentation_root(definition)
+  end
+
+  test "presentation_at/2 raises on ambiguous hand-built semantic paths" do
+    semantic =
+      Semantic.Object.new(nil, %TemplatePath{segments: []}, [
+        Semantic.Field.new("name", %TemplatePath{segments: ["name"]}, :string),
+        Semantic.Field.new("name", %TemplatePath{segments: ["name"]}, :string, id: "/other-name")
+      ])
+
+    definition = malformed_definition(semantic, Layout.Object.new("/", []))
+
+    assert_raise ArgumentError,
+                 ~r/invalid presentation reference \["name"\]: expected exactly one semantic occurrence, found 2/,
+                 fn ->
+                   Info.presentation_at(definition, ["name"])
+                 end
   end
 
   defp collect_refs(%Presentation.Object{semantic_path: path, children: children}) do

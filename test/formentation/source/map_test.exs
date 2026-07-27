@@ -1,7 +1,8 @@
 defmodule Formentation.Source.MapTest do
   use ExUnit.Case, async: true
 
-  alias Formentation.{Info, Node, Presentation, Semantic, TemplatePath}
+  alias Formentation.{Info, Presentation, Semantic, TemplatePath}
+  alias Formentation.Info.Presentation, as: PresentationInfo
 
   defp compile!(declaration, opts \\ []) do
     {:ok, definition, _diagnostics} =
@@ -14,8 +15,8 @@ defmodule Formentation.Source.MapTest do
     test "compiles a root object with one string field" do
       definition = compile!(%{kind: :object, properties: [{"name", %{kind: :string}}]})
 
-      assert %Node.Group{nests_data?: true, id: "/"} = Info.root(definition)
-      assert [%Node.Field{name: "name", id: "/name"}] = Info.fields(definition)
+      assert %Semantic.Object{id: "/"} = Info.root(definition)
+      assert [%Semantic.Field{name: "name", id: "/name"}] = Info.fields(definition)
       assert Info.diagnostics(definition) == []
     end
 
@@ -52,15 +53,15 @@ defmodule Formentation.Source.MapTest do
     test "node/2 finds nodes by id and node_at/2 by instance path" do
       definition = compile!(%{kind: :object, properties: [{"name", %{kind: :string}}]})
 
-      assert %Node.Field{name: "name"} = Info.node(definition, "/name")
-      assert %Node.Field{name: "name"} = Info.node_at(definition, ["name"])
+      assert %Semantic.Field{name: "name"} = Info.node(definition, "/name")
+      assert %Semantic.Field{name: "name"} = Info.node_at(definition, ["name"])
       assert Info.node_at(definition, ["missing"]) == nil
     end
 
     test "field template paths record the property position" do
       definition = compile!(%{kind: :object, properties: [{"name", %{kind: :string}}]})
 
-      assert %Node.Field{template_path: %Formentation.TemplatePath{segments: ["name"]}} =
+      assert %Semantic.Field{template_path: %Formentation.TemplatePath{segments: ["name"]}} =
                Info.node_at(definition, ["name"])
     end
   end
@@ -74,8 +75,11 @@ defmodule Formentation.Source.MapTest do
           properties: [{"serial_number", %{kind: :string, title: "Serial number"}}]
         })
 
-      assert %Node.Group{label: "Pump inspection"} = Info.root(definition)
-      assert %Node.Field{label: "Serial number"} = Info.node_at(definition, ["serial_number"])
+      assert %PresentationInfo.Object{label: "Pump inspection"} =
+               Info.presentation_root(definition)
+
+      assert {:ok, %PresentationInfo.Field{label: "Serial number"}} =
+               Info.presentation_at(definition, ["serial_number"])
 
       assert Info.origins(definition, ["serial_number"])[:label] ==
                {:map_source, [:properties, "serial_number", :title]}
@@ -85,7 +89,9 @@ defmodule Formentation.Source.MapTest do
       definition =
         compile!(%{kind: :object, properties: [{"serial_number", %{kind: :string}}]})
 
-      assert %Node.Field{label: "Serial number"} = Info.node_at(definition, ["serial_number"])
+      assert {:ok, %PresentationInfo.Field{label: "Serial number"}} =
+               Info.presentation_at(definition, ["serial_number"])
+
       assert Info.origins(definition, ["serial_number"])[:label] == {:inference, :label_from_name}
     end
 
@@ -101,7 +107,9 @@ defmodule Formentation.Source.MapTest do
           properties: [{"serial_number", %{kind: :string, title: nil}}]
         })
 
-      assert %Node.Field{label: "Serial number"} = Info.node_at(definition, ["serial_number"])
+      assert {:ok, %PresentationInfo.Field{label: "Serial number"}} =
+               Info.presentation_at(definition, ["serial_number"])
+
       assert Info.origins(definition, ["serial_number"])[:label] == {:inference, :label_from_name}
     end
   end
@@ -179,11 +187,11 @@ defmodule Formentation.Source.MapTest do
             {"when", :string},
             {"choice", :string}
           ] do
-        assert %Formentation.Node.Field{value_type: ^expected} =
+        assert %Formentation.Semantic.Field{value_type: ^expected} =
                  Formentation.Info.node_at(definition, [name])
       end
 
-      assert %Formentation.Node.Group{} = Formentation.Info.root(definition)
+      assert %Formentation.Semantic.Object{} = Formentation.Info.root(definition)
     end
   end
 
@@ -215,7 +223,7 @@ defmodule Formentation.Source.MapTest do
           ]
         })
 
-      assert %Node.Field{options: ["good", "worn", "defective"]} =
+      assert %Semantic.Field{options: ["good", "worn", "defective"]} =
                Info.node_at(definition, ["condition"])
 
       assert Info.role(definition, ["condition"]) == :select
@@ -242,7 +250,7 @@ defmodule Formentation.Source.MapTest do
           properties: [{"condition", %{kind: :string, one_of: nil}}]
         })
 
-      assert %Node.Field{options: nil} = Info.node_at(definition, ["condition"])
+      assert %Semantic.Field{options: nil} = Info.node_at(definition, ["condition"])
       assert Info.role(definition, ["condition"]) == :text
       assert Info.origins(definition, ["condition"])[:role] == {:inference, :string_default}
       assert Info.origins(definition, ["condition"])[:options] == nil
@@ -259,8 +267,9 @@ defmodule Formentation.Source.MapTest do
           ]
         })
 
-      assert %Node.Field{widget: :textarea, help: "Visible to all technicians."} =
-               Info.node_at(definition, ["notes"])
+      assert {:ok,
+              %PresentationInfo.Field{widget: :textarea, help: "Visible to all technicians."}} =
+               Info.presentation_at(definition, ["notes"])
 
       origins = Info.origins(definition, ["notes"])
       assert origins[:widget] == {:map_source, [:properties, "notes", :widget]}
@@ -350,17 +359,21 @@ defmodule Formentation.Source.MapTest do
     test "a group nests members in markup position without nesting data" do
       definition = compile!(grouped_declaration())
 
-      assert [%Node.Field{name: "serial_number"}, group, %Node.Field{name: "notes"}] =
-               Info.root(definition).children
+      assert [
+               %PresentationInfo.Field{semantic_path: %{segments: ["serial_number"]}},
+               group,
+               %PresentationInfo.Field{semantic_path: %{segments: ["notes"]}}
+             ] =
+               Info.presentation_root(definition).children
 
-      assert %Node.Group{
-               nests_data?: false,
+      assert %PresentationInfo.Group{
                id: "/#electrical",
                label: "Electrical",
-               children: [%Node.Field{name: "voltage"}, %Node.Field{name: "insulation_ok"}]
+               children: [
+                 %PresentationInfo.Field{semantic_path: %{segments: ["voltage"]}},
+                 %PresentationInfo.Field{semantic_path: %{segments: ["insulation_ok"]}}
+               ]
              } = group
-
-      assert group.template_path.segments == []
     end
 
     test "native presentation groups only rearrange layout children" do
@@ -394,7 +407,8 @@ defmodule Formentation.Source.MapTest do
     test "members stay reachable by flat instance path and know their group" do
       definition = compile!(grouped_declaration())
 
-      assert %Node.Field{group: "electrical"} = Info.node_at(definition, ["voltage"])
+      assert %Semantic.Field{} = Info.node_at(definition, ["voltage"])
+      assert {:ok, %PresentationInfo.Field{}} = Info.presentation_at(definition, ["voltage"])
       assert Info.node_at(definition, ["voltage"]).id == "/voltage"
     end
 
@@ -412,8 +426,8 @@ defmodule Formentation.Source.MapTest do
 
       definition = compile!(declaration)
 
-      assert %Node.Group{children: children} = Info.node(definition, "/#g")
-      assert Enum.map(children, & &1.name) == ["c", "a"]
+      assert %Presentation.Group{children: children} = Info.node(definition, "/#g")
+      assert Enum.map(children, & &1.semantic_id) == ["/c", "/a"]
 
       assert Enum.map(Info.fields(definition), & &1.name) == ["a", "b", "c", "d"]
     end
@@ -429,6 +443,74 @@ defmodule Formentation.Source.MapTest do
 
       assert [%Formentation.Diagnostic{severity: :warning, code: :unknown_group_field}] =
                Info.diagnostics(definition)
+    end
+
+    test "overlapping groups warn about already consumed members and keep a usable definition" do
+      declaration = %{
+        kind: :object,
+        properties: [
+          {"a", %{kind: :string}},
+          {"b", %{kind: :string}},
+          {"c", %{kind: :string}}
+        ],
+        groups: [
+          %{id: "one", fields: ["a", "b"]},
+          %{id: "two", fields: ["b", "c"]}
+        ]
+      }
+
+      {:ok, definition, diagnostics} =
+        Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
+      assert [
+               %Formentation.Diagnostic{
+                 severity: :warning,
+                 code: :unknown_group_field,
+                 message: ~s(group "two" references unknown field "b")
+               }
+             ] = diagnostics
+
+      assert [
+               %PresentationInfo.Group{
+                 id: "/#one",
+                 children: [
+                   %PresentationInfo.Field{semantic_path: %{segments: ["a"]}},
+                   %PresentationInfo.Field{semantic_path: %{segments: ["b"]}}
+                 ]
+               },
+               %PresentationInfo.Group{
+                 id: "/#two",
+                 children: [%PresentationInfo.Field{semantic_path: %{segments: ["c"]}}]
+               }
+             ] = Info.presentation_root(definition).children
+    end
+
+    test "an overlapping group with no remaining members only warns" do
+      declaration = %{
+        kind: :object,
+        properties: [
+          {"a", %{kind: :string}},
+          {"b", %{kind: :string}}
+        ],
+        groups: [
+          %{id: "one", fields: ["a", "b"]},
+          %{id: "two", fields: ["b"]}
+        ]
+      }
+
+      {:ok, definition, diagnostics} =
+        Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
+      assert [
+               %Formentation.Diagnostic{
+                 severity: :warning,
+                 code: :unknown_group_field,
+                 message: ~s(group "two" references unknown field "b")
+               }
+             ] = diagnostics
+
+      assert [%PresentationInfo.Group{id: "/#one"}] = Info.presentation_root(definition).children
+      assert Info.node(definition, "/#two") == nil
     end
 
     test "a group naming a known unsupported occurrence does not create a presentation reference" do
@@ -480,7 +562,7 @@ defmodule Formentation.Source.MapTest do
 
       definition = compile!(declaration)
 
-      assert [%Node.Field{name: "serial_number"}] = Info.root(definition).children
+      assert [%Semantic.Field{name: "serial_number"}] = Info.root(definition).children
       assert Info.node(definition, "/#electrical") == nil
 
       assert [
@@ -502,8 +584,10 @@ defmodule Formentation.Source.MapTest do
 
       definition = compile!(declaration)
 
-      assert [%Node.Group{id: "/#electrical"}, %Node.Field{name: "notes"}] =
-               Info.root(definition).children
+      assert [
+               %PresentationInfo.Group{id: "/#electrical"},
+               %PresentationInfo.Field{semantic_path: %{segments: ["notes"]}}
+             ] = Info.presentation_root(definition).children
     end
 
     test "non-adjacent members gather at the first member's position" do
@@ -535,7 +619,7 @@ defmodule Formentation.Source.MapTest do
       definition = compile!(declaration)
 
       group = Info.node(definition, "/#electrical")
-      assert %Node.Group{label: nil} = group
+      assert %Presentation.Group{label: nil} = group
       refute Keyword.has_key?(group.origins, :label)
     end
 
@@ -556,10 +640,12 @@ defmodule Formentation.Source.MapTest do
 
       definition = compile!(declaration)
 
-      assert [%Node.Group{id: "/#electrical"}, %Node.Group{id: "/#size"}] =
-               Info.root(definition).children
+      assert [%PresentationInfo.Group{id: "/#electrical"}, %PresentationInfo.Group{id: "/#size"}] =
+               Info.presentation_root(definition).children
 
-      assert Info.node_at(definition, ["width"]).group == "size"
+      assert {:ok, %PresentationInfo.Field{semantic_path: %{segments: ["width"]}}} =
+               Info.presentation_at(definition, ["width"])
+
       assert Info.diagnostics(definition) == []
     end
 
@@ -572,7 +658,9 @@ defmodule Formentation.Source.MapTest do
 
       definition = compile!(declaration)
 
-      assert %Node.Group{children: [%Node.Field{name: "a"}]} = Info.node(definition, "/#g")
+      assert %Presentation.Group{children: [%Presentation.Field{semantic_id: "/a"}]} =
+               Info.node(definition, "/#g")
+
       assert Enum.map(Info.fields(definition), & &1.name) == ["a"]
     end
 
@@ -588,8 +676,8 @@ defmodule Formentation.Source.MapTest do
 
       definition = compile!(declaration)
 
-      assert %Node.Group{children: children} = Info.node(definition, "/#g")
-      assert Enum.map(children, & &1.name) == ["c", "a"]
+      assert %Presentation.Group{children: children} = Info.node(definition, "/#g")
+      assert Enum.map(children, & &1.semantic_id) == ["/c", "/a"]
     end
 
     test "a group naming a nested object member places it unstamped" do
@@ -605,8 +693,8 @@ defmodule Formentation.Source.MapTest do
       definition = compile!(declaration)
 
       assert Info.diagnostics(definition) == []
-      assert %Node.Field{group: "electrical"} = Info.node_at(definition, ["voltage"])
-      assert %Node.Group{nests_data?: true} = Info.node_at(definition, ["dimensions"])
+      assert %Semantic.Field{} = Info.node_at(definition, ["voltage"])
+      assert %Semantic.Object{} = Info.node_at(definition, ["dimensions"])
     end
 
     test "semantic order is independent at root and nested object boundaries" do
@@ -631,18 +719,19 @@ defmodule Formentation.Source.MapTest do
 
       definition = compile!(declaration)
 
-      assert %Node.Group{children: root_group_children} = Info.node(definition, "/#main")
-      assert Enum.map(root_group_children, & &1.name) == ["dimensions", "title"]
+      assert %Presentation.Group{children: root_group_children} = Info.node(definition, "/#main")
+      assert Enum.map(root_group_children, & &1.semantic_id) == ["/dimensions", "/title"]
 
-      assert %Node.Group{children: nested_group_children} =
+      assert %Presentation.Group{children: nested_group_children} =
                Info.node(definition, "/dimensions#size")
 
-      assert Enum.map(nested_group_children, & &1.name) == ["height", "width"]
+      assert Enum.map(nested_group_children, & &1.semantic_id) ==
+               ["/dimensions/height", "/dimensions/width"]
 
       assert Enum.map(Info.fields(definition), & &1.name) ==
                ["title", "width", "depth", "height", "notes"]
 
-      assert %Node.Field{} = Info.node_at(definition, ["dimensions", "width"])
+      assert %Semantic.Field{} = Info.node_at(definition, ["dimensions", "width"])
       assert Info.node_at(definition, ["main", "dimensions", "width"]) == nil
       assert Info.node_at(definition, ["dimensions", "size", "width"]) == nil
     end
@@ -667,10 +756,13 @@ defmodule Formentation.Source.MapTest do
           ]
         })
 
-      assert %Node.Group{nests_data?: true, id: "/dimensions", label: "Dimensions"} =
+      assert %Semantic.Object{id: "/dimensions"} =
                Info.node_at(definition, ["dimensions"])
 
-      assert %Node.Field{id: "/dimensions/width", role: :integer} =
+      assert {:ok, %PresentationInfo.Object{label: "Dimensions"}} =
+               Info.presentation_at(definition, ["dimensions"])
+
+      assert %Semantic.Field{id: "/dimensions/width", role: :integer} =
                Info.node_at(definition, ["dimensions", "width"])
 
       assert Info.required?(definition, ["dimensions", "width"]) == true
@@ -697,10 +789,10 @@ defmodule Formentation.Source.MapTest do
           ]
         })
 
-      assert %Node.Group{nests_data?: false, id: "/dimensions#size"} =
+      assert %Presentation.Group{id: "/dimensions#size"} =
                Info.node(definition, "/dimensions#size")
 
-      assert %Node.Field{group: "size", id: "/dimensions/width"} =
+      assert %Semantic.Field{id: "/dimensions/width"} =
                Info.node_at(definition, ["dimensions", "width"])
     end
 
@@ -836,7 +928,7 @@ defmodule Formentation.Source.MapTest do
                diagnostics
 
       assert diagnostics == Info.diagnostics(definition)
-      assert %Node.Unsupported{name: "gadget"} = Info.node_at(definition, ["gadget"])
+      assert %Semantic.Unsupported{name: "gadget"} = Info.node_at(definition, ["gadget"])
       assert Enum.map(Info.fields(definition), & &1.name) == ["notes"]
     end
 
@@ -850,7 +942,7 @@ defmodule Formentation.Source.MapTest do
       {:ok, definition, _diagnostics} =
         Formentation.compile(declaration, adapter: Formentation.Source.Map)
 
-      assert %Node.Unsupported{required?: true} = Info.node_at(definition, ["gadget"])
+      assert %Semantic.Unsupported{required?: true} = Info.node_at(definition, ["gadget"])
     end
   end
 
@@ -880,7 +972,7 @@ defmodule Formentation.Source.MapTest do
           ]
         })
 
-      assert %Node.Field{examples: ["J. Doe"], default: "unassigned"} =
+      assert %Semantic.Field{examples: ["J. Doe"], default: "unassigned"} =
                Info.node_at(definition, ["reviewed_by"])
 
       origins = Info.origins(definition, ["reviewed_by"])
@@ -892,7 +984,7 @@ defmodule Formentation.Source.MapTest do
     test "absent examples and default stay nil without origin entries" do
       definition = compile!(%{kind: :object, properties: [{"name", %{kind: :string}}]})
 
-      assert %Node.Field{examples: nil, default: nil} = Info.node_at(definition, ["name"])
+      assert %Semantic.Field{examples: nil, default: nil} = Info.node_at(definition, ["name"])
       origins = Info.origins(definition, ["name"])
       refute Keyword.has_key?(origins, :examples)
       refute Keyword.has_key?(origins, :default)
@@ -914,7 +1006,7 @@ defmodule Formentation.Source.MapTest do
       definition =
         compile!(%{kind: :object, properties: [{"name", %{kind: :string, default: nil}}]})
 
-      assert %Node.Field{default: nil} = Info.node_at(definition, ["name"])
+      assert %Semantic.Field{default: nil} = Info.node_at(definition, ["name"])
       refute Keyword.has_key?(Info.origins(definition, ["name"]), :default)
 
       assert [%{severity: :warning, code: :unsupported_keyword} = warning] =
@@ -933,7 +1025,7 @@ defmodule Formentation.Source.MapTest do
           properties: [{"name", %{kind: :string}}]
         })
 
-      assert %Node.Group{} = Info.root(definition)
+      assert %Semantic.Object{} = Info.root(definition)
       assert Info.diagnostics(definition) == []
     end
 
@@ -952,8 +1044,11 @@ defmodule Formentation.Source.MapTest do
           ]
         })
 
-      assert %Node.Group{help: "Recorded at the end of each shift."} = Info.root(definition)
-      assert %Node.Group{help: "One entry per pump."} = Info.node_at(definition, ["pump"])
+      assert %PresentationInfo.Object{help: "Recorded at the end of each shift."} =
+               Info.presentation_root(definition)
+
+      assert {:ok, %PresentationInfo.Object{help: "One entry per pump."}} =
+               Info.presentation_at(definition, ["pump"])
 
       assert Info.origins(definition, ["pump"])[:help] ==
                {:map_source, [:properties, "pump", :help]}
@@ -962,7 +1057,7 @@ defmodule Formentation.Source.MapTest do
     test "an object without help has nil help and no help origin" do
       definition = compile!(%{kind: :object, properties: []})
 
-      assert %Node.Group{help: nil} = Info.root(definition)
+      assert %PresentationInfo.Object{help: nil} = Info.presentation_root(definition)
       refute Keyword.has_key?(Info.origins(definition, []), :help)
     end
 
@@ -981,7 +1076,7 @@ defmodule Formentation.Source.MapTest do
       definition =
         compile!(%{kind: :object, properties: [{"name", %{kind: :string, examples: []}}]})
 
-      assert %Node.Field{examples: []} = Info.node_at(definition, ["name"])
+      assert %Semantic.Field{examples: []} = Info.node_at(definition, ["name"])
 
       assert Info.origins(definition, ["name"])[:examples] ==
                {:map_source, [:properties, "name", :examples]}
@@ -1068,10 +1163,15 @@ defmodule Formentation.Source.MapTest do
           ]
         })
 
-      assert %Node.Field{read_only?: true, hidden?: false} = Info.node_at(definition, ["serial"])
+      assert %Semantic.Field{read_only?: true} = Info.node_at(definition, ["serial"])
 
-      assert %Node.Field{hidden?: true, read_only?: false} =
-               Info.node_at(definition, ["legacy_id"])
+      assert {:ok, %PresentationInfo.Field{hidden?: false}} =
+               Info.presentation_at(definition, ["serial"])
+
+      assert %Semantic.Field{read_only?: false} = Info.node_at(definition, ["legacy_id"])
+
+      assert {:ok, %PresentationInfo.Field{hidden?: true}} =
+               Info.presentation_at(definition, ["legacy_id"])
 
       assert Info.origins(definition, ["serial"])[:read_only] ==
                {:map_source, [:properties, "serial", :read_only]}
@@ -1080,7 +1180,8 @@ defmodule Formentation.Source.MapTest do
                {:map_source, [:properties, "legacy_id", :hidden]}
 
       # an explicit false is applied and carries an origin — the key was declared
-      assert %Node.Field{hidden?: false} = Info.node_at(definition, ["note"])
+      assert {:ok, %PresentationInfo.Field{hidden?: false}} =
+               Info.presentation_at(definition, ["note"])
 
       assert Info.origins(definition, ["note"])[:hidden] ==
                {:map_source, [:properties, "note", :hidden]}
@@ -1089,7 +1190,11 @@ defmodule Formentation.Source.MapTest do
     test "absent hints leave the flags false without origins" do
       definition = compile!(%{kind: :object, properties: [{"name", %{kind: :string}}]})
 
-      assert %Node.Field{hidden?: false, read_only?: false} = Info.node_at(definition, ["name"])
+      assert %Semantic.Field{read_only?: false} = Info.node_at(definition, ["name"])
+
+      assert {:ok, %PresentationInfo.Field{hidden?: false}} =
+               Info.presentation_at(definition, ["name"])
+
       refute Keyword.has_key?(Info.origins(definition, ["name"]), :hidden)
       refute Keyword.has_key?(Info.origins(definition, ["name"]), :read_only)
     end
@@ -1098,7 +1203,7 @@ defmodule Formentation.Source.MapTest do
       definition =
         compile!(%{kind: :object, properties: [{"name", %{kind: :string, read_only: "yes"}}]})
 
-      assert %Node.Field{read_only?: false} = Info.node_at(definition, ["name"])
+      assert %Semantic.Field{read_only?: false} = Info.node_at(definition, ["name"])
       refute Keyword.has_key?(Info.origins(definition, ["name"]), :read_only)
 
       assert [%{severity: :warning, code: :invalid_hint_value} = warning] =
@@ -1118,7 +1223,7 @@ defmodule Formentation.Source.MapTest do
         })
 
       assert Info.diagnostics(definition) == []
-      assert %Node.Group{} = Info.node_at(definition, [])
+      assert %Semantic.Object{} = Info.node_at(definition, [])
     end
   end
 end

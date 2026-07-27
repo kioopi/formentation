@@ -25,6 +25,22 @@ defmodule Formentation.Phoenix.BoundaryTest do
     assert offenders == []
   end
 
+  test "production code does not depend on mixed definition storage" do
+    offenders =
+      for file <- Path.wildcard(Path.join(@lib, "formentation/**/*.ex")),
+          file |> File.read!() |> legacy_mixed_storage_reference?(),
+          do: Path.relative_to(file, @lib)
+
+    assert offenders == []
+  end
+
+  defp legacy_mixed_storage_reference?(source) do
+    Regex.match?(~r/\bFormentation\.Node\b/, source) or
+      Regex.match?(~r/%Node\.|\bNode\.(Field|Group|Unsupported)\b/, source) or
+      String.contains?(source, ["nests_data?", "stamp_declaration_order", "definition.root"]) or
+      String.contains?(source, "%Definition{root:")
+  end
+
   defp references_phoenix?(file) do
     {:ok, ast} = file |> File.read!() |> Code.string_to_quoted()
 

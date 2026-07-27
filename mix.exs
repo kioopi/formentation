@@ -122,10 +122,12 @@ defmodule Formentation.MixProject do
           Formentation.Diagnostic
         ],
         "Nodes & paths": [
-          Formentation.Node,
-          Formentation.Node.Field,
-          Formentation.Node.Group,
-          Formentation.Node.Unsupported,
+          Formentation.Semantic.Object,
+          Formentation.Semantic.Field,
+          Formentation.Semantic.Unsupported,
+          Formentation.Presentation.Object,
+          Formentation.Presentation.Field,
+          Formentation.Presentation.Group,
           Formentation.NodeId,
           Formentation.InstancePath,
           Formentation.TemplatePath,

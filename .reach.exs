@@ -21,8 +21,6 @@
       "Formentation.InstancePath",
       "Formentation.Issue",
       "Formentation.JSONPointer",
-      "Formentation.Node",
-      "Formentation.Node.*",
       "Formentation.NodeId",
       "Formentation.Origin",
       "Formentation.Params",

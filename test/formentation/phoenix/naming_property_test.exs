@@ -6,7 +6,7 @@ defmodule Formentation.Phoenix.NamingPropertyTest do
   # back to its own instance path — otherwise what the browser posts
   # would land somewhere other than where the projection reads.
 
-  alias Formentation.{Form, Info, Node}
+  alias Formentation.{Form, Info, Semantic}
   alias Phoenix.HTML.FormData
 
   defp field_name_gen, do: StreamData.string([?a..?z], min_length: 1, max_length: 8)
@@ -53,12 +53,12 @@ defmodule Formentation.Phoenix.NamingPropertyTest do
 
   defp field_paths(definition, form_state, root) do
     Enum.flat_map(Info.root(definition).children, fn
-      %Node.Field{name: name} ->
+      %Semantic.Field{name: name} ->
         [{[name], root}]
 
-      %Node.Group{nests_data?: true, name: key} = group ->
+      %Semantic.Object{name: key} = object ->
         nested = hd(FormData.to_form(form_state, root, key, []))
-        for %Node.Field{name: name} <- group.children, do: {[key, name], nested}
+        for %Semantic.Field{name: name} <- object.children, do: {[key, name], nested}
     end)
   end
 end

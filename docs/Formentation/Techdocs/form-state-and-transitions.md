@@ -164,10 +164,9 @@ flowchart TD
 
 1. **Normalize** the envelope's values into the three views.
 2. **Decode** every *declared* field — the walk descends through
-   presentational groups without adding a path segment and into
-   data-nesting groups with one ([[18-decisions#D-006 — One `:group` kind, flagged for data nesting|D-006]]),
-   producing one transport and one operation per field. Undeclared keys
-   are never decoded; `Node.Unsupported` never decodes.
+   semantic objects with one path segment per named object, producing one
+   transport and one operation per field. Undeclared keys are never decoded;
+   `Semantic.Unsupported` never decodes.
 3. **Materialize the candidate** — the JSON instance this form would
    submit.
 4. **Validate** the candidate by dispatching `plan.module.validate(plan.artifact, instance)`,
@@ -185,7 +184,7 @@ The candidate is rebuilt from the operations, not patched:
 - `{:set, value}` writes the value, `:unset` omits the key, `:keep` takes
   the value from `original`.
 - Keys the definition does not describe, and values behind
-  `Node.Unsupported` nodes, are **preserved from the original**. A form
+  `Semantic.Unsupported` nodes, are **preserved from the original**. A form
   that renders half of a JSON document must not silently delete the other
   half.
 - If **any** operation is `{:invalid, _}`, the candidate is `:none`
@@ -363,7 +362,7 @@ candidate and `form.issues`:
 
 A blocker's `path` is the *unsupported node's own* instance path, not
 necessarily a deeper underlying issue's path; `node_id` is copied from
-`Formentation.Node.Unsupported.id` so tooling can relate a blocker back
+`Formentation.Semantic.Unsupported.id` so tooling can relate a blocker back
 to the compiled definition without parsing paths. On submit,
 `Formentation.Phoenix.Projector` turns blockers into capability entries
 in the error summary — see [[rendering#Error summary|Rendering]].

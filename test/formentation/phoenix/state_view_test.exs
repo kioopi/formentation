@@ -220,7 +220,7 @@ defmodule Formentation.Phoenix.StateViewTest do
       |> Enum.map(& &1.message)
     end
 
-    # `oneOf` compiles to a preserve-only Node.Unsupported, and the property
+    # `oneOf` compiles to a preserve-only Semantic.Unsupported, and the property
     # is required and absent — so JSV files a bare `required` issue at the
     # same path the blocker owns. Exactly one entry may survive.
     defp required_unsupported_pair do

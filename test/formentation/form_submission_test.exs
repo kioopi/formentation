@@ -4,15 +4,17 @@ defmodule Formentation.FormSubmissionTest do
   import Formentation.Test.FormHelpers
 
   alias Formentation.{
-    Definition,
     Form,
     InstancePath,
     Issue,
-    Node,
+    Presentation,
+    Semantic,
     SubmissionBlocker,
     TemplatePath,
     ValidationPlan
   }
+
+  alias Formentation.Definition.Finalizer
 
   # ---- JSON Schema fixture: `tags` is an unsupported array whose items the
   # full schema still validates; `title` is an unrelated editable sibling.
@@ -135,34 +137,22 @@ defmodule Formentation.FormSubmissionTest do
     def validate(issues, _instance), do: issues
   end
 
-  # root { name: string field, tags: unsupported (required? per opts) }
   defp fake_definition(opts) do
     tags_required = Keyword.get(opts, :tags_required, false)
     issues = Keyword.get(opts, :issues, [])
 
-    name = %Node.Field{
-      id: "/name",
-      name: "name",
-      value_type: :string,
-      role: :text,
-      template_path: %TemplatePath{segments: ["name"]}
-    }
+    semantic =
+      Semantic.Object.new(nil, %TemplatePath{segments: []}, [
+        Semantic.Field.new("name", %TemplatePath{segments: ["name"]}, :string, role: :text),
+        Semantic.Unsupported.new("tags", %TemplatePath{segments: ["tags"]},
+          required?: tags_required
+        )
+      ])
 
-    tags = %Node.Unsupported{
-      id: "/tags",
-      name: "tags",
-      required?: tags_required,
-      template_path: %TemplatePath{segments: ["tags"]}
-    }
+    presentation = Presentation.Object.new("/", [Presentation.Field.new("/name")])
 
-    root = %Node.Group{
-      id: "/",
-      nests_data?: true,
-      template_path: %TemplatePath{segments: []},
-      children: [name, tags]
-    }
-
-    %Definition{root: root, validation: %ValidationPlan{module: FakeValidation, artifact: issues}}
+    {:ok, definition} = Finalizer.finalize(semantic, presentation)
+    %{definition | validation: %ValidationPlan{module: FakeValidation, artifact: issues}}
   end
 
   defp issue(segments, code, source \\ :validation) do
