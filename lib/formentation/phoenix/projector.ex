@@ -13,7 +13,7 @@ defmodule Formentation.Phoenix.Projector do
   Spec: docs/superpowers/specs/2026-07-25-runtime-state-view-contract-design.md
   """
 
-  alias Formentation.{Definition, Diagnostic, Info, InstancePath, Node}
+  alias Formentation.{Definition, Diagnostic, Info, InstancePath, Semantic}
   alias Formentation.Info.Presentation
   alias Formentation.Phoenix.{RenderNode, RenderPlan, StateView}
 
@@ -122,7 +122,7 @@ defmodule Formentation.Phoenix.Projector do
 
   defp project_descriptor(%Presentation.Field{} = field, form, ctx) do
     case Map.fetch(ctx.semantic_nodes, field.semantic_path) do
-      {:ok, %Node.Field{} = node} -> project_field(field, node, form, ctx)
+      {:ok, %Semantic.Field{} = node} -> project_field(field, node, form, ctx)
       {:ok, other} -> invariant!("field descriptor resolved to #{inspect(other)}")
       :error -> invariant!("field descriptor resolved to no semantic occurrence")
     end
@@ -154,13 +154,13 @@ defmodule Formentation.Phoenix.Projector do
 
   defp project_field(
          %Presentation.Field{hidden?: true},
-         %Node.Field{read_only?: true},
+         %Semantic.Field{read_only?: true},
          _form,
          _ctx
        ),
        do: {nil, []}
 
-  defp project_field(%Presentation.Field{} = presentation, %Node.Field{} = node, form, ctx) do
+  defp project_field(%Presentation.Field{} = presentation, %Semantic.Field{} = node, form, ctx) do
     field = form[access_key(node.name)]
     {widget, diagnostics} = resolve_widget(presentation, node)
     path = presentation.semantic_path.segments
@@ -195,21 +195,21 @@ defmodule Formentation.Phoenix.Projector do
 
   defp hinted_widget(:text, _node), do: {:ok, :text_input}
   defp hinted_widget(:textarea, _node), do: {:ok, :textarea}
-  defp hinted_widget(:select, %Node.Field{options: [_ | _]}), do: {:ok, :select}
-  defp hinted_widget(:radio, %Node.Field{options: [_ | _]}), do: {:ok, :radio_group}
-  defp hinted_widget(:checkbox, %Node.Field{value_type: :boolean}), do: {:ok, :checkbox}
+  defp hinted_widget(:select, %Semantic.Field{options: [_ | _]}), do: {:ok, :select}
+  defp hinted_widget(:radio, %Semantic.Field{options: [_ | _]}), do: {:ok, :radio_group}
+  defp hinted_widget(:checkbox, %Semantic.Field{value_type: :boolean}), do: {:ok, :checkbox}
   defp hinted_widget(_hint, _node), do: :fallback
 
-  defp infer_widget(%Node.Field{options: [_ | _]}), do: :select
-  defp infer_widget(%Node.Field{value_type: :boolean}), do: :checkbox
+  defp infer_widget(%Semantic.Field{options: [_ | _]}), do: :select
+  defp infer_widget(%Semantic.Field{value_type: :boolean}), do: :checkbox
 
-  defp infer_widget(%Node.Field{value_type: type}) when type in [:integer, :number],
+  defp infer_widget(%Semantic.Field{value_type: type}) when type in [:integer, :number],
     do: :number_input
 
-  defp infer_widget(%Node.Field{role: :date}), do: :date_input
-  defp infer_widget(%Node.Field{role: :email}), do: :email_input
-  defp infer_widget(%Node.Field{role: :uri}), do: :url_input
-  defp infer_widget(%Node.Field{}), do: :text_input
+  defp infer_widget(%Semantic.Field{role: :date}), do: :date_input
+  defp infer_widget(%Semantic.Field{role: :email}), do: :email_input
+  defp infer_widget(%Semantic.Field{role: :uri}), do: :url_input
+  defp infer_widget(%Semantic.Field{}), do: :text_input
 
   defp fallback_diagnostic(hint, node, widget) do
     %Diagnostic{
@@ -222,8 +222,8 @@ defmodule Formentation.Phoenix.Projector do
     }
   end
 
-  defp object_legend(%Presentation.Object{label: label, semantic_path: %{segments: []}} = object) do
-    label || object.id
+  defp object_legend(%Presentation.Object{label: label, semantic_path: %{segments: []}}) do
+    label || "/"
   end
 
   defp object_legend(%Presentation.Object{label: label, semantic_path: path}) do

@@ -12,7 +12,8 @@ status: current
 
 # Rendering
 
-*As of 2026-07-26 (presentation traversal query seam, [[18-decisions#D-031 — Phoenix preparation consumes presentation descriptors|D-031]]; StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
+*As of 2026-07-27 (native presentation traversal and semantic-index-backed
+projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
 
 ## Projector data flow (`Formentation.Phoenix.Projector`)
 
@@ -25,8 +26,9 @@ data-nesting group), returning `nil` when the node deliberately renders
 nothing, and raising for an unknown or unsupported path.
 
 The walk consumes `Formentation.Info.presentation_root/1` and
-`presentation_at/2`, not `Definition.root`. Those queries return typed
-presentation descriptors:
+`presentation_at/2`, not `Definition.root`. Those queries now read the native
+`Definition.presentation` tree when it exists and return typed presentation
+descriptors:
 
 - **Object descriptors** carry a semantic `InstancePath` and form a
   layout boundary for the root or a nested data object.
@@ -36,13 +38,13 @@ presentation descriptors:
 - **Field descriptors** carry a semantic `InstancePath` plus presentation
   facts such as label, help, hidden-control intent, and widget hint.
 
-The projector resolves semantic facts by asking `Info` at each descriptor's
-path. This keeps declaration order and layout order as separate contracts:
-for example, semantic fields can enumerate as `["a", "c"]` while a
-presentation group renders them as `["c", "a"]`. Unsupported nodes do not
-appear in renderable presentation traversal; their semantic paths still
-classify as unsupported so `project_at/3` and summary labelling preserve
-their existing behaviour.
+The projector builds one semantic-node lookup from `Definition.semantic` and
+uses descriptor paths to resolve field facts through that backing store. This
+keeps declaration order and layout order as separate contracts: for example,
+semantic fields can enumerate as `["a", "c"]` while a presentation group
+renders them as `["c", "a"]`. Unsupported nodes do not appear in renderable
+presentation traversal; their semantic paths still classify as unsupported so
+`project_at/3` and summary labelling preserve their existing behaviour.
 
 Nested object descriptors cause exactly one
 `Phoenix.HTML.FormData.to_form/4` descent for their semantic segment —

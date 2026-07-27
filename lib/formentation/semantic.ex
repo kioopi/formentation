@@ -2,6 +2,7 @@ defmodule Formentation.Semantic do
   @moduledoc false
 
   alias Formentation.{Definition, InstancePath, Node, TemplatePath}
+  alias Formentation.Semantic
 
   defmodule Entry do
     @moduledoc false
@@ -14,7 +15,7 @@ defmodule Formentation.Semantic do
     @type t :: %__MODULE__{
             kind: kind(),
             name: String.t() | nil,
-            node: Node.t(),
+            node: Semantic.Object.t() | Semantic.Field.t() | Semantic.Unsupported.t() | Node.t(),
             instance_path: InstancePath.t(),
             template_path: TemplatePath.t()
           }
@@ -24,11 +25,19 @@ defmodule Formentation.Semantic do
   @type unique_result :: {:ok, entry()} | :not_found | {:ambiguous, non_neg_integer()}
 
   @spec root(Definition.t()) :: entry()
+  def root(%Definition{semantic: %Semantic.Object{} = root}) do
+    entry(:object, root, %InstancePath{segments: []})
+  end
+
   def root(%Definition{root: %Node.Group{} = root}) do
     entry(:object, root, %InstancePath{segments: []})
   end
 
   @spec direct_children(entry()) :: [entry()]
+  def direct_children(%Entry{kind: :object, node: %Semantic.Object{} = node, instance_path: path}) do
+    Enum.map(node.children, &native_child_entry(&1, path))
+  end
+
   def direct_children(%Entry{kind: :object, node: %Node.Group{} = node, instance_path: path}) do
     node.children
     |> Enum.with_index()
@@ -100,6 +109,18 @@ defmodule Formentation.Semantic do
       %Entry{kind: :object} = child -> unsupported_descendants(child)
       %Entry{kind: :field} -> []
     end)
+  end
+
+  defp native_child_entry(%Semantic.Object{} = node, parent_path) do
+    entry(:object, node, child_path(parent_path, node.name))
+  end
+
+  defp native_child_entry(%Semantic.Field{} = node, parent_path) do
+    entry(:field, node, child_path(parent_path, node.name))
+  end
+
+  defp native_child_entry(%Semantic.Unsupported{} = node, parent_path) do
+    entry(:unsupported, node, child_path(parent_path, node.name))
   end
 
   defp direct_child_entries(

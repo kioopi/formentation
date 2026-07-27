@@ -10,7 +10,8 @@ status: current
 
 # Definition and Node
 
-*As of 2026-07-26 (presentation traversal query seam, [[18-decisions#D-031 — Phoenix preparation consumes presentation descriptors|D-031]]; source-neutral validation dispatch; unsupported-node capability query, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]).*
+*As of 2026-07-27 (native semantic/presentation storage for the built-in
+sources and native-backed semantic/presentation query seams, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]).*
 
 `Formentation.Definition` is the compiler's product and the system's
 common language: an immutable, source-independent tree of semantic
@@ -23,24 +24,88 @@ produced.
 
 ```elixir
 %Formentation.Definition{
-  format_version: 2,
-  root: %Formentation.Node.Group{...},
+  format_version: 3,
+  semantic: %Formentation.Semantic.Object{...},
+  semantic_index: %Formentation.Semantic.Index{...},
+  presentation: %Formentation.Presentation.Object{...},
+  validation: %Formentation.ValidationPlan{} | nil,
   diagnostics: [%Formentation.Diagnostic{...}],
-  validation: %Formentation.ValidationPlan{} | nil
+  root: %Formentation.Node.Group{...} | nil
 }
 ```
 
-`root` holds the current mixed node tree directly. `Formentation.Info`
-keeps compatibility access to that tree through `root/1` and `node/2`,
-but its semantic queries use a layout-transparent semantic traversal, and
-its presentation queries expose typed layout descriptors rather than raw
-mixed nodes.
+`semantic` is the declaration tree. It owns occurrence identity, names,
+template paths, value type, role, requiredness, constraints, options,
+defaults, examples, read-only participation, unsupported declarations, and
+semantic origins. Semantic nodes do not store labels, help text, widgets,
+hidden intent, group membership, or instance paths.
+
+`presentation` is the layout tree. It owns layout identity, ordered children,
+presentation groups, label/help/widget/hidden facts, and presentation origins.
+Presentation object and field nodes reference semantic occurrences by
+`semantic_id`; they do not duplicate semantic field facts. The finalizer
+requires every supported semantic occurrence to be referenced exactly once, so
+the current Phase 1 layout is a total, non-duplicating projection of the
+supported semantic tree.
+
+`semantic_index` is the finalized lookup store keyed by semantic id and
+template path. It is derived during finalization and lets runtime consumers
+resolve presentation references without re-walking the semantic tree for every
+field.
+
+`root` is still present as a temporary compatibility tree while the mixed
+representation is being deleted. The built-in map and JSON Schema adapters
+populate both representations during the transition, but native semantic and
+presentation storage are the authoritative structures for the new query seams.
+Native-only definitions can already finalize with `root: nil`.
+
 `validation` is an optional `Formentation.ValidationPlan`
 — an executable module (implementing `Formentation.Validation`) paired
 with the opaque artifact that module owns; `nil` when the source provides
 no authoritative instance validation (the map source, currently).
 
-## One struct per node kind (D-015)
+## Native semantic structs
+
+| Struct | Enforced keys | Own fields |
+| --- | --- | --- |
+| `Semantic.Object` | `id`, `template_path` | `name`, `required?`, `children`, `origins` |
+| `Semantic.Field` | `id`, `name`, `template_path`, `value_type` | `role`, `required?`, `read_only?`, `constraints`, `options`, `default`, `examples`, `origins` |
+| `Semantic.Unsupported` | `id`, `name`, `template_path` | `required?`, `origins` |
+
+`Formentation.Semantic` now reads `Definition.semantic` when it exists. It
+derives current `InstancePath`s from the tree position and node names for
+query results, rather than storing an instance path on each semantic node.
+
+## Native presentation structs
+
+| Struct | Enforced keys | Own fields |
+| --- | --- | --- |
+| `Presentation.Object` | `id`, `semantic_id` | `label`, `help`, `children`, `origins` |
+| `Presentation.Field` | `id`, `semantic_id` | `label`, `help`, `widget`, `hidden?`, `origins` |
+| `Presentation.Group` | `id` | `label`, `help`, `children`, `origins` |
+
+`Formentation.Info.presentation_root/1` and
+`Formentation.Info.presentation_at/2` now read `Definition.presentation` when
+it exists and resolve semantic IDs through `semantic_index`. Their public
+descriptor contract is unchanged: object and field descriptors expose computed
+semantic `InstancePath`s, and presentation groups expose layout identity only.
+
+## Legacy mixed node structs
+
+The mixed `Formentation.Node.*` structs remain as a compatibility surface until
+the final deletion slice removes `Definition.root`:
+
+```elixir
+%Formentation.Definition{
+  format_version: 3,
+  root: %Formentation.Node.Group{...},
+  semantic: %Formentation.Semantic.Object{...},
+  presentation: %Formentation.Presentation.Object{...},
+  validation: %Formentation.ValidationPlan{} | nil
+}
+```
+
+### One struct per node kind (D-015)
 
 Each node kind is its own struct; the struct name is the tag. The
 shape of each struct documents its invariants — there is no `kind`

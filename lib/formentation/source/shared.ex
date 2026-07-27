@@ -152,7 +152,8 @@ defmodule Formentation.Source.Shared do
       legacy_definition
       | semantic: native_definition.semantic,
         semantic_index: native_definition.semantic_index,
-        presentation: native_definition.presentation
+        presentation: native_definition.presentation,
+        format_version: native_definition.format_version
     }
 
     {:ok, definition, diagnostics}

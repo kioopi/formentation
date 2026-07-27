@@ -4,7 +4,7 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
   # view so `Phoenix.Component.used_input?/1` keeps working (D-014).
   # Spec: docs/superpowers/specs/2026-07-23-phase1-step5-formdata-design.md
 
-  alias Formentation.{Form, Info, Node}
+  alias Formentation.{Form, Info, Node, Semantic}
 
   @path_key :__formentation__
 
@@ -108,6 +108,7 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
     path = path_of(form) ++ [key]
 
     case Info.node_at(form_state.definition, path) do
+      %Semantic.Field{} -> Form.field(form_state, path).display_value
       %Node.Field{} -> Form.field(form_state, path).display_value
       _other -> fallback_value(form, key)
     end
@@ -126,6 +127,7 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
     path = path_of(form) ++ [field_to_string(field)]
 
     case Info.node_at(form_state.definition, path) do
+      %Semantic.Field{} = node -> validations(node)
       %Node.Field{} = node -> validations(node)
       _other -> []
     end
@@ -141,7 +143,17 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
       constraint(node, :max_length, :maxlength)
   end
 
+  defp validations(%Semantic.Field{value_type: :string} = node) do
+    required(node, nonempty_string?(node)) ++
+      constraint(node, :min_length, :minlength) ++
+      constraint(node, :max_length, :maxlength)
+  end
+
   defp validations(%Node.Field{value_type: :boolean} = node) do
+    required(node, true)
+  end
+
+  defp validations(%Semantic.Field{value_type: :boolean} = node) do
     required(node, true)
   end
 
@@ -152,7 +164,15 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
       step(node.value_type)
   end
 
+  defp validations(%Semantic.Field{} = node) do
+    required(node, true) ++
+      constraint(node, :min, :min) ++
+      constraint(node, :max, :max) ++
+      step(node.value_type)
+  end
+
   defp required(%Node.Field{required?: true}, true), do: [required: true]
+  defp required(%Semantic.Field{required?: true}, true), do: [required: true]
   defp required(_node, _empty_input_forbidden?), do: []
 
   defp nonempty_string?(node) do

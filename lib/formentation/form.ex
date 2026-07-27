@@ -143,7 +143,7 @@ defmodule Formentation.Form do
 
   A blocker is derived, never stored: it relates a required-but-absent
   preserve-only value, or authoritative validation issues at or below a
-  preserve-only path, to its `Formentation.Node.Unsupported` node.
+  preserve-only semantic node.
   `issues/1` continues to return every underlying issue unchanged.
   """
   @spec submission_blockers(t()) :: [SubmissionBlocker.t()]
@@ -379,7 +379,7 @@ defmodule Formentation.Form do
   end
 
   defp apply_default(
-         %Semantic.Entry{kind: :field, name: name, node: %Node.Field{default: default}},
+         %Semantic.Entry{kind: :field, name: name, node: %{default: default}},
          acc
        )
        when not is_nil(default) do
@@ -432,6 +432,7 @@ defmodule Formentation.Form do
   # D-016: read-only fields do not participate in the replace scope —
   # whatever the transport carried, the original value is kept.
   defp operation_for(%Node.Field{read_only?: true}, _transport, _path), do: :keep
+  defp operation_for(%Semantic.Field{read_only?: true}, _transport, _path), do: :keep
   defp operation_for(_node, :not_provided, _path), do: :unset
   defp operation_for(node, {:provided, raw}, path), do: Codec.decode(node.value_type, raw, path)
 
@@ -582,6 +583,21 @@ defmodule Formentation.Form do
     end
   end
 
+  defp classify(form, path, %Semantic.Unsupported{} = node, candidate) do
+    owned = owned_issues(form, path)
+
+    cond do
+      missing_required?(node, path, candidate) ->
+        [blocker(path, node, :unsupported_required, owned)]
+
+      owned != [] ->
+        [blocker(path, node, :unsupported_invalid, owned)]
+
+      true ->
+        []
+    end
+  end
+
   defp blocker(path, node, code, owned) do
     %SubmissionBlocker{
       path: path,
@@ -604,8 +620,16 @@ defmodule Formentation.Form do
   # definition and the post-#1 candidate, not on any validator's code. An
   # inactive nested parent (absent object) makes the child inactive (D-026).
   defp missing_required?(%Node.Unsupported{required?: false}, _path, _candidate), do: false
+  defp missing_required?(%Semantic.Unsupported{required?: false}, _path, _candidate), do: false
 
   defp missing_required?(%Node.Unsupported{name: name, required?: true}, path, candidate) do
+    case parent_object(candidate, path) do
+      {:ok, object} when is_map(object) -> not Map.has_key?(object, name)
+      _absent_or_non_map -> false
+    end
+  end
+
+  defp missing_required?(%Semantic.Unsupported{name: name, required?: true}, path, candidate) do
     case parent_object(candidate, path) do
       {:ok, object} when is_map(object) -> not Map.has_key?(object, name)
       _absent_or_non_map -> false
