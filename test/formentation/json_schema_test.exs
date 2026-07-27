@@ -1,7 +1,7 @@
 defmodule Formentation.JSONSchemaTest do
   use ExUnit.Case, async: true
 
-  alias Formentation.{Info, Node}
+  alias Formentation.{Info, Node, Presentation, Semantic, TemplatePath}
 
   defp compile!(schema, opts \\ []) do
     {:ok, definition, _diagnostics} =
@@ -42,6 +42,40 @@ defmodule Formentation.JSONSchemaTest do
       assert %Node.Group{nests_data?: true, id: "/"} = Info.root(definition)
       assert [%Node.Field{name: "name", id: "/name"}] = Info.fields(definition)
       assert Info.diagnostics(definition) == []
+    end
+
+    test "also emits native semantic and presentation roots" do
+      definition =
+        compile!(%{
+          "type" => "object",
+          "properties" => %{"name" => %{"type" => "string"}}
+        })
+
+      assert %Semantic.Object{
+               id: "/",
+               template_path: %TemplatePath{segments: []},
+               children: [
+                 %Semantic.Field{
+                   id: "/name",
+                   name: "name",
+                   value_type: :string,
+                   template_path: %TemplatePath{segments: ["name"]}
+                 }
+               ]
+             } = definition.semantic
+
+      assert %Presentation.Object{
+               semantic_id: "/",
+               children: [
+                 %Presentation.Field{
+                   id: "layout:field:/name",
+                   semantic_id: "/name",
+                   label: "Name"
+                 }
+               ]
+             } = definition.presentation
+
+      assert definition.semantic_index.by_id["/name"].node == hd(definition.semantic.children)
     end
 
     test "properties without an order hint sort lexicographically by name" do
@@ -445,6 +479,80 @@ defmodule Formentation.JSONSchemaTest do
       assert group.origins[:label] == {:ui_hints, "/groups/0/title"}
       assert %Node.Field{group: "electrical"} = Info.node_at(definition, ["voltage"])
       assert Info.node_at(definition, ["voltage"]).id == "/voltage"
+    end
+
+    test "native UI hints split semantic read_only from presentation metadata" do
+      hints = %{
+        "fields" => %{
+          "notes" => %{
+            "widget" => "textarea",
+            "help" => "Visible to all technicians.",
+            "hidden" => true,
+            "read_only" => true
+          }
+        }
+      }
+
+      definition = compile!(schema_with_group(), ui: hints)
+
+      assert %Semantic.Field{read_only?: true, origins: semantic_origins} =
+               Enum.find(definition.semantic.children, &(&1.name == "notes"))
+
+      assert semantic_origins[:read_only] == {:ui_hints, "/fields/notes/read_only"}
+      refute Keyword.has_key?(semantic_origins, :help)
+      refute Keyword.has_key?(semantic_origins, :widget)
+      refute Keyword.has_key?(semantic_origins, :hidden)
+
+      assert %Presentation.Field{
+               help: "Visible to all technicians.",
+               widget: :textarea,
+               hidden?: true,
+               origins: presentation_origins
+             } =
+               Enum.find(
+                 definition.presentation.children,
+                 &match?(%Presentation.Field{semantic_id: "/notes"}, &1)
+               )
+
+      assert presentation_origins[:help] == {:ui_hints, "/fields/notes/help"}
+      assert presentation_origins[:widget] == {:ui_hints, "/fields/notes/widget"}
+      assert presentation_origins[:hidden] == {:ui_hints, "/fields/notes/hidden"}
+      refute Keyword.has_key?(presentation_origins, :read_only)
+    end
+
+    test "native presentation group and order hints change layout only" do
+      hints = %{
+        "groups" => [%{"id" => "g", "fields" => ["c", "a"]}],
+        "order" => ["g", "b"]
+      }
+
+      definition =
+        compile!(
+          %{
+            "type" => "object",
+            "properties" => %{
+              "a" => %{"type" => "string"},
+              "b" => %{"type" => "string"},
+              "c" => %{"type" => "string"}
+            }
+          },
+          ui: hints
+        )
+
+      assert Enum.map(definition.semantic.children, & &1.name) == ["a", "b", "c"]
+
+      assert %Presentation.Object{
+               children: [
+                 %Presentation.Group{
+                   id: "/#g",
+                   children: [
+                     %Presentation.Field{semantic_id: "/c"},
+                     %Presentation.Field{semantic_id: "/a"}
+                   ]
+                 },
+                 %Presentation.Field{semantic_id: "/b"}
+               ]
+             } = definition.presentation
     end
 
     test "a group naming an unknown field emits unknown_group_field" do

@@ -1,7 +1,8 @@
 defmodule Formentation.Source.Shared do
   @moduledoc false
 
-  alias Formentation.{Definition, Diagnostic, Node, NodeId, TemplatePath}
+  alias Formentation.{Definition, Diagnostic, Node, NodeId, Presentation, TemplatePath}
+  alias Formentation.Definition.Finalizer
 
   defmodule Context do
     @moduledoc false
@@ -11,6 +12,25 @@ defmodule Formentation.Source.Shared do
               depth: 0,
               max_depth: 16,
               nodes_left: 1_000
+  end
+
+  defmodule Compiled do
+    @moduledoc false
+
+    defstruct [:legacy, :semantic, :presentation]
+  end
+
+  defmodule PresentationGroupSpec do
+    @moduledoc false
+
+    defstruct [:id, :label, :label_origin, :fields]
+  end
+
+  def context(opts) do
+    %Context{
+      max_depth: Keyword.get(opts, :max_depth, 16),
+      nodes_left: Keyword.get(opts, :max_nodes, 1_000)
+    }
   end
 
   def humanize(name), do: name |> String.replace("_", " ") |> String.capitalize()
@@ -88,14 +108,23 @@ defmodule Formentation.Source.Shared do
   end
 
   def compile_impl(source, opts, compile_object_fn) do
-    ctx = %Context{
-      max_depth: Keyword.get(opts, :max_depth, 16),
-      nodes_left: Keyword.get(opts, :max_nodes, 1_000)
-    }
+    ctx = context(opts)
 
     case compile_object_fn.(source, nil, ctx) do
       {:ok, root, ctx} ->
         finalize_legacy(root, ctx)
+
+      {:error, %Diagnostic{} = diagnostic} ->
+        {:error, [diagnostic]}
+    end
+  end
+
+  def compile_compiled_impl(source, opts, compile_object_fn) do
+    ctx = context(opts)
+
+    case compile_object_fn.(source, nil, ctx) do
+      {:ok, %Compiled{} = compiled, ctx} ->
+        finalize_compiled(compiled, ctx)
 
       {:error, %Diagnostic{} = diagnostic} ->
         {:error, [diagnostic]}
@@ -112,6 +141,39 @@ defmodule Formentation.Source.Shared do
 
     {:ok, definition, diagnostics}
   end
+
+  def finalize_compiled(%Compiled{} = compiled, %Context{} = ctx) do
+    {:ok, %Definition{} = legacy_definition, diagnostics} = finalize_legacy(compiled.legacy, ctx)
+
+    {:ok, native_definition} =
+      Finalizer.finalize(compiled.semantic, compiled.presentation, diagnostics: diagnostics)
+
+    definition = %Definition{
+      legacy_definition
+      | semantic: native_definition.semantic,
+        semantic_index: native_definition.semantic_index,
+        presentation: native_definition.presentation
+    }
+
+    {:ok, definition, diagnostics}
+  end
+
+  def require_compiled_object(%Compiled{} = compiled, child_ctx, ctx, required?) do
+    {:ok,
+     %Compiled{
+       compiled
+       | legacy: %{compiled.legacy | required?: required?},
+         semantic: %{compiled.semantic | required?: required?}
+     }, %{ctx | diagnostics: child_ctx.diagnostics, nodes_left: child_ctx.nodes_left}}
+  end
+
+  def fact_origins(origins, allowed_keys) do
+    Enum.filter(origins, fn {key, _origin} -> key in allowed_keys end)
+  end
+
+  def presentation_reference_id(%Presentation.Field{semantic_id: semantic_id}), do: semantic_id
+  def presentation_reference_id(%Presentation.Object{semantic_id: semantic_id}), do: semantic_id
+  def presentation_reference_id(%Presentation.Group{}), do: nil
 
   @reserved_names ["_csrf_token", "_target"]
   @reserved_prefix "_unused_"
