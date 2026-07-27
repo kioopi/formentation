@@ -66,6 +66,16 @@ Supplementary to the numbered steps: an opt-in, demo-driven browser-real test su
 
 ✅ Done (2026-07-26) — A2 of the Phase 1 north-star alignment gate now has an application-facing submission decision ([GitHub issue #19](https://github.com/kioopi/formentation/issues/19)). `Formentation.Form.submit/2` performs the pure `:submit` transition and then returns `{:ok, candidate, submitted_form}` only for `submission_status/1 == :ready`; undecodable, blocked, and invalid submissions return `{:error, submitted_form}` for redisplay. The demo no longer combines `issues/1` and `candidate/1` as a readiness predicate, and failed submits clear stale decoded-candidate output. See [[18-decisions#D-032 — Submit returns the application decision|D-032]] and the refreshed [[form-state-and-transitions|Form state and transitions]] and [[using-with-liveview|Using Formentation with LiveView]] notes.
 
+🚧 In progress (2026-07-27) — the split-definition implementation
+([GitHub issue #18](https://github.com/kioopi/formentation/issues/18)) now has
+native semantic and presentation storage, direct native emission from both
+built-in adapters, a finalized semantic index, and native-backed
+`Formentation.Semantic` / `Formentation.Info.Presentation` query seams. The
+temporary mixed `Definition.root` compatibility tree still exists and public
+`Info.node_at/2` / `Info.fields/1` keep returning legacy nodes while that
+deletion slice remains open. See [[definition-and-node|Definition and Node]],
+[[rendering|Rendering]], and [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]].
+
 > [!info] Where the granular execution records live
 > The per-slice classic-TDD specs and plans that drive each step live **outside this vault**, under `docs/superpowers/specs/` and `docs/superpowers/plans/`. The phase notes here summarize them; those files carry the step-by-step detail.
 

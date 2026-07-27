@@ -1,7 +1,8 @@
 defmodule Formentation.InfoTest do
   use ExUnit.Case, async: true
 
-  alias Formentation.{Definition, Info, Node, Semantic, TemplatePath}
+  alias Formentation.{Definition, Info, Node, Presentation, Semantic, TemplatePath}
+  alias Formentation.Definition.Finalizer
 
   doctest Formentation.Info
 
@@ -291,5 +292,69 @@ defmodule Formentation.InfoTest do
 
     assert Semantic.find(definition, ["main", "legacy"]) == nil
     assert Semantic.find(definition, ["dimensions", "size", "width"]) == nil
+  end
+
+  test "semantic queries read native-only definitions" do
+    {:ok, definition} =
+      Finalizer.finalize(
+        Semantic.Object.new(nil, %TemplatePath{segments: []}, [
+          Semantic.Field.new("name", %TemplatePath{segments: ["name"]}, :string,
+            role: :text,
+            required?: true,
+            origins: [role: {:inference, :string_default}]
+          )
+        ]),
+        Presentation.Object.new("/", [
+          Presentation.Field.new("/name", label: "Name")
+        ])
+      )
+
+    assert definition.root == nil
+    assert [%Semantic.Field{name: "name", required?: true}] = Info.fields(definition)
+    assert %Semantic.Field{role: :text} = Info.node_at(definition, ["name"])
+    assert Info.role(definition, ["name"]) == :text
+    assert Info.required?(definition, ["name"])
+  end
+
+  test "presentation descriptors read native-only layout metadata" do
+    {:ok, definition} =
+      Finalizer.finalize(
+        Semantic.Object.new(nil, %TemplatePath{segments: []}, [
+          Semantic.Field.new("name", %TemplatePath{segments: ["name"]}, :string)
+        ]),
+        Presentation.Object.new("/", [
+          Presentation.Group.new(
+            "identity",
+            [
+              Presentation.Field.new("/name",
+                label: "Display name",
+                help: "Shown to technicians.",
+                widget: :textarea,
+                hidden?: true
+              )
+            ],
+            layout_id: "/#identity",
+            label: "Identity"
+          )
+        ])
+      )
+
+    assert %Formentation.Info.Presentation.Object{
+             children: [
+               %Formentation.Info.Presentation.Group{
+                 id: "/#identity",
+                 label: "Identity",
+                 children: [
+                   %Formentation.Info.Presentation.Field{
+                     semantic_path: %{segments: ["name"]},
+                     label: "Display name",
+                     help: "Shown to technicians.",
+                     widget: :textarea,
+                     hidden?: true
+                   }
+                 ]
+               }
+             ]
+           } = Info.presentation_root(definition)
   end
 end

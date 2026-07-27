@@ -31,7 +31,11 @@ defmodule Formentation.Info do
   def root(%Definition{root: root}), do: root
 
   @doc "Every scalar field, in semantic declaration order independent of presentation layout."
-  @spec fields(Definition.t()) :: [Node.Field.t()]
+  @spec fields(Definition.t()) :: [Semantic.Field.t() | Node.Field.t()]
+  def fields(%Definition{root: %Node.Group{} = root}) do
+    %Definition{root: root} |> Semantic.fields() |> Enum.map(& &1.node)
+  end
+
   def fields(%Definition{} = definition) do
     definition |> Semantic.fields() |> Enum.map(& &1.node)
   end
@@ -53,13 +57,21 @@ defmodule Formentation.Info do
       iex> definition |> Formentation.Info.unsupported_nodes() |> Enum.map(& &1.name)
       ["attachment"]
   """
-  @spec unsupported_nodes(Definition.t()) :: [Node.Unsupported.t()]
+  @spec unsupported_nodes(Definition.t()) :: [Semantic.Unsupported.t() | Node.Unsupported.t()]
   def unsupported_nodes(%Definition{} = definition) do
     definition |> unsupported_nodes_with_paths() |> Enum.map(fn {_path, node} -> node end)
   end
 
   @doc false
-  @spec unsupported_nodes_with_paths(Definition.t()) :: [{InstancePath.t(), Node.Unsupported.t()}]
+  @spec unsupported_nodes_with_paths(Definition.t()) :: [
+          {InstancePath.t(), Semantic.Unsupported.t() | Node.Unsupported.t()}
+        ]
+  def unsupported_nodes_with_paths(%Definition{root: %Node.Group{} = root}) do
+    %Definition{root: root}
+    |> Semantic.unsupported()
+    |> Enum.map(fn entry -> {entry.instance_path, entry.node} end)
+  end
+
   def unsupported_nodes_with_paths(%Definition{} = definition) do
     definition
     |> Semantic.unsupported()
@@ -80,11 +92,21 @@ defmodule Formentation.Info do
   presentation groups; `nil` when the path names nothing. Raises
   `ArgumentError` on invalid segments.
   """
-  @spec node_at(Definition.t(), [InstancePath.segment()]) :: Node.t() | nil
-  def node_at(%Definition{root: root}, segments) when is_list(segments) do
+  @spec node_at(Definition.t(), [InstancePath.segment()]) ::
+          Semantic.Object.t() | Semantic.Field.t() | Semantic.Unsupported.t() | Node.t() | nil
+  def node_at(%Definition{root: %Node.Group{} = root}, segments) when is_list(segments) do
     %InstancePath{segments: segments} = InstancePath.new!(segments)
 
     case Semantic.find(%Definition{root: root}, segments) do
+      nil -> nil
+      entry -> entry.node
+    end
+  end
+
+  def node_at(%Definition{} = definition, segments) when is_list(segments) do
+    %InstancePath{segments: segments} = InstancePath.new!(segments)
+
+    case Semantic.find(definition, segments) do
       nil -> nil
       entry -> entry.node
     end
@@ -183,6 +205,7 @@ defmodule Formentation.Info do
   @spec role(Definition.t(), [InstancePath.segment()]) :: atom() | nil
   def role(definition, path) do
     case node_at(definition, path) do
+      %Semantic.Field{role: role} -> role
       %Node.Field{role: role} -> role
       _group_unsupported_or_missing -> nil
     end
