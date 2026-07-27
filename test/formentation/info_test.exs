@@ -1,73 +1,55 @@
 defmodule Formentation.InfoTest do
   use ExUnit.Case, async: true
 
-  alias Formentation.{Definition, Info, Node, Presentation, Semantic, TemplatePath}
   alias Formentation.Definition.Finalizer
+  alias Formentation.{Info, NodeId, Presentation, Semantic, TemplatePath}
 
   doctest Formentation.Info
 
-  # A hand-built per-kind tree: proves Info reads the split structs
-  # without going through a source adapter. Shape: a root group with a
-  # required field, a data-nesting group wrapping a presentational
-  # fieldset around one field, and an unsupported node.
+  # A hand-built native definition: proves Info reads split structs
+  # without going through a source adapter.
   defp definition do
-    name = %Node.Field{
-      id: "/name",
-      name: "name",
-      label: "Name",
-      value_type: :string,
-      role: :text,
-      required?: true,
-      template_path: %TemplatePath{segments: ["name"]},
-      origins: [label: {:inference, :humanize}]
-    }
+    name =
+      Semantic.Field.new("name", %TemplatePath{segments: ["name"]}, :string,
+        role: :text,
+        required?: true,
+        origins: [role: {:inference, :text_role}]
+      )
 
-    voltage = %Node.Field{
-      id: "/electrical/voltage",
-      name: "voltage",
-      value_type: :integer,
-      role: :integer,
-      group: "power",
-      template_path: %TemplatePath{segments: ["electrical", "voltage"]}
-    }
+    voltage =
+      Semantic.Field.new("voltage", %TemplatePath{segments: ["electrical", "voltage"]}, :integer,
+        role: :integer
+      )
 
-    legacy = %Node.Unsupported{
-      id: "/electrical/legacy",
-      name: "legacy",
-      required?: true,
-      template_path: %TemplatePath{segments: ["electrical", "legacy"]}
-    }
+    legacy =
+      Semantic.Unsupported.new("legacy", %TemplatePath{segments: ["electrical", "legacy"]},
+        required?: true
+      )
 
-    fieldset = %Node.Group{
-      id: "/electrical#power",
-      nests_data?: false,
-      label: "Power",
-      template_path: %TemplatePath{segments: ["electrical"]},
-      children: [voltage, legacy]
-    }
+    electrical =
+      Semantic.Object.new("electrical", %TemplatePath{segments: ["electrical"]}, [
+        voltage,
+        legacy
+      ])
 
-    electrical = %Node.Group{
-      id: "/electrical",
-      name: "electrical",
-      nests_data?: true,
-      template_path: %TemplatePath{segments: ["electrical"]},
-      children: [fieldset]
-    }
+    gadget = Semantic.Unsupported.new("gadget", %TemplatePath{segments: ["gadget"]})
 
-    gadget = %Node.Unsupported{
-      id: "/gadget",
-      name: "gadget",
-      template_path: %TemplatePath{segments: ["gadget"]}
-    }
+    semantic = Semantic.Object.new(nil, %TemplatePath{segments: []}, [name, electrical, gadget])
 
-    root = %Node.Group{
-      id: "/",
-      nests_data?: true,
-      template_path: %TemplatePath{segments: []},
-      children: [name, electrical, gadget]
-    }
+    presentation =
+      Presentation.Object.new("/", [
+        Presentation.Field.new("/name", label: "Name"),
+        Presentation.Object.new("/electrical", [
+          Presentation.Group.new(
+            NodeId.group(%TemplatePath{segments: ["electrical"]}, "power"),
+            [Presentation.Field.new("/electrical/voltage")],
+            label: "Power"
+          )
+        ])
+      ])
 
-    %Definition{root: root}
+    {:ok, definition} = Finalizer.finalize(semantic, presentation)
+    definition
   end
 
   test "fields/1 returns exactly the field nodes, in tree order" do
@@ -75,21 +57,21 @@ defmodule Formentation.InfoTest do
   end
 
   test "node_at/2 descends data groups and looks through presentational groups" do
-    assert %Node.Field{id: "/electrical/voltage"} =
+    assert %Semantic.Field{id: "/electrical/voltage"} =
              Info.node_at(definition(), ["electrical", "voltage"])
   end
 
   test "node_at/2 finds unsupported nodes" do
-    assert %Node.Unsupported{id: "/gadget"} = Info.node_at(definition(), ["gadget"])
+    assert %Semantic.Unsupported{id: "/gadget"} = Info.node_at(definition(), ["gadget"])
   end
 
   test "node/2 finds any node by id, including presentational groups" do
-    assert %Node.Group{nests_data?: false} = Info.node(definition(), "/electrical#power")
+    assert %Presentation.Group{} = Info.node(definition(), "/electrical#power")
   end
 
   test "role/2, origins/2, and required?/2 read per-kind nodes" do
     assert Info.role(definition(), ["name"]) == :text
-    assert Info.origins(definition(), ["name"]) == [label: {:inference, :humanize}]
+    assert Info.origins(definition(), ["name"]) == [role: {:inference, :text_role}]
     assert Info.required?(definition(), ["name"])
     refute Info.required?(definition(), ["electrical", "voltage"])
   end
@@ -100,6 +82,24 @@ defmodule Formentation.InfoTest do
     assert Info.origins(definition(), ["missing"]) == []
   end
 
+  test "origins/2 returns only semantic origins for unsupported paths" do
+    assert Info.origins(definition(), ["gadget"]) == []
+  end
+
+  test "origins/2 works on semantic-only hand-built definitions" do
+    field =
+      Semantic.Field.new("name", %TemplatePath{segments: ["name"]}, :string,
+        origins: [role: {:inference, :text_role}]
+      )
+
+    definition = %Formentation.Definition{
+      semantic: Semantic.Object.new(nil, %TemplatePath{segments: []}, [field]),
+      presentation: nil
+    }
+
+    assert Info.origins(definition, ["name"]) == [role: {:inference, :text_role}]
+  end
+
   test "semantic_kind/2 classifies paths without accepting presentation group IDs" do
     assert Info.semantic_kind(definition(), []) == :object
     assert Info.semantic_kind(definition(), ["name"]) == :field
@@ -107,6 +107,43 @@ defmodule Formentation.InfoTest do
     assert Info.semantic_kind(definition(), ["electrical", "legacy"]) == :unsupported
     assert Info.semantic_kind(definition(), ["electrical", "power"]) == nil
     assert Info.semantic_kind(definition(), ["missing"]) == nil
+  end
+
+  test "semantic_kind/2 raises on ambiguous hand-built semantic paths" do
+    semantic =
+      Semantic.Object.new(nil, %TemplatePath{segments: []}, [
+        Semantic.Field.new("name", %TemplatePath{segments: ["name"]}, :string),
+        Semantic.Field.new("name", %TemplatePath{segments: ["name"]}, :string, id: "/other-name")
+      ])
+
+    definition = %Formentation.Definition{semantic: semantic}
+
+    assert_raise ArgumentError, ~r/ambiguous semantic path \["name"\]: found 2 occurrences/, fn ->
+      Info.semantic_kind(definition, ["name"])
+    end
+  end
+
+  test "semantic_node_index/1 raises on ambiguous hand-built semantic paths" do
+    semantic =
+      Semantic.Object.new(nil, %TemplatePath{segments: []}, [
+        Semantic.Field.new("name", %TemplatePath{segments: ["name"]}, :string),
+        Semantic.Field.new("name", %TemplatePath{segments: ["name"]}, :string, id: "/other-name")
+      ])
+
+    definition = %Formentation.Definition{semantic: semantic}
+
+    assert_raise ArgumentError, ~r/ambiguous semantic path \["name"\]: found 2 occurrences/, fn ->
+      Info.semantic_node_index(definition)
+    end
+  end
+
+  test "node/2 returns nil when a definition has no presentation tree" do
+    definition = %Formentation.Definition{
+      semantic_index: %Semantic.Index{},
+      presentation: nil
+    }
+
+    assert Info.node(definition, "/missing") == nil
   end
 
   test "unsupported_nodes/1 returns unsupported nodes in declaration order" do
@@ -120,18 +157,15 @@ defmodule Formentation.InfoTest do
 
   test "unsupported_nodes/1 preserves node identity fields" do
     [legacy, _gadget] = Info.unsupported_nodes(definition())
-    assert %Node.Unsupported{id: "/electrical/legacy", required?: true} = legacy
+    assert %Semantic.Unsupported{id: "/electrical/legacy", required?: true} = legacy
   end
 
   test "unsupported_nodes/1 is empty when there are none" do
-    root = %Node.Group{
-      id: "/",
-      nests_data?: true,
-      template_path: %TemplatePath{segments: []},
-      children: []
-    }
+    semantic = Semantic.Object.new(nil, %TemplatePath{segments: []}, [])
+    presentation = Presentation.Object.new("/", [])
+    {:ok, definition} = Finalizer.finalize(semantic, presentation)
 
-    assert Info.unsupported_nodes(%Definition{root: root}) == []
+    assert Info.unsupported_nodes(definition) == []
   end
 
   test "unsupported_nodes_with_paths/1 pairs nodes with instance paths through both group flavors" do
@@ -140,103 +174,7 @@ defmodule Formentation.InfoTest do
       |> Info.unsupported_nodes_with_paths()
       |> Enum.map(fn {path, node} -> {path.segments, node.name} end)
 
-    # legacy lives inside data-nesting `electrical` and presentation `fieldset`:
-    # the data group contributes "electrical", the presentation group nothing.
     assert paths == [{["electrical", "legacy"], "legacy"}, {["gadget"], "gadget"}]
-  end
-
-  test "semantic fallback order preserves unstamped mixed-tree order" do
-    a = %Node.Field{
-      id: "/a",
-      name: "a",
-      value_type: :string,
-      template_path: %TemplatePath{segments: ["a"]}
-    }
-
-    legacy = %Node.Unsupported{
-      id: "/legacy",
-      name: "legacy",
-      template_path: %TemplatePath{segments: ["legacy"]}
-    }
-
-    group = %Node.Group{
-      id: "/#grouped",
-      nests_data?: false,
-      template_path: %TemplatePath{segments: []},
-      children: [a, legacy]
-    }
-
-    b = %Node.Field{
-      id: "/b",
-      name: "b",
-      value_type: :string,
-      template_path: %TemplatePath{segments: ["b"]}
-    }
-
-    gadget = %Node.Unsupported{
-      id: "/gadget",
-      name: "gadget",
-      template_path: %TemplatePath{segments: ["gadget"]}
-    }
-
-    root = %Node.Group{
-      id: "/",
-      nests_data?: true,
-      template_path: %TemplatePath{segments: []},
-      children: [group, b, gadget]
-    }
-
-    definition = %Definition{root: root}
-
-    assert ["a", "b"] == definition |> Info.fields() |> Enum.map(& &1.name)
-    assert ["legacy", "gadget"] == definition |> Info.unsupported_nodes() |> Enum.map(& &1.name)
-  end
-
-  test "semantic_kind/2 raises on ambiguous hand-built paths without changing node_at/2" do
-    first = %Node.Group{
-      id: "/a",
-      name: "a",
-      nests_data?: true,
-      template_path: %TemplatePath{segments: ["a"]},
-      children: [
-        %Node.Field{
-          id: "/a/x",
-          name: "x",
-          value_type: :string,
-          template_path: %TemplatePath{segments: ["a", "x"]}
-        }
-      ]
-    }
-
-    second = %Node.Group{
-      id: "/a",
-      name: "a",
-      nests_data?: true,
-      template_path: %TemplatePath{segments: ["a"]},
-      children: [
-        %Node.Field{
-          id: "/a/y",
-          name: "y",
-          value_type: :string,
-          template_path: %TemplatePath{segments: ["a", "y"]}
-        }
-      ]
-    }
-
-    root = %Node.Group{
-      id: "/",
-      nests_data?: true,
-      template_path: %TemplatePath{segments: []},
-      children: [first, second]
-    }
-
-    definition = %Definition{root: root}
-
-    assert Info.node_at(definition, ["a", "y"]) == nil
-
-    assert_raise ArgumentError, ~r/ambiguous semantic path \["a", "y"\]/, fn ->
-      Info.semantic_kind(definition, ["a", "y"])
-    end
   end
 
   test "semantic entries expose object boundaries and computed paths" do
@@ -309,7 +247,6 @@ defmodule Formentation.InfoTest do
         ])
       )
 
-    assert definition.root == nil
     assert [%Semantic.Field{name: "name", required?: true}] = Info.fields(definition)
     assert %Semantic.Field{role: :text} = Info.node_at(definition, ["name"])
     assert Info.role(definition, ["name"]) == :text
@@ -324,7 +261,7 @@ defmodule Formentation.InfoTest do
         ]),
         Presentation.Object.new("/", [
           Presentation.Group.new(
-            "identity",
+            "/#identity",
             [
               Presentation.Field.new("/name",
                 label: "Display name",
@@ -333,7 +270,6 @@ defmodule Formentation.InfoTest do
                 hidden?: true
               )
             ],
-            layout_id: "/#identity",
             label: "Identity"
           )
         ])

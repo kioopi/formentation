@@ -18,8 +18,4 @@ defmodule Formentation.Presentation do
   @doc false
   @spec field_id(String.t()) :: String.t()
   def field_id(semantic_id) when is_binary(semantic_id), do: "layout:field:" <> semantic_id
-
-  @doc false
-  @spec group_id(String.t()) :: String.t()
-  def group_id(id) when is_binary(id), do: "layout:group:" <> id
 end

@@ -82,7 +82,7 @@ into a build failure. [[diagnostics-and-origins#Origins — provenance for resol
 are the single sanctioned difference and are asserted separately.
 
 The fact list is the test's real interface: adding a semantic field to
-`Node.Field` without adding it there means the new field is silently
+`Semantic.Field` without adding it there means the new field is silently
 unchecked across sources. It is the one place in the suite where an
 omission is more dangerous than a wrong assertion.
 

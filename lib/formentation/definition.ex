@@ -11,12 +11,11 @@ defmodule Formentation.Definition do
   currently).
   """
 
-  alias Formentation.{Diagnostic, Node, Presentation, Semantic, ValidationPlan}
+  alias Formentation.{Diagnostic, Presentation, Semantic, ValidationPlan}
 
   @format_version 3
 
   defstruct [
-    :root,
     :semantic,
     :semantic_index,
     :presentation,
@@ -27,9 +26,8 @@ defmodule Formentation.Definition do
 
   @type t :: %__MODULE__{
           format_version: pos_integer(),
-          root: Node.t() | nil,
           semantic: Semantic.Object.t() | nil,
-          semantic_index: Semantic.Index.t() | nil,
+          semantic_index: term(),
           presentation: Presentation.Object.t() | nil,
           diagnostics: [Diagnostic.t()],
           validation: ValidationPlan.t() | nil

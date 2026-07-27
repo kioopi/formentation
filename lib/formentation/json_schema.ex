@@ -15,7 +15,6 @@ defmodule Formentation.JSONSchema do
     Definition,
     Diagnostic,
     JSONPointer,
-    Node,
     NodeId,
     Presentation,
     Semantic,
@@ -193,30 +192,17 @@ defmodule Formentation.JSONSchema do
       properties = Map.get(schema, "properties", %{})
 
       with {:ok, children, ctx} <- compile_properties(properties, required, ctx) do
-        legacy_children = children |> Enum.map(& &1.legacy) |> Shared.stamp_declaration_order()
         {label, label_origin} = resolve_label(schema, name, ctx.source_path)
         {help, help_origin} = resolve_help(schema, ctx.source_path)
 
         presentation_origins = Shared.origin_entries(label: label_origin, help: help_origin)
 
-        legacy =
-          Shared.create_group_node(name, legacy_children, ctx,
-            label: label,
-            label_origin: label_origin,
-            help: help,
-            help_origin: help_origin
-          )
-
-        semantic =
-          Semantic.Object.new(name, ctx.template_path, Enum.map(children, & &1.semantic),
-            origins: []
-          )
+        semantic = Semantic.Object.new(name, ctx.template_path, Enum.map(children, & &1.semantic))
 
         presentation =
           Presentation.Object.new(
             semantic.id,
             children |> Enum.map(& &1.presentation) |> Enum.reject(&is_nil/1),
-            id: Presentation.object_id(semantic.id),
             label: label,
             help: help,
             origins: presentation_origins
@@ -224,7 +210,6 @@ defmodule Formentation.JSONSchema do
 
         {:ok,
          %Shared.Compiled{
-           legacy: %{legacy | children: legacy_children},
            semantic: semantic,
            presentation: presentation
          }, ctx}
@@ -374,22 +359,6 @@ defmodule Formentation.JSONSchema do
           default: default_origin
         )
 
-      legacy = %Node.Field{
-        id: NodeId.from_path(template_path),
-        name: name,
-        label: label,
-        role: role,
-        value_type: Map.fetch!(@value_types, Map.fetch!(schema, "type")),
-        help: help,
-        template_path: template_path,
-        required?: required?,
-        options: option_set(schema),
-        default: default,
-        examples: examples,
-        constraints: constraints(schema),
-        origins: origins
-      }
-
       semantic =
         Semantic.Field.new(
           name,
@@ -406,13 +375,12 @@ defmodule Formentation.JSONSchema do
 
       presentation =
         Presentation.Field.new(semantic.id,
-          id: Presentation.field_id(semantic.id),
           label: label,
           help: help,
           origins: presentation_origins(origins)
         )
 
-      {:ok, %Shared.Compiled{legacy: legacy, semantic: semantic, presentation: presentation}, ctx}
+      {:ok, %Shared.Compiled{semantic: semantic, presentation: presentation}, ctx}
     end
   end
 
@@ -424,18 +392,12 @@ defmodule Formentation.JSONSchema do
       origin_suffix = if code == :unsupported_type, do: ["type"], else: []
       origin = {:json_schema, JSONPointer.join(source_path ++ origin_suffix)}
 
-      legacy = %Node.Unsupported{
-        id: NodeId.from_path(template_path),
-        name: name,
-        required?: required?,
-        template_path: template_path,
-        origins: Shared.origin_entries(kind: origin)
-      }
+      origins = Shared.origin_entries(kind: origin)
 
       semantic =
         Semantic.Unsupported.new(name, template_path,
           required?: required?,
-          origins: legacy.origins
+          origins: origins
         )
 
       diagnostic = %Diagnostic{
@@ -446,7 +408,7 @@ defmodule Formentation.JSONSchema do
         template_path: template_path
       }
 
-      {:ok, %Shared.Compiled{legacy: legacy, semantic: semantic, presentation: nil},
+      {:ok, %Shared.Compiled{semantic: semantic, presentation: nil},
        %{ctx | diagnostics: [diagnostic | ctx.diagnostics]}}
     end
   end
@@ -543,33 +505,30 @@ defmodule Formentation.JSONSchema do
   defp presentation_origins(origins), do: Shared.fact_origins(origins, @presentation_origin_keys)
 
   defp apply_hints(
-         %Definition{root: root, semantic: semantic, presentation: presentation} = definition,
+         %Definition{semantic: semantic, presentation: presentation} = definition,
          ui
        ) do
-    {children, field_warnings} =
-      apply_field_hints(root.children, Map.get(ui, "fields", %{}))
-
-    {children, group_warnings} =
-      apply_group_hints(children, Map.get(ui, "groups", []))
-
-    {children, order_warnings} = apply_order(children, Map.get(ui, "order"))
-
-    diagnostics = definition.diagnostics ++ field_warnings ++ group_warnings ++ order_warnings
-    semantic = apply_native_semantic_field_hints(semantic, Map.get(ui, "fields", %{}))
+    fields = Map.get(ui, "fields", %{})
+    {semantic, field_warnings} = apply_native_semantic_field_hints(semantic, fields)
 
     presentation =
       presentation
-      |> apply_native_presentation_field_hints(Map.get(ui, "fields", %{}), semantic)
-      |> apply_native_group_hints(Map.get(ui, "groups", []), semantic)
-      |> apply_native_order(Map.get(ui, "order"), semantic)
+      |> apply_native_presentation_field_hints(fields, semantic)
+
+    {presentation, group_warnings} =
+      apply_native_group_hints(presentation, Map.get(ui, "groups", []), semantic)
+
+    {presentation, order_warnings} =
+      apply_native_order(presentation, Map.get(ui, "order"), semantic)
+
+    diagnostics = definition.diagnostics ++ field_warnings ++ group_warnings ++ order_warnings
 
     {:ok, native_definition} =
       Finalizer.finalize(semantic, presentation, diagnostics: diagnostics)
 
     definition = %{
       definition
-      | root: %{root | children: children},
-        semantic: native_definition.semantic,
+      | semantic: native_definition.semantic,
         semantic_index: native_definition.semantic_index,
         presentation: native_definition.presentation,
         diagnostics: diagnostics
@@ -578,90 +537,7 @@ defmodule Formentation.JSONSchema do
     {:ok, definition, diagnostics}
   end
 
-  defp apply_field_hints(children, fields) do
-    {by_name, warnings} =
-      Enum.reduce(fields, {Map.new(children, &{&1.name, &1}), []}, fn {name, hint},
-                                                                      {by_name, warnings} ->
-        case by_name do
-          %{^name => %Node.Field{} = node} ->
-            {node, new_warnings} = apply_field_hint(node, name, hint)
-            {%{by_name | name => node}, [new_warnings | warnings]}
-
-          %{^name => _non_field} ->
-            {by_name, warnings}
-
-          _no_match ->
-            {by_name, [[unknown_hint_field(name)] | warnings]}
-        end
-      end)
-
-    {Enum.map(children, &Map.fetch!(by_name, &1.name)), flatten_warnings(warnings)}
-  end
-
   defp flatten_warnings(warnings), do: warnings |> Enum.reverse() |> List.flatten()
-
-  defp apply_field_hint(node, name, hint) do
-    {node, widget_warnings} = apply_widget(node, name, hint)
-    node = apply_help(node, name, hint)
-    {node, hidden_warnings} = apply_hidden(node, name, hint)
-    {node, read_only_warnings} = apply_read_only(node, name, hint)
-    {node, widget_warnings ++ hidden_warnings ++ read_only_warnings}
-  end
-
-  defp apply_widget(node, name, %{"widget" => widget}) when is_map_key(@widgets, widget) do
-    pointer = JSONPointer.join(["fields", name, "widget"])
-
-    {%{
-       node
-       | widget: Map.fetch!(@widgets, widget),
-         origins: node.origins ++ [widget: {:ui_hints, pointer}]
-     }, []}
-  end
-
-  defp apply_widget(node, name, %{"widget" => widget}) do
-    warning = %Diagnostic{
-      severity: :warning,
-      code: :unknown_widget,
-      message: "unknown widget #{inspect(widget)} for field #{inspect(name)}",
-      origin: {:ui_hints, JSONPointer.join(["fields", name, "widget"])},
-      template_path: %TemplatePath{segments: []}
-    }
-
-    {node, [warning]}
-  end
-
-  defp apply_widget(node, _name, _hint), do: {node, []}
-
-  defp apply_help(node, name, %{"help" => help}) when is_binary(help) do
-    pointer = JSONPointer.join(["fields", name, "help"])
-    origins = Keyword.delete(node.origins, :help) ++ [help: {:ui_hints, pointer}]
-    %{node | help: help, origins: origins}
-  end
-
-  defp apply_help(node, _name, _hint), do: node
-
-  defp apply_hidden(node, name, %{"hidden" => value}) when is_boolean(value) do
-    pointer = JSONPointer.join(["fields", name, "hidden"])
-    {%{node | hidden?: value, origins: node.origins ++ [hidden: {:ui_hints, pointer}]}, []}
-  end
-
-  defp apply_hidden(node, name, %{"hidden" => other}) do
-    {node, [invalid_flag_warning("hidden", name, other)]}
-  end
-
-  defp apply_hidden(node, _name, _hint), do: {node, []}
-
-  defp apply_read_only(node, name, %{"read_only" => value}) when is_boolean(value) do
-    pointer = JSONPointer.join(["fields", name, "read_only"])
-
-    {%{node | read_only?: value, origins: node.origins ++ [read_only: {:ui_hints, pointer}]}, []}
-  end
-
-  defp apply_read_only(node, name, %{"read_only" => other}) do
-    {node, [invalid_flag_warning("read_only", name, other)]}
-  end
-
-  defp apply_read_only(node, _name, _hint), do: {node, []}
 
   defp invalid_flag_warning(key, name, value) do
     %Diagnostic{
@@ -685,24 +561,6 @@ defmodule Formentation.JSONSchema do
     }
   end
 
-  defp apply_group_hints(children, groups) do
-    {children, warnings, _count} =
-      Enum.reduce(groups, {children, [], 0}, fn group, {children, warnings, index} ->
-        spec = %{
-          id: Map.fetch!(group, "id"),
-          label: group["title"],
-          label_origin: group_label_origin(group, index),
-          fields: Map.fetch!(group, "fields")
-        }
-
-        {children, unknown} = Shared.attach_group(children, spec, %TemplatePath{segments: []})
-        new_warnings = Enum.map(unknown, &unknown_group_field(&1, group, index))
-        {children, [new_warnings | warnings], index + 1}
-      end)
-
-    {children, flatten_warnings(warnings)}
-  end
-
   defp group_label_origin(%{"title" => title}, index) when is_binary(title) do
     {:ui_hints, "/groups/#{index}/title"}
   end
@@ -719,25 +577,6 @@ defmodule Formentation.JSONSchema do
     }
   end
 
-  defp apply_order(children, nil), do: {children, []}
-
-  defp apply_order(children, order) when is_list(order) do
-    {matched, warnings} =
-      Enum.reduce(order, {[], []}, fn entry, {matched, warnings} ->
-        case Enum.find(children, &order_match?(&1, entry)) do
-          nil -> {matched, [unknown_order_entry(entry) | warnings]}
-          child -> {[child | matched], warnings}
-        end
-      end)
-
-    matched = matched |> Enum.reverse() |> Enum.uniq()
-    {matched ++ Enum.reject(children, &(&1 in matched)), Enum.reverse(warnings)}
-  end
-
-  defp order_match?(child, entry) do
-    child.name == entry or child.id == NodeId.group(%TemplatePath{segments: []}, entry)
-  end
-
   defp unknown_order_entry(entry) do
     %Diagnostic{
       severity: :warning,
@@ -749,6 +588,9 @@ defmodule Formentation.JSONSchema do
   end
 
   defp apply_native_semantic_field_hints(%Semantic.Object{} = semantic, fields) do
+    field_kind_by_name = Map.new(semantic.children, &{&1.name, semantic_kind(&1)})
+    warnings = field_hint_warnings(fields, field_kind_by_name)
+
     children =
       Enum.map(semantic.children, fn
         %Semantic.Field{name: name} = field ->
@@ -770,7 +612,54 @@ defmodule Formentation.JSONSchema do
           child
       end)
 
-    %{semantic | children: children}
+    {%{semantic | children: children}, warnings}
+  end
+
+  defp semantic_kind(%Semantic.Field{}), do: :field
+  defp semantic_kind(%Semantic.Object{}), do: :object
+  defp semantic_kind(%Semantic.Unsupported{}), do: :unsupported
+
+  defp field_hint_warnings(fields, field_kind_by_name) do
+    fields
+    |> Enum.flat_map(fn {name, hint} ->
+      case Map.get(field_kind_by_name, name) do
+        :field -> invalid_field_hint_warnings(name, hint)
+        nil -> [unknown_hint_field(name)]
+        _non_field -> []
+      end
+    end)
+  end
+
+  defp invalid_field_hint_warnings(name, hint) do
+    []
+    |> maybe_unknown_widget(name, hint)
+    |> maybe_invalid_flag("hidden", name, hint)
+    |> maybe_invalid_flag("read_only", name, hint)
+    |> Enum.reverse()
+  end
+
+  defp maybe_unknown_widget(warnings, name, %{"widget" => widget})
+       when not is_map_key(@widgets, widget) do
+    [
+      %Diagnostic{
+        severity: :warning,
+        code: :unknown_widget,
+        message: "unknown widget #{inspect(widget)} for field #{inspect(name)}",
+        origin: {:ui_hints, JSONPointer.join(["fields", name, "widget"])},
+        template_path: %TemplatePath{segments: []}
+      }
+      | warnings
+    ]
+  end
+
+  defp maybe_unknown_widget(warnings, _name, _hint), do: warnings
+
+  defp maybe_invalid_flag(warnings, key, name, hint) do
+    case Map.fetch(hint, key) do
+      {:ok, value} when is_boolean(value) -> warnings
+      {:ok, value} -> [invalid_flag_warning(key, name, value) | warnings]
+      :error -> warnings
+    end
   end
 
   defp apply_native_presentation_field_hints(
@@ -845,8 +734,8 @@ defmodule Formentation.JSONSchema do
   defp apply_native_hidden(field, _name, _hint), do: field
 
   defp apply_native_group_hints(%Presentation.Object{} = presentation, groups, semantic) do
-    {children, _index} =
-      Enum.reduce(groups, {presentation.children, 0}, fn group, {children, index} ->
+    {children, warnings, _index} =
+      Enum.reduce(groups, {presentation.children, [], 0}, fn group, {children, warnings, index} ->
         spec = %Shared.PresentationGroupSpec{
           id: Map.fetch!(group, "id"),
           label: group["title"],
@@ -854,10 +743,12 @@ defmodule Formentation.JSONSchema do
           fields: Map.fetch!(group, "fields")
         }
 
-        {attach_native_group(children, semantic, spec), index + 1}
+        {children, unknown} = attach_native_group(children, semantic, spec)
+        new_warnings = Enum.map(unknown, &unknown_group_field(&1, group, index))
+        {children, [new_warnings | warnings], index + 1}
       end)
 
-    %{presentation | children: children}
+    {%{presentation | children: children}, flatten_warnings(warnings)}
   end
 
   defp attach_native_group(
@@ -866,22 +757,25 @@ defmodule Formentation.JSONSchema do
          %Shared.PresentationGroupSpec{fields: fields} = spec
        ) do
     fields = Enum.uniq(fields)
-    by_name = presentation_children_by_name(children, semantic)
+    by_name = Shared.presentation_children_by_name(children, semantic.children)
+    unsupported_names = Shared.unsupported_names(semantic.children)
 
     members =
       fields
       |> Enum.filter(&is_map_key(by_name, &1))
       |> Enum.map(&Map.fetch!(by_name, &1))
 
-    place_native_group(children, spec, members)
+    unknown =
+      Enum.reject(fields, &(is_map_key(by_name, &1) or MapSet.member?(unsupported_names, &1)))
+
+    {place_native_group(children, spec, members), unknown}
   end
 
   defp place_native_group(children, _spec, []), do: children
 
   defp place_native_group(children, %Shared.PresentationGroupSpec{id: id} = spec, members) do
     group =
-      Presentation.Group.new(id, members,
-        layout_id: NodeId.group(%TemplatePath{segments: []}, id),
+      Presentation.Group.new(NodeId.group(%TemplatePath{segments: []}, id), members,
         label: spec.label,
         origins: Shared.origin_entries(label: spec.label_origin)
       )
@@ -894,35 +788,31 @@ defmodule Formentation.JSONSchema do
     |> List.insert_at(first_index, group)
   end
 
-  defp apply_native_order(%Presentation.Object{} = presentation, nil, _semantic), do: presentation
+  defp apply_native_order(%Presentation.Object{} = presentation, nil, _semantic),
+    do: {presentation, []}
 
   defp apply_native_order(%Presentation.Object{} = presentation, order, semantic)
        when is_list(order) do
-    {matched, _unknown} =
+    name_by_id = Map.new(semantic.children, &{&1.id, &1.name})
+
+    {matched, warnings} =
       Enum.reduce(order, {[], []}, fn entry, {matched, unknown} ->
-        case Enum.find(presentation.children, &native_order_match?(&1, entry, semantic)) do
-          nil -> {matched, [entry | unknown]}
+        case Enum.find(presentation.children, &native_order_match?(&1, entry, name_by_id)) do
+          nil -> {matched, [unknown_order_entry(entry) | unknown]}
           child -> {[child | matched], unknown}
         end
       end)
 
     matched = matched |> Enum.reverse() |> Enum.uniq()
-    %{presentation | children: matched ++ Enum.reject(presentation.children, &(&1 in matched))}
+
+    {%{presentation | children: matched ++ Enum.reject(presentation.children, &(&1 in matched))},
+     Enum.reverse(warnings)}
   end
 
-  defp presentation_children_by_name(children, semantic) do
-    by_id = Map.new(semantic.children, &{&1.id, &1.name})
-
-    children
-    |> Enum.filter(&Shared.presentation_reference_id/1)
-    |> Map.new(fn child -> {Map.fetch!(by_id, child.semantic_id), child} end)
-  end
-
-  defp native_order_match?(%Presentation.Group{id: id}, entry, _semantic),
+  defp native_order_match?(%Presentation.Group{id: id}, entry, _name_by_id),
     do: id == NodeId.group(%TemplatePath{segments: []}, entry)
 
-  defp native_order_match?(child, entry, semantic) do
-    name_by_id = Map.new(semantic.children, &{&1.id, &1.name})
+  defp native_order_match?(child, entry, name_by_id) do
     Map.get(name_by_id, Shared.presentation_reference_id(child)) == entry
   end
 end

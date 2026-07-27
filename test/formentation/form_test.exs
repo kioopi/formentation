@@ -1,11 +1,11 @@
 defmodule Formentation.FormTest do
   use ExUnit.Case, async: true
 
-  alias Formentation.{Definition, Form, InstancePath, Issue, Node, Params, TemplatePath}
   alias Formentation.Fixtures.PumpInspection
+  alias Formentation.{Form, InstancePath, Issue, Params}
+  alias Formentation.Form.FieldState
 
   doctest Formentation.Form
-  alias Formentation.Form.FieldState
 
   defp pump_definition do
     {:ok, definition, []} =
@@ -612,51 +612,25 @@ defmodule Formentation.FormTest do
 
   describe "per-kind node trees" do
     defp per_kind_definition do
-      priority = %Node.Field{
-        id: "/priority",
-        name: "priority",
-        value_type: :string,
-        default: "normal",
-        template_path: %TemplatePath{segments: ["priority"]}
-      }
+      {:ok, definition, [_warning]} =
+        Formentation.compile(
+          %{
+            kind: :object,
+            properties: [
+              {"priority", %{kind: :string, default: "normal"}},
+              {"electrical",
+               %{
+                 kind: :object,
+                 properties: [{"voltage", %{kind: :integer}}],
+                 groups: [%{id: "power", fields: ["voltage"]}]
+               }},
+              {"gadget", %{kind: :file}}
+            ]
+          },
+          adapter: Formentation.Source.Map
+        )
 
-      voltage = %Node.Field{
-        id: "/electrical/voltage",
-        name: "voltage",
-        value_type: :integer,
-        template_path: %TemplatePath{segments: ["electrical", "voltage"]}
-      }
-
-      fieldset = %Node.Group{
-        id: "/electrical#power",
-        nests_data?: false,
-        label: "Power",
-        template_path: %TemplatePath{segments: ["electrical"]},
-        children: [voltage]
-      }
-
-      electrical = %Node.Group{
-        id: "/electrical",
-        name: "electrical",
-        nests_data?: true,
-        template_path: %TemplatePath{segments: ["electrical"]},
-        children: [fieldset]
-      }
-
-      gadget = %Node.Unsupported{
-        id: "/gadget",
-        name: "gadget",
-        template_path: %TemplatePath{segments: ["gadget"]}
-      }
-
-      root = %Node.Group{
-        id: "/",
-        nests_data?: true,
-        template_path: %TemplatePath{segments: []},
-        children: [priority, electrical, gadget]
-      }
-
-      %Definition{root: root}
+      definition
     end
 
     test "defaults: :apply reads per-kind field and group nodes" do

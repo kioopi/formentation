@@ -37,7 +37,7 @@ A form passes through a small number of named stages:
 
 - **Declaration** — what you write: a description of the form in some source vocabulary — plain Elixir data, or a JSON Schema document (draft 2020-12) with an optional UI-hints companion. See the [conceptual model](docs/Formentation/Planning/03-conceptual-model.md).
 - **Source adapter** — a module implementing the `Formentation.Source` behaviour that compiles a declaration into a definition. `Formentation.Source.Map` is the reference adapter; `Formentation.JSONSchema` compiles JSON Schema. See [source adapters](docs/Formentation/Techdocs/source-adapters.md).
-- **Definition** — the compiled result: a static, source-independent tree of `Formentation.Node` structs (groups and fields with labels, roles, constraints). See [Definition and Node](docs/Formentation/Techdocs/definition-and-node.md).
+- **Definition** — the compiled result: static semantic storage plus a presentation layout tree, queried through `Formentation.Info`. See [Definition and Node](docs/Formentation/Techdocs/definition-and-node.md).
 - **Info** — the stable query surface. Renderers, tooling, and tests ask `Formentation.Info` questions (`fields/1`, `role/2`, `required?/2`, …) instead of pattern-matching definition internals.
 - **Form state** — a definition paired with the data, params, and interaction history of one filling-in. Pure and Phoenix-free. See [form state and transitions](docs/Formentation/Techdocs/form-state-and-transitions.md).
 - **Projection and rendering** — form state becomes an ordinary `Phoenix.HTML.Form`, which the projector turns into a render plan and the theme into HTML. See [rendering](docs/Formentation/Techdocs/rendering.md).
@@ -54,8 +54,9 @@ iex> definition = compile!(schema(), ui: ui_hints())
 iex> Info.fields(definition) |> Enum.map(&{&1.name, &1.role})
 [{"name", :text}, {"email", :email}, {"newsletter", :boolean}]
 
-iex> Info.node_at(definition, ["email"]).group
-"contact"
+iex> {:ok, email} = Info.presentation_at(definition, ["email"])
+iex> email.widget
+:email_input
 ```
 
 Every resolved value knows where it came from — a JSON Pointer into the schema or hints document, or a named inference rule:

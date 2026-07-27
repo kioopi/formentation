@@ -26,9 +26,8 @@ data-nesting group), returning `nil` when the node deliberately renders
 nothing, and raising for an unknown or unsupported path.
 
 The walk consumes `Formentation.Info.presentation_root/1` and
-`presentation_at/2`, not `Definition.root`. Those queries now read the native
-`Definition.presentation` tree when it exists and return typed presentation
-descriptors:
+`presentation_at/2`. Those queries read the native `Definition.presentation`
+tree and return typed presentation descriptors:
 
 - **Object descriptors** carry a semantic `InstancePath` and form a
   layout boundary for the root or a nested data object.
@@ -56,7 +55,7 @@ are both presentation-hidden and semantically read-only project to nothing.
 
 ## `RenderPlan` and render-node shapes
 
-One struct per node kind (D-015), mirroring `Formentation.Node`:
+One struct per render node shape:
 
 - `Formentation.Phoenix.RenderPlan` — `root` (a `RenderNode.Group`),
   `summary` (the submit-gated error-summary entries, `%{id, label,
@@ -64,9 +63,8 @@ One struct per node kind (D-015), mirroring `Formentation.Node`:
   `:widget_fallback`). Planning-note fields with no Phase 1 behavior
   (fingerprint, active branches, item identities) are omitted, not
   stubbed.
-- `Formentation.Phoenix.RenderNode.Group` — `legend`, `children`. Both
-  D-006 group flavors project to this one shape; only the field names
-  inside differ.
+- `Formentation.Phoenix.RenderNode.Group` — `legend`, `children`. Semantic
+  objects and presentation groups both project to this one render shape.
 - `Formentation.Phoenix.RenderNode.Field` — `widget`, `field` (the
   `%Phoenix.HTML.FormField{}`, carrying id/name/value), `label`, `help`,
   `options`, `validations` (`Phoenix.HTML.Form.input_validations/2`,
@@ -139,7 +137,7 @@ It combines two sources:
   only — the degradation is keyed on what `issues/2` reports, not on the
   source's module.
 
-An entry whose path resolves to a `Node.Unsupported` is the one object
+An entry whose path resolves to a `Semantic.Unsupported` is the one object
 entry the projector labels, humanizing the node's last path segment; root
 and group entries stay unlabelled.
 

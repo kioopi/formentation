@@ -125,11 +125,10 @@ walk and defers presentation order to the `order` hint. It is gated and
 enriched by the two passes below.
 
 The scalar surface both adapters translate is the same: object schemas
-become data-nesting groups ([[18-decisions#D-006 — One `:group` kind, flagged for data nesting|D-006]]);
-`string`/`integer`/`number`/`boolean` properties become `Field`s with
-resolved label, role, help, options, default, examples, and constraints;
-anything outside the subset becomes a `Node.Unsupported` plus a warning,
-never a crash.
+become `Semantic.Object`s; `string`/`integer`/`number`/`boolean` properties
+become semantic fields with presentation descriptors for label, help, widget,
+and hidden intent; anything outside the subset becomes a
+`Semantic.Unsupported` plus a warning, never a crash.
 
 ## The JSV metaschema pre-pass
 
@@ -165,13 +164,13 @@ tree. The vocabulary:
 
 - **`order`** — reorders top-level children by name or group id.
 - **`groups`** — declares presentation groups (`id`, `fields`, optional
-  `title`), realized through the shared `attach_group/3`.
+  `title`) in the native presentation tree.
 - **`fields.*`** — per-field `widget` and `help` overrides, and the `hidden`/`read_only` participation flags ([[18-decisions#D-016 — Participation is definition-driven, not transport-driven|D-016]]). Hints address top-level fields only — the post-pass does not recurse into nested objects (recorded in [[16-open-questions|open questions]]; the map source's inline keys have no such limit).
 
 Hints are validated up front (`check_hints/1`) so a malformed `:ui` map
 errors before any work; unknown fields, widgets, and order entries each
 raise a targeted warning rather than failing. Field hints apply only to
-`Node.Field`s — a hint naming a non-field property is ignored. `Source.Map`
+semantic fields — a hint naming a non-field property is ignored. `Source.Map`
 needs no such pass: it expresses the same intent inline, which is exactly
 what the differential property checks stays equivalent.
 

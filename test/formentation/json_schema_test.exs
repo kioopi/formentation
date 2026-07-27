@@ -1,7 +1,8 @@
 defmodule Formentation.JSONSchemaTest do
   use ExUnit.Case, async: true
 
-  alias Formentation.{Info, Node, Presentation, Semantic, TemplatePath}
+  alias Formentation.{Info, Presentation, Semantic, TemplatePath}
+  alias Formentation.Info.Presentation, as: PresentationInfo
 
   defp compile!(schema, opts \\ []) do
     {:ok, definition, _diagnostics} =
@@ -9,6 +10,9 @@ defmodule Formentation.JSONSchemaTest do
 
     definition
   end
+
+  defp presentation_key(%PresentationInfo.Group{id: id}), do: id
+  defp presentation_key(%PresentationInfo.Field{semantic_path: path}), do: path.segments
 
   defp schema_with_group do
     %{
@@ -39,8 +43,8 @@ defmodule Formentation.JSONSchemaTest do
       definition =
         compile!(%{"type" => "object", "properties" => %{"name" => %{"type" => "string"}}})
 
-      assert %Node.Group{nests_data?: true, id: "/"} = Info.root(definition)
-      assert [%Node.Field{name: "name", id: "/name"}] = Info.fields(definition)
+      assert %Semantic.Object{id: "/"} = Info.root(definition)
+      assert [%Semantic.Field{name: "name", id: "/name"}] = Info.fields(definition)
       assert Info.diagnostics(definition) == []
     end
 
@@ -104,8 +108,11 @@ defmodule Formentation.JSONSchemaTest do
           }
         })
 
-      assert %Node.Group{label: "Pump inspection"} = Info.root(definition)
-      assert %Node.Field{label: "Serial number"} = Info.node_at(definition, ["serial_number"])
+      assert %PresentationInfo.Object{label: "Pump inspection"} =
+               Info.presentation_root(definition)
+
+      assert {:ok, %PresentationInfo.Field{label: "Serial number"}} =
+               Info.presentation_at(definition, ["serial_number"])
 
       assert Info.origins(definition, ["serial_number"])[:label] ==
                {:json_schema, "/properties/serial_number/title"}
@@ -118,7 +125,9 @@ defmodule Formentation.JSONSchemaTest do
           "properties" => %{"serial_number" => %{"type" => "string"}}
         })
 
-      assert %Node.Field{label: "Serial number"} = Info.node_at(definition, ["serial_number"])
+      assert {:ok, %PresentationInfo.Field{label: "Serial number"}} =
+               Info.presentation_at(definition, ["serial_number"])
+
       assert Info.origins(definition, ["serial_number"])[:label] == {:inference, :label_from_name}
     end
   end
@@ -198,7 +207,7 @@ defmodule Formentation.JSONSchemaTest do
             {"when", :string},
             {"choice", :string}
           ] do
-        assert %Formentation.Node.Field{value_type: ^expected} =
+        assert %Formentation.Semantic.Field{value_type: ^expected} =
                  Formentation.Info.node_at(definition, [name])
       end
     end
@@ -270,7 +279,7 @@ defmodule Formentation.JSONSchemaTest do
           }
         })
 
-      assert %Node.Field{options: ["good", "worn", "defective"]} =
+      assert %Semantic.Field{options: ["good", "worn", "defective"]} =
                Info.node_at(definition, ["condition"])
 
       assert Info.role(definition, ["condition"]) == :select
@@ -321,7 +330,7 @@ defmodule Formentation.JSONSchemaTest do
         })
 
       assert Info.role(definition, ["day"]) == :date
-      assert %Node.Field{options: ["2026-01-01"]} = Info.node_at(definition, ["day"])
+      assert %Semantic.Field{options: ["2026-01-01"]} = Info.node_at(definition, ["day"])
     end
   end
 
@@ -343,7 +352,7 @@ defmodule Formentation.JSONSchemaTest do
                diagnostics
 
       assert diagnostic.origin == {:json_schema, "/properties/tags/type"}
-      assert %Node.Unsupported{name: "tags"} = Info.node_at(definition, ["tags"])
+      assert %Semantic.Unsupported{name: "tags"} = Info.node_at(definition, ["tags"])
       assert Enum.map(Info.fields(definition), & &1.name) == ["notes"]
     end
 
@@ -362,7 +371,7 @@ defmodule Formentation.JSONSchemaTest do
       assert [%Formentation.Diagnostic{severity: :warning, code: :unsupported_keyword}] =
                diagnostics
 
-      assert %Node.Unsupported{name: "either"} = Info.node_at(definition, ["either"])
+      assert %Semantic.Unsupported{name: "either"} = Info.node_at(definition, ["either"])
     end
 
     test "a non-string enum is unsupported_keyword" do
@@ -378,7 +387,7 @@ defmodule Formentation.JSONSchemaTest do
       assert [%Formentation.Diagnostic{severity: :warning, code: :unsupported_keyword}] =
                diagnostics
 
-      assert %Node.Unsupported{name: "rating"} = Info.node_at(definition, ["rating"])
+      assert %Semantic.Unsupported{name: "rating"} = Info.node_at(definition, ["rating"])
     end
 
     test "an unsupported node keeps required? true when listed in required" do
@@ -392,7 +401,7 @@ defmodule Formentation.JSONSchemaTest do
           adapter: Formentation.JSONSchema
         )
 
-      assert %Node.Unsupported{required?: true} = Info.node_at(definition, ["tags"])
+      assert %Semantic.Unsupported{required?: true} = Info.node_at(definition, ["tags"])
     end
 
     test "a non-object root is an unsupported_type error" do
@@ -419,10 +428,13 @@ defmodule Formentation.JSONSchemaTest do
           }
         })
 
-      assert %Node.Group{nests_data?: true, id: "/dimensions", label: "Dimensions"} =
+      assert %Semantic.Object{id: "/dimensions"} =
                Info.node_at(definition, ["dimensions"])
 
-      assert %Node.Field{id: "/dimensions/width", role: :integer} =
+      assert {:ok, %PresentationInfo.Object{label: "Dimensions"}} =
+               Info.presentation_at(definition, ["dimensions"])
+
+      assert %Semantic.Field{id: "/dimensions/width", role: :integer} =
                Info.node_at(definition, ["dimensions", "width"])
 
       assert Info.required?(definition, ["dimensions", "width"]) == true
@@ -470,14 +482,16 @@ defmodule Formentation.JSONSchemaTest do
 
       group = Info.node(definition, "/#electrical")
 
-      assert %Node.Group{
-               nests_data?: false,
+      assert %Presentation.Group{
                label: "Electrical",
-               children: [%Node.Field{name: "voltage"}, %Node.Field{name: "insulation_ok"}]
+               children: [
+                 %Presentation.Field{semantic_id: "/voltage"},
+                 %Presentation.Field{semantic_id: "/insulation_ok"}
+               ]
              } = group
 
       assert group.origins[:label] == {:ui_hints, "/groups/0/title"}
-      assert %Node.Field{group: "electrical"} = Info.node_at(definition, ["voltage"])
+      assert {:ok, %PresentationInfo.Field{}} = Info.presentation_at(definition, ["voltage"])
       assert Info.node_at(definition, ["voltage"]).id == "/voltage"
     end
 
@@ -568,6 +582,31 @@ defmodule Formentation.JSONSchemaTest do
                diagnostics
     end
 
+    test "a group naming a known unsupported occurrence does not warn as unknown" do
+      schema = %{
+        "type" => "object",
+        "properties" => %{
+          "a" => %{"type" => "string"},
+          "att" => %{"type" => "array"}
+        }
+      }
+
+      hints = %{"groups" => [%{"id" => "g", "fields" => ["a", "att"]}]}
+
+      {:ok, definition, diagnostics} =
+        Formentation.compile(schema, adapter: Formentation.JSONSchema, ui: hints)
+
+      assert [%Formentation.Diagnostic{severity: :warning, code: :unsupported_type}] =
+               diagnostics
+
+      refute Enum.any?(diagnostics, &(&1.code == :unknown_group_field))
+
+      assert %Presentation.Group{children: [%Presentation.Field{semantic_id: "/a"}]} =
+               Info.node(definition, "/#g")
+
+      assert Info.presentation_at(definition, ["att"]) == :unsupported
+    end
+
     test "widget and help overrides carry ui_hints origins" do
       hints = %{
         "fields" => %{
@@ -577,8 +616,9 @@ defmodule Formentation.JSONSchemaTest do
 
       definition = compile!(schema_with_group(), ui: hints)
 
-      assert %Node.Field{widget: :textarea, help: "Visible to all technicians."} =
-               Info.node_at(definition, ["notes"])
+      assert {:ok,
+              %PresentationInfo.Field{widget: :textarea, help: "Visible to all technicians."}} =
+               Info.presentation_at(definition, ["notes"])
 
       origins = Info.origins(definition, ["notes"])
       assert origins[:widget] == {:ui_hints, "/fields/notes/widget"}
@@ -592,9 +632,10 @@ defmodule Formentation.JSONSchemaTest do
 
       definition = compile!(schema_with_group(), ui: hints)
 
-      voltage = Info.node_at(definition, ["voltage"])
-      assert voltage.widget == :select
-      assert voltage.group == "electrical"
+      assert %Semantic.Field{} = Info.node_at(definition, ["voltage"])
+
+      assert {:ok, %PresentationInfo.Field{widget: :select}} =
+               Info.presentation_at(definition, ["voltage"])
 
       assert Info.origins(definition, ["voltage"])[:widget] ==
                {:ui_hints, "/fields/voltage/widget"}
@@ -606,7 +647,9 @@ defmodule Formentation.JSONSchemaTest do
 
       definition = compile!(schema, ui: hints)
 
-      assert %Node.Group{children: [%Node.Field{name: "a"}]} = Info.node(definition, "/#g")
+      assert %Presentation.Group{children: [%Presentation.Field{semantic_id: "/a"}]} =
+               Info.node(definition, "/#g")
+
       assert Enum.map(Info.fields(definition), & &1.name) == ["a"]
     end
 
@@ -627,9 +670,14 @@ defmodule Formentation.JSONSchemaTest do
 
       definition = compile!(schema, ui: hints)
 
-      assert %Node.Group{children: children} = Info.node(definition, "/#g")
-      assert Enum.map(children, & &1.name) == ["c", "a"]
-      assert Enum.map(Info.root(definition).children, & &1.id) == ["/#g", "/b"]
+      assert %Presentation.Group{children: children} = Info.node(definition, "/#g")
+      assert Enum.map(children, & &1.semantic_id) == ["/c", "/a"]
+
+      assert Enum.map(Info.presentation_root(definition).children, &presentation_key/1) == [
+               "/#g",
+               ["b"]
+             ]
+
       assert Enum.map(Info.fields(definition), & &1.name) == ["a", "b", "c"]
     end
 
@@ -643,7 +691,9 @@ defmodule Formentation.JSONSchemaTest do
         )
 
       assert [%Formentation.Diagnostic{severity: :warning, code: :unknown_widget}] = diagnostics
-      assert %Node.Field{widget: nil} = Info.node_at(definition, ["notes"])
+
+      assert {:ok, %PresentationInfo.Field{widget: nil}} =
+               Info.presentation_at(definition, ["notes"])
     end
 
     test "hints for an unknown property warn with unknown_hint_field" do
@@ -686,7 +736,9 @@ defmodule Formentation.JSONSchemaTest do
         Formentation.compile(schema, adapter: Formentation.JSONSchema, ui: hints)
 
       assert diagnostics == []
-      assert %Node.Group{help: nil} = Info.node_at(definition, ["address"])
+
+      assert {:ok, %PresentationInfo.Object{help: nil}} =
+               Info.presentation_at(definition, ["address"])
     end
 
     test "malformed hints are an invalid_ui_hints error" do
@@ -718,10 +770,10 @@ defmodule Formentation.JSONSchemaTest do
       definition = compile!(schema_with_group(), ui: hints)
 
       assert [
-               %Node.Field{name: "serial_number"},
-               %Node.Group{id: "/#electrical"},
-               %Node.Field{name: "notes"}
-             ] = Info.root(definition).children
+               %PresentationInfo.Field{semantic_path: %{segments: ["serial_number"]}},
+               %PresentationInfo.Group{id: "/#electrical"},
+               %PresentationInfo.Field{semantic_path: %{segments: ["notes"]}}
+             ] = Info.presentation_root(definition).children
     end
 
     test "children absent from the order hint append in existing deterministic order" do
@@ -729,18 +781,18 @@ defmodule Formentation.JSONSchemaTest do
       definition = compile!(schema_with_group(), ui: hints)
 
       assert [
-               %Node.Field{name: "notes"},
-               %Node.Group{id: "/#electrical"},
-               %Node.Field{name: "serial_number"}
-             ] = Info.root(definition).children
+               %PresentationInfo.Field{semantic_path: %{segments: ["notes"]}},
+               %PresentationInfo.Group{id: "/#electrical"},
+               %PresentationInfo.Field{semantic_path: %{segments: ["serial_number"]}}
+             ] = Info.presentation_root(definition).children
     end
 
     test "a duplicated order entry does not duplicate the node" do
       hints = %{"order" => ["notes", "notes"]}
       definition = compile!(schema_with_group(), ui: hints)
 
-      assert Enum.map(Info.root(definition).children, & &1.name) ==
-               ["notes", "insulation_ok", "serial_number", "voltage"]
+      assert Enum.map(Info.presentation_root(definition).children, & &1.semantic_path.segments) ==
+               [["notes"], ["insulation_ok"], ["serial_number"], ["voltage"]]
     end
 
     test "an unknown order entry warns and the rest still applies" do
@@ -755,7 +807,8 @@ defmodule Formentation.JSONSchemaTest do
       assert [%Formentation.Diagnostic{severity: :warning, code: :unknown_order_entry}] =
                diagnostics
 
-      assert %Node.Field{name: "notes"} = List.first(Info.root(definition).children)
+      assert %PresentationInfo.Field{semantic_path: %{segments: ["notes"]}} =
+               List.first(Info.presentation_root(definition).children)
     end
   end
 
@@ -773,10 +826,11 @@ defmodule Formentation.JSONSchemaTest do
           }
         })
 
-      assert %Node.Group{help: "Recorded at the end of each shift."} = Info.root(definition)
+      assert %PresentationInfo.Object{help: "Recorded at the end of each shift."} =
+               Info.presentation_root(definition)
 
-      assert %Node.Field{help: "Full name of the reviewing engineer."} =
-               Info.node_at(definition, ["reviewed_by"])
+      assert {:ok, %PresentationInfo.Field{help: "Full name of the reviewing engineer."}} =
+               Info.presentation_at(definition, ["reviewed_by"])
 
       assert Info.origins(definition, ["reviewed_by"])[:help] ==
                {:json_schema, "/properties/reviewed_by/description"}
@@ -796,8 +850,8 @@ defmodule Formentation.JSONSchemaTest do
           ui: %{"fields" => %{"summary" => %{"help" => "Keep it under two sentences."}}}
         )
 
-      assert %Node.Field{help: "Keep it under two sentences."} =
-               Info.node_at(definition, ["summary"])
+      assert {:ok, %PresentationInfo.Field{help: "Keep it under two sentences."}} =
+               Info.presentation_at(definition, ["summary"])
 
       origins = Info.origins(definition, ["summary"])
       assert origins[:help] == {:ui_hints, "/fields/summary/help"}
@@ -817,7 +871,7 @@ defmodule Formentation.JSONSchemaTest do
           }
         })
 
-      assert %Node.Field{examples: ["J. Doe"], default: "unassigned"} =
+      assert %Semantic.Field{examples: ["J. Doe"], default: "unassigned"} =
                Info.node_at(definition, ["reviewed_by"])
 
       origins = Info.origins(definition, ["reviewed_by"])
@@ -833,7 +887,7 @@ defmodule Formentation.JSONSchemaTest do
           "properties" => %{"name" => %{"type" => "string", "default" => nil}}
         })
 
-      assert %Node.Field{default: nil} = Info.node_at(definition, ["name"])
+      assert %Semantic.Field{default: nil} = Info.node_at(definition, ["name"])
       refute Keyword.has_key?(Info.origins(definition, ["name"]), :default)
 
       assert [%{severity: :warning, code: :unsupported_keyword} = warning] =
@@ -852,7 +906,7 @@ defmodule Formentation.JSONSchemaTest do
           "properties" => %{"name" => %{"type" => "string"}}
         })
 
-      assert %Node.Group{} = Info.root(definition)
+      assert %Semantic.Object{} = Info.root(definition)
       assert Info.diagnostics(definition) == []
     end
 
@@ -876,7 +930,7 @@ defmodule Formentation.JSONSchemaTest do
           "properties" => %{"checklist_version" => %{"type" => "string", "const" => "2"}}
         })
 
-      assert %Node.Field{options: ["2"], role: :select} =
+      assert %Semantic.Field{options: ["2"], role: :select} =
                Info.node_at(definition, ["checklist_version"])
 
       origins = Info.origins(definition, ["checklist_version"])
@@ -895,7 +949,7 @@ defmodule Formentation.JSONSchemaTest do
         })
 
       assert Info.role(definition, ["due"]) == :date
-      assert %Node.Field{options: ["2026-01-01"]} = Info.node_at(definition, ["due"])
+      assert %Semantic.Field{options: ["2026-01-01"]} = Info.node_at(definition, ["due"])
     end
 
     test "const wins over enum for the option set" do
@@ -907,7 +961,7 @@ defmodule Formentation.JSONSchemaTest do
           }
         })
 
-      assert %Node.Field{options: ["good"]} = Info.node_at(definition, ["condition"])
+      assert %Semantic.Field{options: ["good"]} = Info.node_at(definition, ["condition"])
 
       assert Info.origins(definition, ["condition"])[:options] ==
                {:json_schema, "/properties/condition/const"}
@@ -922,7 +976,7 @@ defmodule Formentation.JSONSchemaTest do
           "properties" => %{"version" => %{"type" => "string", "const" => 2}}
         })
 
-      assert %Node.Unsupported{} = Info.node_at(definition, ["version"])
+      assert %Semantic.Unsupported{} = Info.node_at(definition, ["version"])
 
       assert [%{severity: :warning, code: :unsupported_keyword} = warning] =
                Info.diagnostics(definition)
@@ -937,7 +991,7 @@ defmodule Formentation.JSONSchemaTest do
           "properties" => %{"count" => %{"type" => "integer", "const" => 3}}
         })
 
-      assert %Node.Unsupported{} = Info.node_at(definition, ["count"])
+      assert %Semantic.Unsupported{} = Info.node_at(definition, ["count"])
       assert [%{code: :unsupported_keyword} = warning] = Info.diagnostics(definition)
       assert warning.message =~ "const on a non-string type"
     end
@@ -955,7 +1009,7 @@ defmodule Formentation.JSONSchemaTest do
           }
         })
 
-      assert %Node.Group{} = Info.node_at(definition, ["meta"])
+      assert %Semantic.Object{} = Info.node_at(definition, ["meta"])
       assert Info.diagnostics(definition) == []
     end
   end
@@ -1102,10 +1156,15 @@ defmodule Formentation.JSONSchemaTest do
           }
         )
 
-      assert %Node.Field{read_only?: true, hidden?: false} = Info.node_at(definition, ["serial"])
+      assert %Semantic.Field{read_only?: true} = Info.node_at(definition, ["serial"])
 
-      assert %Node.Field{hidden?: true, read_only?: false} =
-               Info.node_at(definition, ["legacy_id"])
+      assert {:ok, %PresentationInfo.Field{hidden?: false}} =
+               Info.presentation_at(definition, ["serial"])
+
+      assert %Semantic.Field{read_only?: false} = Info.node_at(definition, ["legacy_id"])
+
+      assert {:ok, %PresentationInfo.Field{hidden?: true}} =
+               Info.presentation_at(definition, ["legacy_id"])
 
       assert Info.origins(definition, ["serial"])[:read_only] ==
                {:ui_hints, "/fields/serial/read_only"}
@@ -1121,7 +1180,9 @@ defmodule Formentation.JSONSchemaTest do
           ui: %{"fields" => %{"serial" => %{"hidden" => "yes"}}}
         )
 
-      assert %Node.Field{hidden?: false} = Info.node_at(definition, ["serial"])
+      assert {:ok, %PresentationInfo.Field{hidden?: false}} =
+               Info.presentation_at(definition, ["serial"])
+
       refute Keyword.has_key?(Info.origins(definition, ["serial"]), :hidden)
 
       assert [%{severity: :warning, code: :invalid_hint_value} = warning] = diagnostics

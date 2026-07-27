@@ -778,17 +778,17 @@ to this gate.
       their implementation nodes can affect behaviour.
 - [ ] Wave 0 proves equivalent transition/candidate semantics under different
       layouts and layout-invariant nested-object presence.
-- [ ] `Definition` stores separate semantic and presentation structures.
-- [ ] Both current adapters produce those structures directly.
-- [ ] Default presentation layout is deterministic.
-- [ ] Layout references are validated and resolve to semantic occurrences.
-- [ ] `Form` traverses semantic structure only.
-- [ ] Phoenix preparation traverses layout and resolves semantic references.
-- [ ] The old mixed root tree, `nests_data?`, and presentation membership on
+- [x] `Definition` stores separate semantic and presentation structures.
+- [x] Both current adapters produce those structures directly.
+- [x] Default presentation layout is deterministic.
+- [x] Layout references are validated and resolve to semantic occurrences.
+- [x] `Form` traverses semantic structure only.
+- [x] Phoenix preparation traverses layout and resolves semantic references.
+- [x] The old mixed root tree, `nests_data?`, and presentation membership on
       semantic fields are removed.
-- [ ] The definition format version is bumped and the breaking change is
+- [x] The definition format version is bumped and the breaking change is
       documented.
-- [ ] `Info.fields/1` returns semantic declaration order while presentation
+- [x] `Info.fields/1` returns semantic declaration order while presentation
       traversal returns layout order; the intentional behaviour correction is
       documented.
 - [ ] Existing `new/3` and `validate/2` remain the ordinary construction and

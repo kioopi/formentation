@@ -2,7 +2,8 @@ defmodule Formentation.DifferentialTest do
   use ExUnit.Case, async: true
 
   alias Formentation.Fixtures.{Annotations, FieldAccess, PumpInspection}
-  alias Formentation.{Info, Node}
+  alias Formentation.{Info, Semantic}
+  alias Formentation.Info.Presentation
 
   # Every node fact the differential test compares. Origins are excluded
   # deliberately: they are the one sanctioned difference between sources
@@ -10,20 +11,14 @@ defmodule Formentation.DifferentialTest do
   @facts [
     :id,
     :name,
-    :label,
-    :help,
     :role,
     :value_type,
-    :widget,
-    :group,
     :options,
     :default,
     :examples,
     :template_path,
     :required?,
-    :hidden?,
     :read_only?,
-    :nests_data?,
     :constraints
   ]
 
@@ -60,6 +55,10 @@ defmodule Formentation.DifferentialTest do
         assert_equivalent(Info.root(ctx.from_map), Info.root(ctx.from_json))
       end
 
+      test "every presentation fact matches apart from origins", ctx do
+        assert presentation_facts(ctx.from_map) == presentation_facts(ctx.from_json)
+      end
+
       test "each side carries its own source's origin tags", ctx do
         for name <- @fixture.field_names() do
           map_tags = for {_key, {tag, _ref}} <- Info.origins(ctx.from_map, [name]), do: tag
@@ -81,14 +80,47 @@ defmodule Formentation.DifferentialTest do
     assert Map.take(left, @facts) == Map.take(right, @facts),
            "nodes #{inspect(left.id)} and #{inspect(right.id)} differ"
 
-    assert Enum.count(children_of(left)) == Enum.count(children_of(right)),
+    left_children = children_by_id(left)
+    right_children = children_by_id(right)
+
+    assert map_size(left_children) == map_size(right_children),
            "children of #{inspect(left.id)} differ in count"
 
-    children_of(left)
-    |> Enum.zip(children_of(right))
-    |> Enum.each(fn {l, r} -> assert_equivalent(l, r) end)
+    for {id, child} <- left_children do
+      assert Map.has_key?(right_children, id), "right side is missing child #{inspect(id)}"
+      assert_equivalent(child, Map.fetch!(right_children, id))
+    end
   end
 
-  defp children_of(%Node.Group{children: children}), do: children
+  defp children_by_id(node), do: Map.new(children_of(node), &{&1.id, &1})
+
+  defp children_of(%Semantic.Object{children: children}), do: children
   defp children_of(_leaf), do: []
+
+  defp presentation_facts(definition) do
+    definition
+    |> Info.presentation_root()
+    |> collect_presentation_facts()
+    |> Enum.sort()
+  end
+
+  defp collect_presentation_facts(%Presentation.Object{} = object) do
+    [
+      {:object, object.semantic_path.segments, object.label, object.help}
+      | Enum.flat_map(object.children, &collect_presentation_facts/1)
+    ]
+  end
+
+  defp collect_presentation_facts(%Presentation.Group{} = group) do
+    [
+      {:group, group.id, group.label, group.help}
+      | Enum.flat_map(group.children, &collect_presentation_facts/1)
+    ]
+  end
+
+  defp collect_presentation_facts(%Presentation.Field{} = field) do
+    [
+      {:field, field.semantic_path.segments, field.label, field.help, field.widget, field.hidden?}
+    ]
+  end
 end

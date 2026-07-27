@@ -42,12 +42,7 @@ defmodule Formentation.Definition.Finalizer do
   end
 
   defp validate_semantic(%Semantic.Object{template_path: %TemplatePath{segments: []}} = root) do
-    root
-    |> collect_semantic(%Semantic.Index{}, nil)
-    |> case do
-      {:ok, index} -> {:ok, index}
-      {:error, diagnostic} -> {:error, diagnostic}
-    end
+    collect_semantic(root, %Semantic.Index{}, nil)
   end
 
   defp validate_semantic(%Semantic.Object{} = root) do

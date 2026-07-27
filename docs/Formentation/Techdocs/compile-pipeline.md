@@ -73,11 +73,20 @@ Both are held to a **differential property**: compiling the same form through ei
 
 ### 3. Output — the `Definition`
 
-The adapter returns a [[definition-and-node|`%Definition{}`]]: a `root` node, a `format_version`, and a list of diagnostics. It is deliberately inert — it holds no params, no field errors, and no DOM identifiers, which is what makes it safe to cache and share. Its shape (the `Node` tree, node kinds, the `nests_data?` distinction) is the subject of [[definition-and-node|Definition and Node]].
+The adapter returns a [[definition-and-node|`%Definition{}`]]: a semantic tree,
+a presentation tree, a semantic index, a `format_version`, and diagnostics. It
+is deliberately inert — it holds no params, no field errors, and no DOM
+identifiers, which is what makes it safe to cache and share. Its storage shape
+is the subject of [[definition-and-node|Definition]].
 
 ### 4. Query — `Formentation.Info`
 
-Consumers never pattern-match a `Definition`'s internals. They ask `Formentation.Info`: `root/1`, `fields/1`, `node/2`, `node_at/2`, `origins/2`, `role/2`, `required?/2`, and `diagnostics/1`. `Info` is the stable seam between the compiled representation and everything downstream — renderers, tooling, tests, and applications — so the node tree was refactored into per-kind structs without breaking consumers.
+Consumers never pattern-match a `Definition`'s internals. They ask
+`Formentation.Info`: `root/1`, `fields/1`, `node/2`, `node_at/2`,
+`presentation_root/1`, `presentation_at/2`, `origins/2`, `role/2`,
+`required?/2`, and `diagnostics/1`. `Info` is the stable seam between the
+compiled representation and everything downstream — renderers, tooling, tests,
+and applications.
 
 ## Cross-cutting concerns
 
@@ -104,7 +113,8 @@ The pipeline stops at `Info`. It produces meaning, not markup: no projection, no
 | Schema validator | `Formentation.JSONSchema.Validator` | `lib/formentation/json_schema/validator.ex` |
 | Shared walk context | `Formentation.Source.Shared` | `lib/formentation/source/shared.ex` |
 | Compiled definition | `Formentation.Definition` | `lib/formentation/definition.ex` |
-| Semantic node | `Formentation.Node.Field` · `Node.Group` · `Node.Unsupported` | `lib/formentation/node/` |
+| Semantic storage | `Formentation.Semantic.Object` · `Semantic.Field` · `Semantic.Unsupported` | `lib/formentation/semantic/` |
+| Presentation storage | `Formentation.Presentation.Object` · `Presentation.Field` · `Presentation.Group` | `lib/formentation/presentation/` |
 | Query surface | `Formentation.Info` | `lib/formentation/info.ex` |
 
 ## Related notes

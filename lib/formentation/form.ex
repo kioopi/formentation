@@ -6,7 +6,7 @@ defmodule Formentation.Form do
   later projects this state through `Phoenix.HTML.FormData` (step 5) and
   never owns decoding.
 
-  Runtime structure comes from `Formentation.Semantic` queries. `Form`
+  Runtime structure comes from semantic queries. `Form`
   decodes, defaults, materializes, and classifies blockers by semantic
   object boundaries and paths, not by presentation groups or layout order.
 
@@ -32,7 +32,6 @@ defmodule Formentation.Form do
     Info,
     InstancePath,
     Issue,
-    Node,
     Params,
     Semantic,
     SubmissionBlocker,
@@ -379,7 +378,7 @@ defmodule Formentation.Form do
   end
 
   defp apply_default(
-         %Semantic.Entry{kind: :field, name: name, node: %{default: default}},
+         %Semantic.Entry{kind: :field, name: name, node: %Semantic.Field{default: default}},
          acc
        )
        when not is_nil(default) do
@@ -431,7 +430,6 @@ defmodule Formentation.Form do
 
   # D-016: read-only fields do not participate in the replace scope —
   # whatever the transport carried, the original value is kept.
-  defp operation_for(%Node.Field{read_only?: true}, _transport, _path), do: :keep
   defp operation_for(%Semantic.Field{read_only?: true}, _transport, _path), do: :keep
   defp operation_for(_node, :not_provided, _path), do: :unset
   defp operation_for(node, {:provided, raw}, path), do: Codec.decode(node.value_type, raw, path)
@@ -568,21 +566,6 @@ defmodule Formentation.Form do
   # A preserve-only node blocks when a required value is missing from an
   # active parent, or when it owns authoritative validation issues at/below
   # its path. Missing-required wins the code; owned issues always ride along.
-  defp classify(form, path, %Node.Unsupported{} = node, candidate) do
-    owned = owned_issues(form, path)
-
-    cond do
-      missing_required?(node, path, candidate) ->
-        [blocker(path, node, :unsupported_required, owned)]
-
-      owned != [] ->
-        [blocker(path, node, :unsupported_invalid, owned)]
-
-      true ->
-        []
-    end
-  end
-
   defp classify(form, path, %Semantic.Unsupported{} = node, candidate) do
     owned = owned_issues(form, path)
 
@@ -619,15 +602,7 @@ defmodule Formentation.Form do
   # Source-neutral: requiredness and candidate presence are facts on the
   # definition and the post-#1 candidate, not on any validator's code. An
   # inactive nested parent (absent object) makes the child inactive (D-026).
-  defp missing_required?(%Node.Unsupported{required?: false}, _path, _candidate), do: false
   defp missing_required?(%Semantic.Unsupported{required?: false}, _path, _candidate), do: false
-
-  defp missing_required?(%Node.Unsupported{name: name, required?: true}, path, candidate) do
-    case parent_object(candidate, path) do
-      {:ok, object} when is_map(object) -> not Map.has_key?(object, name)
-      _absent_or_non_map -> false
-    end
-  end
 
   defp missing_required?(%Semantic.Unsupported{name: name, required?: true}, path, candidate) do
     case parent_object(candidate, path) do

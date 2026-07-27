@@ -2,7 +2,8 @@ defmodule Formentation.PumpInspectionTest do
   use ExUnit.Case, async: true
 
   alias Formentation.Fixtures.PumpInspection
-  alias Formentation.{Info, Node}
+  alias Formentation.{Info, Presentation, Semantic}
+  alias Formentation.Info.Presentation, as: PresentationInfo
 
   setup do
     {:ok, definition, []} =
@@ -20,15 +21,17 @@ defmodule Formentation.PumpInspectionTest do
     assert Info.required?(definition, ["voltage"]) == false
     assert Info.role(definition, ["last_service"]) == :date
     assert Info.role(definition, ["condition"]) == :select
-    assert Info.node_at(definition, ["voltage"]).group == "electrical"
 
-    assert %Node.Field{options: ["good", "worn", "defective"]} =
+    assert {:ok, %PresentationInfo.Field{semantic_path: %{segments: ["voltage"]}}} =
+             Info.presentation_at(definition, ["voltage"])
+
+    assert %Semantic.Field{options: ["good", "worn", "defective"]} =
              Info.node_at(definition, ["condition"])
   end
 
   test "notes carries its overrides with origins", %{definition: definition} do
-    assert %Node.Field{widget: :textarea, help: "Visible to all technicians."} =
-             Info.node_at(definition, ["notes"])
+    assert {:ok, %PresentationInfo.Field{widget: :textarea, help: "Visible to all technicians."}} =
+             Info.presentation_at(definition, ["notes"])
 
     origins = Info.origins(definition, ["notes"])
     assert origins[:label] == {:map_source, [:properties, "notes", :title]}
@@ -44,8 +47,8 @@ defmodule Formentation.PumpInspectionTest do
 
   test "the electrical group renders as presentation only", %{definition: definition} do
     group = Info.node(definition, "/#electrical")
-    assert %Node.Group{nests_data?: false, label: "Electrical"} = group
-    assert Enum.map(group.children, & &1.name) == ["voltage", "insulation_ok"]
+    assert %Presentation.Group{label: "Electrical"} = group
+    assert Enum.map(group.children, & &1.semantic_id) == ["/voltage", "/insulation_ok"]
   end
 
   test "compilation is deterministic", %{definition: definition} do

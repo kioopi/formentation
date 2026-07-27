@@ -73,11 +73,11 @@ a [[source-adapters|source adapter]], stamping every node with a
 [[paths-and-identity|`TemplatePath`]], a derived `NodeId`, and
 [[diagnostics-and-origins|origins]] for each resolved value.
 
-For the example, the schema's seven properties become seven
-`Node.Field`s; the `ui.json` `order` reorders them; `groups` folds
-`voltage` and `insulation_ok` into a **presentational** group; and
-`fields.notes` overrides the widget and help. The result knows what the
-form *means* and nothing about what it will look like in a browser:
+For the example, the schema's seven scalar properties become seven
+semantic fields; the `ui.json` `order` reorders their presentation
+references; `groups` folds `voltage` and `insulation_ok` into a presentation
+group; and `fields.notes` overrides the widget and help. The result knows
+what the form *means* and nothing about browser state:
 
 ```elixir
 Info.role(definition, ["last_service"])   #=> :date

@@ -41,8 +41,7 @@ defmodule Formentation.DefinitionTest do
               format_version: 3,
               semantic: ^semantic,
               semantic_index: %Semantic.Index{} = index,
-              presentation: ^presentation,
-              root: nil
+              presentation: ^presentation
             }} = Finalizer.finalize(semantic, presentation)
 
     assert Map.fetch!(index.by_id, field.id).node == field
@@ -95,10 +94,13 @@ defmodule Formentation.DefinitionTest do
       Presentation.Object.new(semantic.id, [
         Presentation.Field.new(serial.id),
         Presentation.Object.new(dimensions.id, [
-          Presentation.Group.new("size", [
-            Presentation.Field.new(height.id),
-            Presentation.Field.new(width.id)
-          ])
+          Presentation.Group.new(
+            NodeId.group(template(["dimensions"]), "size"),
+            [
+              Presentation.Field.new(height.id),
+              Presentation.Field.new(width.id)
+            ]
+          )
         ])
       ])
 
@@ -172,7 +174,7 @@ defmodule Formentation.DefinitionTest do
     end
   end
 
-  test "finalizer raises on duplicate semantic template paths" do
+  test "finalizer raises on invalid semantic child template paths" do
     semantic = root([field("a"), field("b", id: "/b", origins: [], constraints: %{})])
     [a, b] = semantic.children
     semantic = %{semantic | children: [a, %{b | template_path: a.template_path}]}
@@ -181,6 +183,62 @@ defmodule Formentation.DefinitionTest do
     assert_raise ArgumentError, ~r/:invalid_semantic_template_path/, fn ->
       Finalizer.finalize(semantic, presentation)
     end
+  end
+
+  test "finalizer raises on non-root semantic roots" do
+    semantic = Semantic.Object.new("nested", template(["nested"]), [])
+    presentation = Presentation.Object.new("/", [])
+
+    assert_raise ArgumentError, ~r/:invalid_semantic_root/, fn ->
+      Finalizer.finalize(semantic, presentation)
+    end
+  end
+
+  test "finalizer raises on invalid semantic children" do
+    semantic = root([%{name: "not_a_semantic_node"}])
+    presentation = Presentation.Object.new("/", [])
+
+    assert_raise ArgumentError, ~r/:invalid_semantic_child/, fn ->
+      Finalizer.finalize(semantic, presentation)
+    end
+  end
+
+  test "finalizer raises on semantic children without string names" do
+    semantic = root([%{field("name") | name: nil}])
+    presentation = Presentation.Object.new("/", [])
+
+    assert_raise ArgumentError, ~r/:invalid_semantic_name/, fn ->
+      Finalizer.finalize(semantic, presentation)
+    end
+  end
+
+  test "duplicate child diagnostics fall back when malformed children have no origin" do
+    semantic = root([%{name: "a"}, %{name: "a"}])
+    presentation = Presentation.Object.new("/", [])
+
+    assert {:error,
+            [
+              %{
+                code: :duplicate_property_name,
+                origin: nil,
+                template_path: %TemplatePath{segments: []}
+              }
+            ]} = Finalizer.finalize(semantic, presentation)
+  end
+
+  test "nested duplicate child diagnostics halt parent semantic collection" do
+    child = object("nested", [nested_field("nested", "a"), nested_field("nested", "a")])
+    semantic = root([child])
+    presentation = Presentation.Object.new("/", [])
+
+    assert {:error,
+            [
+              %{
+                code: :duplicate_property_name,
+                template_path: %TemplatePath{segments: ["nested", "a"]}
+              }
+            ]} =
+             Finalizer.finalize(semantic, presentation)
   end
 
   test "finalizer raises on duplicate layout ids" do
@@ -225,6 +283,15 @@ defmodule Formentation.DefinitionTest do
       ])
 
     assert_raise ArgumentError, ~r/:missing_presentation_reference/, fn ->
+      Finalizer.finalize(semantic, presentation)
+    end
+  end
+
+  test "finalizer raises on invalid presentation children" do
+    semantic = root([])
+    presentation = Presentation.Object.new(semantic.id, [%{id: "not_a_presentation_node"}])
+
+    assert_raise ArgumentError, ~r/:invalid_presentation_child/, fn ->
       Finalizer.finalize(semantic, presentation)
     end
   end

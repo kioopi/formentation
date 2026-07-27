@@ -1,7 +1,7 @@
 defmodule Formentation.Semantic do
   @moduledoc false
 
-  alias Formentation.{Definition, InstancePath, Node, TemplatePath}
+  alias Formentation.{Definition, InstancePath, TemplatePath}
   alias Formentation.Semantic
 
   defmodule Entry do
@@ -15,7 +15,7 @@ defmodule Formentation.Semantic do
     @type t :: %__MODULE__{
             kind: kind(),
             name: String.t() | nil,
-            node: Semantic.Object.t() | Semantic.Field.t() | Semantic.Unsupported.t() | Node.t(),
+            node: Semantic.Object.t() | Semantic.Field.t() | Semantic.Unsupported.t(),
             instance_path: InstancePath.t(),
             template_path: TemplatePath.t()
           }
@@ -29,23 +29,9 @@ defmodule Formentation.Semantic do
     entry(:object, root, %InstancePath{segments: []})
   end
 
-  def root(%Definition{root: %Node.Group{} = root}) do
-    entry(:object, root, %InstancePath{segments: []})
-  end
-
   @spec direct_children(entry()) :: [entry()]
   def direct_children(%Entry{kind: :object, node: %Semantic.Object{} = node, instance_path: path}) do
     Enum.map(node.children, &native_child_entry(&1, path))
-  end
-
-  def direct_children(%Entry{kind: :object, node: %Node.Group{} = node, instance_path: path}) do
-    node.children
-    |> Enum.with_index()
-    |> Enum.flat_map(fn {child, index} -> direct_child_entries(child, path, [index]) end)
-    |> Enum.sort_by(fn {entry, reversed_index_path} ->
-      {declaration_order(entry.node), Enum.reverse(reversed_index_path)}
-    end)
-    |> Enum.map(fn {entry, _reversed_index_path} -> entry end)
   end
 
   def direct_children(%Entry{}), do: []
@@ -83,6 +69,8 @@ defmodule Formentation.Semantic do
 
   defp find_unique_entry(entry, []), do: {:ok, entry}
 
+  # Finalized definitions cannot contain sibling name ambiguity. The explicit
+  # ambiguity result keeps query callers defensive around hand-built structs.
   defp find_unique_entry(%Entry{} = entry, [segment | rest]) do
     case Enum.filter(direct_children(entry), &(&1.name == segment)) do
       [] -> :not_found
@@ -123,33 +111,6 @@ defmodule Formentation.Semantic do
     entry(:unsupported, node, child_path(parent_path, node.name))
   end
 
-  defp direct_child_entries(
-         %Node.Group{nests_data?: false, children: children},
-         parent_path,
-         reversed_index_path
-       ) do
-    children
-    |> Enum.with_index()
-    |> Enum.flat_map(fn {child, child_index} ->
-      direct_child_entries(child, parent_path, [child_index | reversed_index_path])
-    end)
-  end
-
-  defp direct_child_entries(%Node.Group{nests_data?: true} = node, parent_path, index) do
-    path = child_path(parent_path, node.name)
-    [{entry(:object, node, path), index}]
-  end
-
-  defp direct_child_entries(%Node.Field{} = node, parent_path, index) do
-    path = child_path(parent_path, node.name)
-    [{entry(:field, node, path), index}]
-  end
-
-  defp direct_child_entries(%Node.Unsupported{} = node, parent_path, index) do
-    path = child_path(parent_path, node.name)
-    [{entry(:unsupported, node, path), index}]
-  end
-
   defp entry(kind, node, instance_path) do
     %Entry{
       kind: kind,
@@ -163,7 +124,4 @@ defmodule Formentation.Semantic do
   defp child_path(%InstancePath{segments: segments}, name) when is_binary(name) do
     InstancePath.new!(segments ++ [name])
   end
-
-  defp declaration_order(%{declaration_order: order}) when is_integer(order), do: order
-  defp declaration_order(_node), do: :infinity
 end

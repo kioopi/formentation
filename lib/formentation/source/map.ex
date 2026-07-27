@@ -10,7 +10,7 @@ defmodule Formentation.Source.Map do
 
   @behaviour Formentation.Source
 
-  alias Formentation.{Diagnostic, Node, NodeId, Presentation, Semantic, TemplatePath}
+  alias Formentation.{Diagnostic, NodeId, Presentation, Semantic, TemplatePath}
   alias Formentation.Source.Shared
 
   @scalar_kinds [:string, :integer, :number, :boolean]
@@ -39,10 +39,6 @@ defmodule Formentation.Source.Map do
          {:ok, required} <- fetch_list(declaration, :required, ctx),
          {:ok, children, ctx} <- compile_children(declaration, required, ctx),
          {:ok, groups} <- fetch_groups(declaration, ctx) do
-      legacy_children = Enum.map(children, & &1.legacy)
-      legacy_children = Shared.stamp_declaration_order(legacy_children)
-      {legacy_children, ctx} = attach_groups(legacy_children, groups, ctx)
-
       semantic_children = Enum.map(children, & &1.semantic)
       {presentation_children, ctx} = attach_presentation_groups(children, groups, ctx)
 
@@ -54,26 +50,16 @@ defmodule Formentation.Source.Map do
           help: key_origin(declaration, :help, ctx.source_path)
         )
 
-      legacy =
-        Shared.create_group_node(name, legacy_children, ctx,
-          label: label,
-          label_origin: label_origin,
-          help: declaration[:help],
-          help_origin: key_origin(declaration, :help, ctx.source_path)
-        )
-
-      semantic =
-        Semantic.Object.new(name, ctx.template_path, semantic_children, origins: [])
+      semantic = Semantic.Object.new(name, ctx.template_path, semantic_children)
 
       presentation =
         Presentation.Object.new(semantic.id, presentation_children,
-          id: Presentation.object_id(semantic.id),
           label: label,
           help: declaration[:help],
           origins: presentation_origins
         )
 
-      {:ok, %Shared.Compiled{legacy: legacy, semantic: semantic, presentation: presentation}, ctx}
+      {:ok, %Shared.Compiled{semantic: semantic, presentation: presentation}, ctx}
     end
   end
 
@@ -213,18 +199,12 @@ defmodule Formentation.Source.Map do
       template_path = TemplatePath.child(ctx.template_path, name)
       source_path = ctx.source_path ++ [:properties, name]
 
-      legacy = %Node.Unsupported{
-        id: NodeId.from_path(template_path),
-        name: name,
-        required?: required?,
-        template_path: template_path,
-        origins: Shared.origin_entries(kind: {:map_source, source_path ++ [:kind]})
-      }
+      origins = Shared.origin_entries(kind: {:map_source, source_path ++ [:kind]})
 
       semantic =
         Semantic.Unsupported.new(name, template_path,
           required?: required?,
-          origins: legacy.origins
+          origins: origins
         )
 
       diagnostic = %Diagnostic{
@@ -235,7 +215,7 @@ defmodule Formentation.Source.Map do
         template_path: template_path
       }
 
-      {:ok, %Shared.Compiled{legacy: legacy, semantic: semantic, presentation: nil},
+      {:ok, %Shared.Compiled{semantic: semantic, presentation: nil},
        %{ctx | diagnostics: [diagnostic | ctx.diagnostics]}}
     end
   end
@@ -275,25 +255,6 @@ defmodule Formentation.Source.Map do
           read_only: read_only_origin
         )
 
-      legacy = %Node.Field{
-        id: NodeId.from_path(template_path),
-        name: name,
-        label: label,
-        role: role,
-        value_type: kind,
-        template_path: template_path,
-        required?: required?,
-        hidden?: hidden,
-        read_only?: read_only,
-        options: one_of_options(spec),
-        help: spec[:help],
-        widget: spec[:widget],
-        default: default,
-        examples: examples,
-        constraints: Map.take(spec, @constraint_keys),
-        origins: origins
-      }
-
       semantic =
         Semantic.Field.new(name, template_path, kind,
           role: role,
@@ -308,7 +269,6 @@ defmodule Formentation.Source.Map do
 
       presentation =
         Presentation.Field.new(semantic.id,
-          id: Presentation.field_id(semantic.id),
           label: label,
           help: spec[:help],
           widget: spec[:widget],
@@ -316,7 +276,7 @@ defmodule Formentation.Source.Map do
           origins: presentation_origins(origins)
         )
 
-      {:ok, %Shared.Compiled{legacy: legacy, semantic: semantic, presentation: presentation}, ctx}
+      {:ok, %Shared.Compiled{semantic: semantic, presentation: presentation}, ctx}
     end
   end
 
@@ -434,20 +394,6 @@ defmodule Formentation.Source.Map do
   defp semantic_origins(origins), do: Shared.fact_origins(origins, @semantic_origin_keys)
   defp presentation_origins(origins), do: Shared.fact_origins(origins, @presentation_origin_keys)
 
-  defp attach_groups(children, groups, ctx) do
-    Enum.reduce(groups, {children, ctx}, &attach_group/2)
-  end
-
-  defp attach_group(%{id: id, fields: member_names} = group, {children, ctx}) do
-    {label, label_origin} = group_label(group, ctx.source_path)
-    spec = %{id: id, label: label, label_origin: label_origin, fields: member_names}
-
-    {children, unknown} = Shared.attach_group(children, spec, ctx.template_path)
-    ctx = warn_unknown_members(unknown, id, ctx)
-
-    {children, ctx}
-  end
-
   defp attach_presentation_groups(compiled_children, groups, ctx) do
     children = compiled_children |> Enum.map(& &1.presentation) |> Enum.reject(&is_nil/1)
     Enum.reduce(groups, {children, ctx}, &attach_presentation_group(&1, &2, compiled_children))
@@ -467,8 +413,10 @@ defmodule Formentation.Source.Map do
       fields: member_names
     }
 
-    {children, _unknown_already_warned_by_legacy_layout} =
+    {children, unknown} =
       attach_presentation_group(children, compiled_children, spec, ctx.template_path)
+
+    ctx = warn_unknown_members(unknown, id, ctx)
 
     {children, ctx}
   end
@@ -480,15 +428,20 @@ defmodule Formentation.Source.Map do
          template_path
        ) do
     field_names = Enum.uniq(field_names)
-    compiled_by_name = Map.new(compiled_children, &{&1.semantic.name, &1})
-    presentation_by_name = Map.new(compiled_children, &{&1.semantic.name, &1.presentation})
-    unknown = Enum.reject(field_names, &is_map_key(compiled_by_name, &1))
+    semantic_children = Enum.map(compiled_children, & &1.semantic)
+    presentation_by_name = Shared.presentation_children_by_name(children, semantic_children)
+    unsupported_names = Shared.unsupported_names(semantic_children)
+
+    unknown =
+      Enum.reject(
+        field_names,
+        &(is_map_key(presentation_by_name, &1) or MapSet.member?(unsupported_names, &1))
+      )
 
     members =
       field_names
-      |> Enum.filter(&is_map_key(compiled_by_name, &1))
+      |> Enum.filter(&is_map_key(presentation_by_name, &1))
       |> Enum.map(&Map.fetch!(presentation_by_name, &1))
-      |> Enum.reject(&is_nil/1)
 
     {place_presentation_group(children, spec, members, template_path), unknown}
   end
@@ -502,8 +455,7 @@ defmodule Formentation.Source.Map do
          template_path
        ) do
     group =
-      Presentation.Group.new(id, members,
-        layout_id: NodeId.group(template_path, id),
+      Presentation.Group.new(NodeId.group(template_path, id), members,
         label: spec.label,
         origins: Shared.origin_entries(label: spec.label_origin)
       )

@@ -15,7 +15,7 @@ defmodule Formentation.Presentation.Group do
   @spec new(String.t(), [Presentation.descriptor()], keyword()) :: t()
   def new(id, children, opts \\ []) when is_binary(id) and is_list(children) do
     %__MODULE__{
-      id: Keyword.get(opts, :layout_id, Presentation.group_id(id)),
+      id: id,
       label: Keyword.get(opts, :label),
       help: Keyword.get(opts, :help),
       origins: Keyword.get(opts, :origins, []),
