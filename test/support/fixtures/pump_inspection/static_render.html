@@ -6,17 +6,20 @@
   
   
 </div><div class="ftn-field">
-  <label for="ftn--asset_payload--field--control--condition">Condition</label>
-  <select id="ftn--asset_payload--field--control--condition" name="asset[payload][condition]" required>
-  <option value=""></option>
-  <option value="good">
-    good
-  </option><option value="worn" selected>
-    worn
-  </option><option value="defective">
-    defective
-  </option>
-</select>
+  
+  <fieldset id="ftn--asset_payload--field--container--condition" tabindex="-1" class="ftn-radio-group" role="radiogroup">
+  <legend>Condition</legend>
+  <div class="ftn-radio">
+    <input type="radio" id="ftn--asset_payload--field--option_0--condition" name="asset[payload][condition]" value="good" required>
+    <label for="ftn--asset_payload--field--option_0--condition">good</label>
+  </div><div class="ftn-radio">
+    <input type="radio" id="ftn--asset_payload--field--option_1--condition" name="asset[payload][condition]" value="worn" checked required>
+    <label for="ftn--asset_payload--field--option_1--condition">worn</label>
+  </div><div class="ftn-radio">
+    <input type="radio" id="ftn--asset_payload--field--option_2--condition" name="asset[payload][condition]" value="defective" required>
+    <label for="ftn--asset_payload--field--option_2--condition">defective</label>
+  </div>
+</fieldset>
   
   
 </div><div class="ftn-field">

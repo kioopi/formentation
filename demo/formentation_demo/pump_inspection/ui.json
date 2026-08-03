@@ -4,6 +4,7 @@
     { "id": "electrical", "title": "Electrical", "fields": ["voltage", "insulation_ok"] }
   ],
   "fields": {
+    "condition": { "widget": "radio" },
     "notes": { "widget": "textarea", "help": "Visible to all technicians." }
   }
 }

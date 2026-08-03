@@ -136,7 +136,8 @@ It combines two sources:
 - **Field entries** — every rendered field with `show_errors?: true`
   contributes one entry per error message. Scalar fields link to their prepared
   control id; radio groups link to their prepared container id, the rendered
-  fieldset.
+  fieldset. That fieldset has `tabindex="-1"`, so following its summary anchor
+  moves focus to a meaningful, non-tab-stop group boundary.
 - **Object entries** — root and object-level issues never appear in
   Phoenix's per-field `field.errors` convention. The projector asks the
   source's `StateView.issues/2` for the complete, normalized, adapter-ordered

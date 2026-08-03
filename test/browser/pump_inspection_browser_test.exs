@@ -54,7 +54,7 @@ defmodule FormentationDemo.PumpInspectionBrowserTest do
     conn
     |> visit_connected("/")
     |> fill_in("Serial number", with: "PX-2044")
-    |> select("Condition", option: "worn")
+    |> check("worn")
     |> click_button("Save")
     |> assert_has("pre#decoded-candidate", text: "PX-2044")
   end
@@ -104,5 +104,16 @@ defmodule FormentationDemo.PumpInspectionBrowserTest do
     |> assert_has(".ftn-error-summary[role='alert']")
     |> click_link(nil, "Serial number:", exact: false)
     |> assert_has("##{field_id(["serial_number"], :control)}:focus")
+  end
+
+  test "clicking a radio summary link focuses its fieldset container", %{conn: conn} do
+    conn
+    |> visit_connected("/")
+    |> uncheck("Native browser validation")
+    |> assert_has("form#asset-form[novalidate]")
+    |> click_button("Save")
+    |> assert_has(".ftn-error-summary[role='alert']")
+    |> click_link(nil, "Condition:", exact: false)
+    |> assert_has("##{field_id(["condition"], :container)}:focus")
   end
 end

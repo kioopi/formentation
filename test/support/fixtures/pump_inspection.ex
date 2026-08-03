@@ -17,7 +17,12 @@ defmodule Formentation.Fixtures.PumpInspection do
       properties: [
         {"serial_number", %{kind: :string, title: "Serial number", min_length: 4}},
         {"condition",
-         %{kind: :string, title: "Condition", one_of: ["good", "worn", "defective"]}},
+         %{
+           kind: :string,
+           title: "Condition",
+           one_of: ["good", "worn", "defective"],
+           widget: :radio
+         }},
         {"last_service", %{kind: :string, title: "Last service", role: :date}},
         {"operating_hours", %{kind: :integer, title: "Operating hours", min: 0}},
         {"voltage", %{kind: :number, title: "Voltage (V)"}},

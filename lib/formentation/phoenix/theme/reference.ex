@@ -159,6 +159,7 @@ defmodule Formentation.Phoenix.Theme.Reference do
     ~H"""
     <fieldset
       id={@node.dom.container}
+      tabindex="-1"
       class="ftn-radio-group"
       role="radiogroup"
       aria-describedby={@describedby}

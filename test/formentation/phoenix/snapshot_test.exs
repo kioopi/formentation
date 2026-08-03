@@ -13,9 +13,8 @@ defmodule Formentation.Phoenix.SnapshotTest do
   # The phase's "one reviewed snapshot per example form": the end-to-end
   # example rendered statically under the parent namespace. To update
   # intentionally: delete the file, rerun, review the diff, commit.
-  # The compare is byte-exact: editor auto-formatting of the .html fixture
-  # (e.g. "insert final newline") breaks the test just as surely as a real
-  # markup change, so save it as generated, not through a formatter.
+  # The compare is byte-exact apart from a conventional terminal newline in
+  # the checked-in text fixture. All rendered markup remains significant.
   test "the end-to-end example renders as reviewed" do
     {:ok, definition, _diagnostics} =
       Formentation.compile(PumpInspection.map_source(), adapter: Formentation.Source.Map)
@@ -49,7 +48,7 @@ defmodule Formentation.Phoenix.SnapshotTest do
     assert Floki.find(doc, "form") == []
 
     if File.exists?(@snapshot) do
-      assert html == File.read!(@snapshot)
+      assert html == String.trim_trailing(File.read!(@snapshot), "\n")
     else
       File.write!(@snapshot, html)
       flunk("Snapshot written to #{@snapshot} — review the HTML, then rerun.")

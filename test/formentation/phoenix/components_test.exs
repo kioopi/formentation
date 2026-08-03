@@ -34,6 +34,9 @@ defmodule Formentation.Phoenix.ComponentsTest do
     render_component(&Formentation.Phoenix.fields/1, definition: definition, form: form)
   end
 
+  defp field_id(namespace, path, part),
+    do: DOMIdentity.field(namespace, InstancePath.new!(path), part)
+
   defp assert_all_references_resolve(doc) do
     ids = doc |> Floki.find("[id]") |> Enum.flat_map(&Floki.attribute(&1, "id")) |> MapSet.new()
 
@@ -97,11 +100,18 @@ defmodule Formentation.Phoenix.ComponentsTest do
       assert Floki.find(doc, "form") == []
       find_one(doc, "div.ftn-form")
 
-      serial = find_one(doc, "input#ftn--asset_payload--field--control--serial_number")
-      assert Floki.attribute(serial, "name") == ["asset[payload][serial_number]"]
-      assert_labelled(doc, "ftn--asset_payload--field--control--serial_number")
+      serial =
+        find_one(doc, ~s(input[id="#{field_id("asset_payload", ["serial_number"], :control)}"]))
 
-      street = find_one(doc, "input#ftn--asset_payload--field--control--address--street")
+      assert Floki.attribute(serial, "name") == ["asset[payload][serial_number]"]
+      assert_labelled(doc, field_id("asset_payload", ["serial_number"], :control))
+
+      street =
+        find_one(
+          doc,
+          ~s(input[id="#{field_id("asset_payload", ["address", "street"], :control)}"])
+        )
+
       assert Floki.attribute(street, "name") == ["asset[payload][address][street]"]
       assert Floki.attribute(street, "value") == ["Elm"]
 
@@ -127,7 +137,8 @@ defmodule Formentation.Phoenix.ComponentsTest do
       doc = parse!(render_fields(definition, form))
 
       find_one(doc, "div.ftn-error-summary[role=alert]")
-      find_one(doc, "a[href='#ftn--payload--field--control--operating_hours']")
+      target = field_id("payload", ["operating_hours"], :control)
+      find_one(doc, ~s(a[href="##{target}"]))
     end
 
     test "renders reordered groups in presentation order without changing names" do
@@ -162,12 +173,7 @@ defmodule Formentation.Phoenix.ComponentsTest do
 
       assert names == ["payload[a]", "payload[d]", "payload[b]", "payload[c]"]
 
-      assert ids == [
-               "ftn--payload--field--control--a",
-               "ftn--payload--field--control--d",
-               "ftn--payload--field--control--b",
-               "ftn--payload--field--control--c"
-             ]
+      assert ids == Enum.map(["a", "d", "b", "c"], &field_id("payload", [&1], :control))
 
       refute Enum.any?(names, &String.contains?(&1, "late"))
     end
@@ -184,7 +190,7 @@ defmodule Formentation.Phoenix.ComponentsTest do
         )
         |> parse!()
 
-      input = find_one(doc, "#ftn--asset_payload--field--control--serial_number")
+      input = find_one(doc, ~s([id="#{field_id("asset_payload", ["serial_number"], :control)}"]))
       assert Floki.attribute(input, "name") == ["payload[serial_number]"]
     end
 
@@ -220,7 +226,19 @@ defmodule Formentation.Phoenix.ComponentsTest do
             {"condition--option_0", %{kind: :string}},
             {"serial-number", %{kind: :string}},
             {"first name", %{kind: :string}},
-            {"0starts_with_a_digit", %{kind: :string}}
+            {"0starts_with_a_digit", %{kind: :string}},
+            {"left",
+             %{
+               kind: :object,
+               properties: [{"value", %{kind: :string}}],
+               groups: [%{id: "details", title: "Details", fields: ["value"]}]
+             }},
+            {"right",
+             %{
+               kind: :object,
+               properties: [{"value", %{kind: :string}}],
+               groups: [%{id: "details", title: "Details", fields: ["value"]}]
+             }}
           ],
           groups: [%{id: "notes_help", fields: ["notes", "notes_help"]}]
         })
@@ -279,6 +297,11 @@ defmodule Formentation.Phoenix.ComponentsTest do
       )
 
       assert_all_references_resolve(doc)
+
+      assert 2 ==
+               doc
+               |> Floki.find("fieldset.ftn-group legend")
+               |> Enum.count(&(Floki.text(&1) == "Details"))
     end
 
     test "two occurrences of one definition can coexist under distinct namespaces" do
@@ -312,9 +335,12 @@ defmodule Formentation.Phoenix.ComponentsTest do
         )
 
       doc = parse!(html)
-      street = find_one(doc, "input#ftn--payload--field--control--address--street")
+
+      street =
+        find_one(doc, ~s(input[id="#{field_id("payload", ["address", "street"], :control)}"]))
+
       assert Floki.attribute(street, "name") == ["payload[address][street]"]
-      assert Floki.find(doc, "#ftn--payload--field--control--serial_number") == []
+      assert Floki.find(doc, ~s([id="#{field_id("payload", ["serial_number"], :control)}"])) == []
     end
 
     test "raises on an unknown path" do

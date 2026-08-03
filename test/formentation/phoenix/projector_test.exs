@@ -230,6 +230,49 @@ defmodule Formentation.Phoenix.ProjectorTest do
   end
 
   describe "groups and non-rendering nodes" do
+    test "DOM identities are deterministic and independent of display text and sibling order" do
+      declaration = fn properties, title ->
+        %{
+          kind: :object,
+          properties: properties,
+          groups: [%{id: "panel", title: title, fields: ["a", "b"]}]
+        }
+      end
+
+      first =
+        declaration.(
+          [
+            {"a", %{kind: :string, title: "Alpha"}},
+            {"b", %{kind: :string, title: "Beta"}}
+          ],
+          "First legend"
+        )
+        |> compile!()
+
+      second =
+        declaration.(
+          [
+            {"b", %{kind: :string, title: "Different beta"}},
+            {"a", %{kind: :string, title: "Different alpha"}}
+          ],
+          "Changed legend"
+        )
+        |> compile!()
+
+      form = FormData.to_form(Form.new(first), as: "payload")
+      assert Projector.project(first, form) == Projector.project(first, form)
+
+      identities = fn definition ->
+        definition
+        |> Projector.project(form)
+        |> Map.fetch!(:root)
+        |> flatten_fields()
+        |> Map.new(&{&1.field.name, &1.dom})
+      end
+
+      assert identities.(first) == identities.(second)
+    end
+
     test "presentation order can differ from semantic declaration order" do
       definition =
         compile!(%{
