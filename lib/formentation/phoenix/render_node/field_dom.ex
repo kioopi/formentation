@@ -4,8 +4,8 @@ defmodule Formentation.Phoenix.RenderNode.FieldDOM do
 
   Components consume these values verbatim; they never derive identifiers from
   Phoenix's transport-oriented field id. `control` names scalar controls (and
-  hidden inputs), while `container` names composite widgets such as a radio
-  group's fieldset.
+  hidden inputs), while `container` is reserved for composite widgets. Only a
+  `:radio_group` currently consumes `container`, for its fieldset.
   """
 
   @enforce_keys [:control, :container, :help, :errors, :options]

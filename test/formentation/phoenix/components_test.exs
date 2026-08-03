@@ -50,14 +50,14 @@ defmodule Formentation.Phoenix.ComponentsTest do
 
     summary_targets =
       doc
-      |> Floki.find(".ftn-error-summary a[href]")
+      |> Floki.find("a[href^='#']")
       |> Enum.flat_map(&Floki.attribute(&1, "href"))
-      |> Enum.map(&String.trim_leading(&1, "#"))
+      |> Enum.map(&String.replace_prefix(&1, "#", ""))
 
-    assert MapSet.subset?(
-             MapSet.new(label_targets ++ describedby_targets ++ summary_targets),
-             ids
-           )
+    dangling =
+      MapSet.difference(MapSet.new(label_targets ++ describedby_targets ++ summary_targets), ids)
+
+    assert MapSet.to_list(dangling) == []
   end
 
   describe "fields/1" do
@@ -82,6 +82,45 @@ defmodule Formentation.Phoenix.ComponentsTest do
 
       find_one(doc, ~s(a[href="##{target}"]))
       find_one(doc, ~s(fieldset[id="#{target}"]))
+      assert_all_references_resolve(doc)
+    end
+
+    test "every reference-theme widget with an error has one resolvable summary target" do
+      widgets = [
+        {"text", :text, %{kind: :string}, :control},
+        {"textarea", :textarea, %{kind: :string, widget: :textarea}, :control},
+        {"select", :select, %{kind: :string, one_of: ["one", "two"]}, :control},
+        {"radio", :radio, %{kind: :string, one_of: ["one", "two"], widget: :radio}, :container},
+        {"checkbox", :checkbox, %{kind: :boolean}, :control},
+        {"number", :number, %{kind: :integer}, :control},
+        {"date", :date, %{kind: :string, role: :date}, :control},
+        {"email", :email, %{kind: :string, role: :email}, :control},
+        {"url", :url, %{kind: :string, role: :uri}, :control},
+        {"hidden", :hidden, %{kind: :string, hidden: true}, :control}
+      ]
+
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: Enum.map(widgets, fn {name, _key, field, _part} -> {name, field} end)
+        })
+
+      source = %Formentation.SourceFixture{
+        params: Map.new(widgets, fn {name, _key, _field, _part} -> {name, ""} end),
+        errors:
+          Enum.map(widgets, fn {_name, key, _field, _part} -> {key, {"is invalid", []}} end),
+        submitted?: true,
+        visibility: Map.new(widgets, fn {name, _key, _field, _part} -> {[name], :show} end)
+      }
+
+      doc = parse!(render_fields(definition, FormData.to_form(source, as: "payload")))
+
+      for {name, _key, _field, part} <- widgets do
+        target = field_id("payload", [name], part)
+        assert [_] = Floki.find(doc, ~s(a[href="##{target}"]))
+        assert [_] = Floki.find(doc, ~s([id="#{target}"]))
+      end
+
       assert_all_references_resolve(doc)
     end
 

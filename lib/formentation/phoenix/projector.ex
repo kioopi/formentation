@@ -386,8 +386,27 @@ defmodule Formentation.Phoenix.Projector do
 
   defp field_entries(%RenderNode.Field{}), do: []
 
-  defp summary_target(%RenderNode.Field{widget: :radio_group, dom: dom}), do: dom.container
-  defp summary_target(%RenderNode.Field{dom: dom}), do: dom.control
+  defp summary_target(%RenderNode.Field{widget: widget, dom: dom}),
+    do: Map.fetch!(dom, summary_part(widget))
+
+  # Reference-theme contract: every widget must appear here. Composite widgets
+  # target the element their component renders as the group-level control;
+  # scalar widgets target their control.
+  defp summary_part(:radio_group), do: :container
+
+  defp summary_part(widget)
+       when widget in [
+              :hidden_input,
+              :checkbox,
+              :textarea,
+              :select,
+              :number_input,
+              :date_input,
+              :email_input,
+              :url_input,
+              :text_input
+            ],
+       do: :control
 
   # Root, group and unsupported-node issues never enter Phoenix's per-field
   # error convention (step-5 spec decision 7), so they arrive normalized
