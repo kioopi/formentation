@@ -13,7 +13,7 @@ status: current
 # Rendering
 
 *As of 2026-08-03 (native presentation traversal and semantic-index-backed
-projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
+projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]; DOM identity, [[18-decisions#D-034 — Phoenix renderer DOM identities are typed and injective|D-034]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
 
 ## Projector data flow (`Formentation.Phoenix.Projector`)
 
@@ -216,9 +216,15 @@ ftn--<namespace>--<kind>--<part>--<identity token>...
 `kind` is `field`, `object`, or `group`. Field identities contain their
 absolute instance-path segments; object identities contain their occurrence
 path (none for the root); group identities contain the opaque layout id and
-the enclosing object's occurrence path. `part` is `control`, `help`, `errors`,
-`container`, or `option_<index>`. These are separate token positions, so a
-field called `notes_help` and the help for `notes` cannot share an id.
+the enclosing object's occurrence path. The definition finalizer rejects a
+duplicate layout id across presentation objects, groups, and fields, while the
+enclosing occurrence path distinguishes repeated collection items. `part` is
+`control`, `container`, `help`, `errors`, or `option_<index>`. For fields,
+`control` names the labelled/error-summary target when it is a control,
+`container` names a composite widget's grouping element (such as a radio
+fieldset), and `option_<index>` names one radio input. These are separate token
+positions, so a field called `notes_help` and the help for `notes` cannot share
+an id.
 
 Identity and namespace bytes are escaped byte by byte: ASCII letters, digits,
 and `_` remain literal except that a leading digit is encoded; every other byte
@@ -227,6 +233,12 @@ token delimiter. The grammar preserves both path boundaries (`["a_b"]` versus
 `["a", "b"]`) and segment type (`[0]` versus `["0"]`). Its output alphabet is
 `[A-Za-z0-9_-]` and the `ftn` prefix makes it usable as an unescaped HTML/CSS
 identifier in browser, Floki, and LazyHTML selectors.
+
+The namespace is escaped too, so `asset-form` produces `asset-2Dform` while
+`asset_form` stays readable; prefer a snake_case render namespace when readable
+ids matter. `ftn-` remains the reference markup's class vocabulary
+(`ftn-field`, `ftn-group`, and so on); `ftn--` is the distinct prefix for
+renderer-minted ids.
 
 The spelling is deliberately readable and stable: applications may use these
 ids in tests, styles, and scripts. It changes only as a compatibility change.

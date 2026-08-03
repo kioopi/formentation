@@ -666,10 +666,13 @@ part, and typed occurrence identity. Its documented stable format is
 fixed-width `-XX` escape, so `--` is structural only; leading digits are
 escaped to preserve the distinction between string and integer instance-path
 segments. Fields use absolute instance paths, objects their occurrence paths,
-and groups their layout id plus enclosing object occurrence path. Field parts
-are control, help, errors, and indexed radio options; object/group parts are
-container and help. No hash, random value, counter, traversal index, or
-occupied-id allocation participates in uniqueness.
+and groups their layout id plus enclosing object occurrence path. The finalized
+definition invariant rejects duplicate layout ids across presentation objects,
+groups, and fields; the enclosing occurrence path then separates repeated
+collection items. Field parts are control, composite-widget container, help,
+errors, and indexed radio options; object/group parts are container and help.
+No hash, random value, counter, traversal index, or occupied-id allocation
+participates in uniqueness.
 
 **Consequences.** DOM identity is renderer-owned rather than a side effect of
 Phoenix transport naming: `Phoenix.HTML.FormField.name` remains unchanged, and
