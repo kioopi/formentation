@@ -93,6 +93,8 @@ Also as of 2026-07-26, the unsupported-node submission-blocker feature ([GitHub 
 
 Also as of 2026-07-26, the presentation traversal migration ([GitHub issue #17](https://github.com/kioopi/formentation/issues/17), [[18-decisions#D-031 — Phoenix preparation consumes presentation descriptors|D-031]]) is documented: [[definition-and-node|Definition and Node]] now describes the temporary `Formentation.Info.Presentation` descriptor vocabulary and the `presentation_root/1`/`presentation_at/2` query seam; [[rendering|Rendering]] now states that the projector consumes those descriptors rather than walking the mixed root tree, that layout order can differ from semantic declaration order, and that nested Phoenix descent is driven by semantic-object descriptors. The public Userguide did not change because the component API, names, IDs, markup, and transport behaviour stayed the same.
 
+Also as of 2026-08-03, collision-proof DOM identity adoption ([GitHub issue #30](https://github.com/kioopi/formentation/issues/30), [[18-decisions#D-035 — Phoenix rendering prepares and consumes DOM identities|D-035]]) is documented: [[rendering|Rendering]], [[end-to-end-data-flow|End-to-end data flow]], [[browser-testing|Browser testing]], and the rendering user guides now distinguish Phoenix transport names from renderer-owned ids, explain namespace resolution, and match the reviewed HTML fixture and browser selectors.
+
 As of 2026-07-26, the project direction is additionally frozen in
 [[19-north-star-architecture|North-star architecture]],
 [[phase-1-north-star-alignment|the alignment plan]], and

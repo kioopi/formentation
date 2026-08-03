@@ -17,6 +17,13 @@ defmodule Formentation.Phoenix.Projector do
   alias Formentation.Info.Presentation
   alias Formentation.Phoenix.{DOMIdentity, RenderNode, RenderPlan, StateView}
 
+  @missing_namespace ~S"""
+                     Formentation cannot mint DOM ids without a namespace. Give the form a name or an id
+                     (`to_form(state, as: "payload")` or `to_form(state, id: "payload")`), or pass
+                     `dom_namespace:` to Formentation.Phoenix.fields/1 or Formentation.Phoenix.field/1.
+                     """
+                     |> String.trim()
+
   @doc """
   Projects the whole definition against `form` into a render plan.
 
@@ -49,6 +56,21 @@ defmodule Formentation.Phoenix.Projector do
   def project(%Definition{} = definition, %Phoenix.HTML.Form{} = form),
     do: project(definition, form, [])
 
+  @doc """
+  Projects the whole definition with an explicit renderer-owned DOM namespace.
+
+  ## Example
+
+      iex> {:ok, definition, []} =
+      ...>   Formentation.compile(
+      ...>     %{kind: :object, properties: [{"email", %{kind: :string, role: :email}}]},
+      ...>     adapter: Formentation.Source.Map
+      ...>   )
+      iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
+      iex> [field] = Formentation.Phoenix.Projector.project(definition, form, dom_namespace: "asset_payload").root.children
+      iex> {field.dom.control, field.field.name}
+      {"ftn--asset_payload--field--control--email", "payload[email]"}
+  """
   @spec project(Definition.t(), Phoenix.HTML.Form.t(), keyword()) :: RenderPlan.t()
   def project(%Definition{} = definition, %Phoenix.HTML.Form{} = form, opts) when is_list(opts) do
     ctx =
@@ -89,6 +111,9 @@ defmodule Formentation.Phoenix.Projector do
       when is_list(segments),
       do: project_at(definition, form, segments, [])
 
+  @doc """
+  Projects one subtree with an explicit renderer-owned DOM namespace.
+  """
   @spec project_at(Definition.t(), Phoenix.HTML.Form.t(), [String.t()], keyword()) ::
           RenderNode.t() | nil
   def project_at(%Definition{} = definition, %Phoenix.HTML.Form{} = form, segments, opts)
@@ -209,10 +234,11 @@ defmodule Formentation.Phoenix.Projector do
     field = form[access_key(node.name)]
     {widget, diagnostics} = resolve_widget(presentation, node)
     path = presentation.semantic_path.segments
-    instance_path = InstancePath.new!(path)
+    instance_path = presentation.semantic_path
 
     dom = %RenderNode.FieldDOM{
       control: DOMIdentity.field(ctx.dom_namespace, instance_path, :control),
+      container: DOMIdentity.field(ctx.dom_namespace, instance_path, :container),
       help: DOMIdentity.field(ctx.dom_namespace, instance_path, :help),
       errors: DOMIdentity.field(ctx.dom_namespace, instance_path, :errors),
       options: option_ids(node.options, ctx.dom_namespace, instance_path)
@@ -354,11 +380,14 @@ defmodule Formentation.Phoenix.Projector do
 
   defp field_entries(%RenderNode.Field{show_errors?: true} = node) do
     for {message, _opts} <- node.errors do
-      summary_entry(node.dom.control, node.label, message)
+      summary_entry(summary_target(node), node.label, message)
     end
   end
 
   defp field_entries(%RenderNode.Field{}), do: []
+
+  defp summary_target(%RenderNode.Field{widget: :radio_group, dom: dom}), do: dom.container
+  defp summary_target(%RenderNode.Field{dom: dom}), do: dom.control
 
   # Root, group and unsupported-node issues never enter Phoenix's per-field
   # error convention (step-5 spec decision 7), so they arrive normalized
@@ -404,19 +433,7 @@ defmodule Formentation.Phoenix.Projector do
   defp summary_entry(id, label, message), do: %{id: id, label: label, message: message}
 
   defp dom_namespace!(form, opts) do
-    case Keyword.fetch(opts, :dom_namespace) do
-      {:ok, namespace} ->
-        namespace
-
-      :error ->
-        message = ~S"""
-        Formentation cannot mint DOM ids without a namespace. Give the form a name or an id
-        (`to_form(state, as: "payload")` or `to_form(state, id: "payload")`), or pass
-        `dom_namespace:` to Formentation.Phoenix.fields/1 or Formentation.Phoenix.field/1.
-        """
-
-        form.id || form.name ||
-          raise ArgumentError, String.trim(message)
-    end
+    Keyword.get(opts, :dom_namespace) || form.id || form.name ||
+      raise ArgumentError, @missing_namespace
   end
 end

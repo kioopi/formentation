@@ -5,8 +5,8 @@ defmodule Formentation.Phoenix.ProjectorTest do
 
   doctest Formentation.Phoenix.Projector
 
-  alias Formentation.Form
-  alias Formentation.Phoenix.{Projector, RenderNode, RenderPlan}
+  alias Formentation.{Form, InstancePath}
+  alias Formentation.Phoenix.{DOMIdentity, Projector, RenderNode, RenderPlan}
   alias Phoenix.HTML.FormData
 
   defp compile!(declaration) do
@@ -76,11 +76,15 @@ defmodule Formentation.Phoenix.ProjectorTest do
       plan = Projector.project(definition, form)
       [serial | _] = plan.root.children
 
-      assert plan.root.dom.container == "ftn--payload--object--container"
-      assert plan.root.dom.help == "ftn--payload--object--help"
-      assert serial.dom.control == "ftn--payload--field--control--serial_number"
-      assert serial.dom.help == "ftn--payload--field--help--serial_number"
-      assert serial.dom.errors == "ftn--payload--field--errors--serial_number"
+      root_path = InstancePath.new!([])
+      serial_path = InstancePath.new!(["serial_number"])
+
+      assert plan.root.dom.container == DOMIdentity.object("payload", root_path, :container)
+      assert plan.root.dom.help == DOMIdentity.object("payload", root_path, :help)
+      assert serial.dom.control == DOMIdentity.field("payload", serial_path, :control)
+      assert serial.dom.container == DOMIdentity.field("payload", serial_path, :container)
+      assert serial.dom.help == DOMIdentity.field("payload", serial_path, :help)
+      assert serial.dom.errors == DOMIdentity.field("payload", serial_path, :errors)
       assert serial.dom.options == []
     end
 
@@ -91,7 +95,8 @@ defmodule Formentation.Phoenix.ProjectorTest do
       [field | _] =
         Projector.project(definition, form, dom_namespace: "asset_payload").root.children
 
-      assert field.dom.control == "ftn--asset_payload--field--control--serial_number"
+      assert field.dom.control ==
+               DOMIdentity.field("asset_payload", InstancePath.new!(["serial_number"]), :control)
     end
 
     test "raises clearly when no DOM namespace can be resolved" do
@@ -101,6 +106,23 @@ defmodule Formentation.Phoenix.ProjectorTest do
       assert_raise ArgumentError,
                    ~r/Formentation cannot mint DOM ids without a namespace/,
                    fn -> Projector.project(definition, form) end
+    end
+
+    test "a nil override falls back to the Phoenix form namespace" do
+      definition = flat_definition()
+      form = FormData.to_form(Form.new(definition), as: "payload")
+
+      assert Projector.project(definition, form, dom_namespace: nil) ==
+               Projector.project(definition, form)
+    end
+
+    test "an empty explicit override remains invalid" do
+      definition = flat_definition()
+      form = FormData.to_form(Form.new(definition), as: "payload")
+
+      assert_raise ArgumentError, ~r/non-empty binary namespace/, fn ->
+        Projector.project(definition, form, dom_namespace: "")
+      end
     end
 
     test "label falls back to the humanized field name" do
@@ -174,6 +196,19 @@ defmodule Formentation.Phoenix.ProjectorTest do
     test "a hidden field is a hidden input regardless of hints" do
       assert {:hidden_input, []} =
                single_widget(%{kind: :string, widget: :textarea, hidden: true})
+    end
+
+    test "prepares one radio option id per option" do
+      plan = single_field_plan(%{kind: :string, one_of: ["yes", "no"], widget: :radio})
+      [%RenderNode.Field{options: options, dom: dom}] = plan.root.children
+
+      assert dom.options ==
+               Enum.map(0..1, fn index ->
+                 DOMIdentity.field("payload", InstancePath.new!(["f"]), {:option, index})
+               end)
+
+      assert length(dom.options) == length(options)
+      assert Enum.uniq(dom.options) == dom.options
     end
 
     test "nonsense hints fall back to the inferred widget with a diagnostic" do
@@ -415,6 +450,30 @@ defmodule Formentation.Phoenix.ProjectorTest do
   end
 
   describe "error visibility and the summary" do
+    test "a radio summary targets the rendered radio container" do
+      definition =
+        compile!(%{
+          kind: :object,
+          required: ["condition"],
+          properties: [{"condition", %{kind: :string, one_of: ["yes", "no"], widget: :radio}}]
+        })
+
+      source = %Formentation.SourceFixture{
+        params: %{"condition" => ""},
+        errors: [condition: {"is required", []}],
+        submitted?: true,
+        visibility: %{
+          ["condition"] => :show
+        }
+      }
+
+      plan = Projector.project(definition, FormData.to_form(source, as: "payload"))
+      [%RenderNode.Field{widget: :radio_group, dom: dom}] = plan.root.children
+
+      assert [%{id: summary_target}] = plan.summary
+      assert summary_target == dom.container
+    end
+
     test "on submit every field error is visible and summarized" do
       {definition, form} = decode_error_form(:submit)
       plan = Projector.project(definition, form)

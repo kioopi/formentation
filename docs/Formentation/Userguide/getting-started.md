@@ -10,7 +10,7 @@ status: current
 
 # Getting started
 
-*Covers Formentation as of 2026-07-26. Every snippet below was run
+*Covers Formentation as of 2026-08-03. Every snippet below was run
 against that version.*
 
 This page walks the whole loop once: declare a form, compile it, render
@@ -149,20 +149,20 @@ The `as: "payload"` option namespaces every input. That produces:
 ```html
 <div class="ftn-form">
   <div class="ftn-field">
-    <label for="payload_email">Email address</label>
-    <input type="email" id="payload_email" name="payload[email]"
+    <label for="ftn--payload--field--control--email">Email address</label>
+    <input type="email" id="ftn--payload--field--control--email" name="payload[email]"
            value="ada@example.com" required minlength="3">
   </div>
   <div class="ftn-field">
-    <label for="payload_age">Age</label>
-    <input type="number" id="payload_age" name="payload[age]"
-           value="" min="0" step="1">
+    <label for="ftn--payload--field--control--age">Age</label>
+    <input type="text" inputmode="numeric" id="ftn--payload--field--control--age" name="payload[age]"
+           value="">
   </div>
   <div class="ftn-field">
     <input type="hidden" name="payload[subscribed]" value="false">
-    <input type="checkbox" id="payload_subscribed"
+    <input type="checkbox" id="ftn--payload--field--control--subscribed"
            name="payload[subscribed]" value="true">
-    <label for="payload_subscribed">Subscribe to the newsletter</label>
+    <label for="ftn--payload--field--control--subscribed">Subscribe to the newsletter</label>
   </div>
 </div>
 ```

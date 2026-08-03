@@ -13,7 +13,7 @@ status: current
 
 # Browser testing
 
-> [!note] As of 2026-07-26 · browser-test suite added; LiveSocket join race fixed
+> [!note] As of 2026-08-03 · browser-test suite and prepared DOM identities
 > Describes the opt-in Playwright suite as built: the harness, the config
 > posture, and what each of the four seed tests pins. This is additive to
 > [[test-and-verification-architecture|the test architecture]]'s mechanism
@@ -181,7 +181,7 @@ All four live in `test/browser/pump_inspection_browser_test.exs`, driving
 4. **Error-summary anchor focus** — unchecks native validation, submits a
    blank form, clicks the `Serial number:` link inside the error summary
    (`.ftn-error-summary[role='alert']`), and asserts keyboard focus lands
-   on `#asset_payload_serial_number`. This is an end-to-end interaction
+   on `#ftn--asset_payload--field--control--serial_number`. This is an end-to-end interaction
    (`click` → focus movement) with no server-side equivalent to assert
    against.
 

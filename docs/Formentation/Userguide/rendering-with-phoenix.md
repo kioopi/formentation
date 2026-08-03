@@ -212,7 +212,7 @@ Errors appear only once there is something to show them for. Given a
 <div class="ftn-field">
   <label for="ftn--payload--field--control--age">Age</label>
   <input type="text" inputmode="numeric" id="ftn--payload--field--control--age" name="payload[age]" value="10"
-         aria-describedby="ftn--payload--field--errors--age" aria-invalid="true" min="18" step="1">
+         aria-describedby="ftn--payload--field--errors--age" aria-invalid="true" required>
   <ul id="ftn--payload--field--errors--age" class="ftn-errors">
     <li>value 10 is lower than minimum 18</li>
   </ul>
@@ -232,6 +232,11 @@ there is nothing to configure.
 Errors are rendered with a deterministic id and linked from the control
 via `aria-describedby`, composing with the help text's id when both are
 present.
+
+Integer and number fields deliberately render as `type="text"` with
+`inputmode="numeric"`: browsers can otherwise refuse or sanitize a raw
+non-numeric value after a failed decode. The renderer therefore preserves that
+raw text instead of emitting non-conforming `min`, `max`, or `step` attributes.
 
 ## Accessibility
 

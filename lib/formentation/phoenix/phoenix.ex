@@ -3,10 +3,10 @@ defmodule Formentation.Phoenix do
   The public rendering surface: whole-body and subtree rendering of a
   compiled definition against any `Phoenix.HTML.FormData` form. Both
   components compose *inside* an enclosing hand-written `<form>` — they
-  never emit a `<form>` element. Phoenix keeps ownership of submitted names;
-  Formentation prepares collision-proof renderer-owned DOM ids from one
-  namespace per render. That namespace is `dom_namespace`, then `form.id`,
-  then `form.name`; rendering raises with guidance if none is available.
+  never emit a `<form>` element. Submitted names still compose under a parent
+  namespace such as `asset[payload][...]` (use-case req. 5). Renderer-owned DOM
+  ids are separate: `dom_namespace`, then `form.id`, then `form.name`; rendering
+  raises with guidance if none is available.
 
   Phase 1 renders through the reference theme directly; a pluggable
   theme contract is Phase 3.
@@ -23,7 +23,7 @@ defmodule Formentation.Phoenix do
   ```heex
   <.form for={@asset_form} phx-change="validate" phx-submit="save">
     <.input field={@asset_form[:name]} label="Asset name" />
-  <Formentation.Phoenix.fields definition={@definition} form={@payload_form} />
+    <Formentation.Phoenix.fields definition={@definition} form={@payload_form} />
   </.form>
   ```
 

@@ -6,11 +6,12 @@ defmodule Formentation.Phoenix.RenderNode.FieldDOM do
   Phoenix's transport-oriented field id.
   """
 
-  @enforce_keys [:control, :help, :errors, :options]
-  defstruct [:control, :help, :errors, :options]
+  @enforce_keys [:control, :container, :help, :errors, :options]
+  defstruct [:control, :container, :help, :errors, :options]
 
   @type t :: %__MODULE__{
           control: String.t(),
+          container: String.t(),
           help: String.t(),
           errors: String.t(),
           options: [String.t()]

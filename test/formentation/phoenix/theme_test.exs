@@ -6,7 +6,8 @@ defmodule Formentation.Phoenix.ThemeTest do
   import Formentation.HTMLAssertions
   import Phoenix.LiveViewTest, only: [render_component: 2]
 
-  alias Formentation.Phoenix.RenderNode
+  alias Formentation.InstancePath
+  alias Formentation.Phoenix.{DOMIdentity, RenderNode}
   alias Formentation.Phoenix.Theme.Reference
 
   defp form_field(overrides \\ []) do
@@ -21,6 +22,7 @@ defmodule Formentation.Phoenix.ThemeTest do
       label: "Notes",
       dom: %RenderNode.FieldDOM{
         control: "ftn--payload--field--control--notes",
+        container: "ftn--payload--field--container--notes",
         help: "ftn--payload--field--help--notes",
         errors: "ftn--payload--field--errors--notes",
         options: []
@@ -46,9 +48,10 @@ defmodule Formentation.Phoenix.ThemeTest do
       field: form_field(id: "insulation_ok", name: "insulation_ok", field: :insulation_ok),
       label: "Insulation test passed",
       dom: %RenderNode.FieldDOM{
-        control: "ftn--payload--field--control--insulation_ok",
-        help: "ftn--payload--field--help--insulation_ok",
-        errors: "ftn--payload--field--errors--insulation_ok",
+        control: DOMIdentity.field("payload", InstancePath.new!(["insulation_ok"]), :control),
+        container: DOMIdentity.field("payload", InstancePath.new!(["insulation_ok"]), :container),
+        help: DOMIdentity.field("payload", InstancePath.new!(["insulation_ok"]), :help),
+        errors: DOMIdentity.field("payload", InstancePath.new!(["insulation_ok"]), :errors),
         options: []
       }
     ]
@@ -63,10 +66,15 @@ defmodule Formentation.Phoenix.ThemeTest do
       label: "Condition",
       options: ["good", "worn", "defective"],
       dom: %RenderNode.FieldDOM{
-        control: "ftn--payload--field--control--condition",
-        help: "ftn--payload--field--help--condition",
-        errors: "ftn--payload--field--errors--condition",
-        options: []
+        control: DOMIdentity.field("payload", InstancePath.new!(["condition"]), :control),
+        container: DOMIdentity.field("payload", InstancePath.new!(["condition"]), :container),
+        help: DOMIdentity.field("payload", InstancePath.new!(["condition"]), :help),
+        errors: DOMIdentity.field("payload", InstancePath.new!(["condition"]), :errors),
+        options:
+          Enum.map(
+            0..2,
+            &DOMIdentity.field("payload", InstancePath.new!(["condition"]), {:option, &1})
+          )
       }
     ]
 
@@ -80,9 +88,10 @@ defmodule Formentation.Phoenix.ThemeTest do
       label: "Condition",
       options: ["good", "worn"],
       dom: %RenderNode.FieldDOM{
-        control: "ftn--payload--field--control--condition",
-        help: "ftn--payload--field--help--condition",
-        errors: "ftn--payload--field--errors--condition",
+        control: DOMIdentity.field("payload", InstancePath.new!(["condition"]), :control),
+        container: DOMIdentity.field("payload", InstancePath.new!(["condition"]), :container),
+        help: DOMIdentity.field("payload", InstancePath.new!(["condition"]), :help),
+        errors: DOMIdentity.field("payload", InstancePath.new!(["condition"]), :errors),
         options: [
           "ftn--payload--field--option_0--condition",
           "ftn--payload--field--option_1--condition"
@@ -345,6 +354,10 @@ defmodule Formentation.Phoenix.ThemeTest do
 
       fieldset = find_one(doc, "fieldset.ftn-radio-group")
       assert Floki.text(find_one(doc, "legend")) == "Condition"
+
+      assert Floki.attribute(fieldset, "id") == [
+               DOMIdentity.field("payload", InstancePath.new!(["condition"]), :container)
+             ]
 
       assert Floki.attribute(fieldset, "aria-describedby") == [
                "ftn--payload--field--help--condition"

@@ -35,6 +35,29 @@ defmodule Formentation.Phoenix.ComponentsTest do
   end
 
   describe "fields/1" do
+    test "an invalid radio summary links to the rendered radio container" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [{"condition", %{kind: :string, one_of: ["yes", "no"], widget: :radio}}]
+        })
+
+      source = %Formentation.SourceFixture{
+        params: %{"condition" => ""},
+        errors: [condition: {"is required", []}],
+        submitted?: true,
+        visibility: %{
+          ["condition"] => :show
+        }
+      }
+
+      doc = parse!(render_fields(definition, FormData.to_form(source, as: "payload")))
+      target = DOMIdentity.field("payload", InstancePath.new!(["condition"]), :container)
+
+      find_one(doc, ~s(a[href="##{target}"]))
+      find_one(doc, ~s(fieldset[id="#{target}"]))
+    end
+
     test "renders the whole body under a parent namespace without a form element" do
       definition = nested_definition()
 
