@@ -85,6 +85,23 @@ defmodule Formentation.Phoenix.ComponentsTest do
       assert_all_references_resolve(doc)
     end
 
+    test "a hidden field error does not produce an unusable summary link" do
+      definition =
+        compile!(%{kind: :object, properties: [{"token", %{kind: :string, hidden: true}}]})
+
+      source = %Formentation.SourceFixture{
+        params: %{"token" => ""},
+        errors: [token: {"is invalid", []}],
+        submitted?: true,
+        visibility: %{["token"] => :show}
+      }
+
+      doc = parse!(render_fields(definition, FormData.to_form(source, as: "payload")))
+
+      assert Floki.find(doc, ".ftn-error-summary") == []
+      assert_all_references_resolve(doc)
+    end
+
     test "every reference-theme widget with an error has one resolvable summary target" do
       widgets = [
         {"text", :text, %{kind: :string}, :control},
@@ -95,8 +112,7 @@ defmodule Formentation.Phoenix.ComponentsTest do
         {"number", :number, %{kind: :integer}, :control},
         {"date", :date, %{kind: :string, role: :date}, :control},
         {"email", :email, %{kind: :string, role: :email}, :control},
-        {"url", :url, %{kind: :string, role: :uri}, :control},
-        {"hidden", :hidden, %{kind: :string, hidden: true}, :control}
+        {"url", :url, %{kind: :string, role: :uri}, :control}
       ]
 
       definition =

@@ -155,13 +155,13 @@ To iterate on a single test file: `PLAYWRIGHT_E2E=1 mix test <file> --only
 browser` (bypassing the alias, since `mix test.browser` doesn't forward a
 file argument ahead of `--only browser` today — pass it after, as `args`).
 
-## What the four seed tests pin
+## What the five seed tests pin
 
-All four live in `test/browser/pump_inspection_browser_test.exs`, driving
+All five live in `test/browser/pump_inspection_browser_test.exs`, driving
 `FormentationDemo.PumpInspectionLive` at `/`:
 
-1. **Valid-submit smoke** — fills in the two blank required fields
-   (`Serial number`, `Condition`), clicks Save, and asserts the decoded
+1. **Valid-submit smoke** — fills in the three blank required fields
+   (`Serial number`, `Condition`, and `Mounting`), clicks Save, and asserts the decoded
    candidate JSON appears in `pre#decoded-candidate`. Baseline: the whole
    stack works end to end through a real browser.
 2. **`_unused_` gating of a pristine required field** ([[18-decisions#D-014 — Usage is a first-class interaction axis|D-014]]) —
@@ -183,7 +183,8 @@ All four live in `test/browser/pump_inspection_browser_test.exs`, driving
    (`.ftn-error-summary[role='alert']`), and asserts keyboard focus lands
    on `#ftn--asset_payload--field--control--serial_number`. This is an end-to-end interaction
    (`click` → focus movement) with no server-side equivalent to assert.
-   The same browser regression clicks `Mounting:` and verifies focus lands on
+5. **Radio-summary anchor focus** — unchecks native validation, submits a
+   blank form, clicks `Mounting:` in the error summary, and verifies focus lands on
    the radio fieldset's prepared container id; the fieldset is programmatically
    focusable with `tabindex="-1"` without entering ordinary tab order.
 

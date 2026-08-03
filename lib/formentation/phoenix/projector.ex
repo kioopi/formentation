@@ -378,6 +378,10 @@ defmodule Formentation.Phoenix.Projector do
     Enum.flat_map(children, &field_entries/1)
   end
 
+  # Hidden inputs have no visible, focusable target in the reference theme, so
+  # their errors cannot be actionable summary entries.
+  defp field_entries(%RenderNode.Field{widget: :hidden_input}), do: []
+
   defp field_entries(%RenderNode.Field{show_errors?: true} = node) do
     for {message, _opts} <- node.errors do
       summary_entry(summary_target(node), node.label, message)
@@ -396,7 +400,6 @@ defmodule Formentation.Phoenix.Projector do
 
   defp summary_part(widget)
        when widget in [
-              :hidden_input,
               :checkbox,
               :textarea,
               :select,
