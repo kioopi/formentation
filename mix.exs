@@ -143,6 +143,7 @@ defmodule Formentation.MixProject do
         ],
         "Phoenix rendering": [
           Formentation.Phoenix,
+          Formentation.Phoenix.DOMIdentity,
           Formentation.Phoenix.Projector,
           Formentation.Phoenix.RenderPlan,
           Formentation.Phoenix.RenderNode,

@@ -2,6 +2,8 @@ defmodule Formentation.Phoenix.DOMIdentityTest do
   use ExUnit.Case, async: true
   use ExUnitProperties
 
+  doctest Formentation.Phoenix.DOMIdentity
+
   alias Formentation.InstancePath
   alias Formentation.Phoenix.DOMIdentity
   alias Formentation.Phoenix.DOMIdentityDecoder
@@ -41,6 +43,9 @@ defmodule Formentation.Phoenix.DOMIdentityTest do
     end
 
     test "encodes radio option parts and readable hostile strings" do
+      assert DOMIdentity.field(@namespace, path(["condition"]), :container) ==
+               "ftn--asset_payload--field--container--condition"
+
       assert DOMIdentity.field(@namespace, path(["condition"]), {:option, 2}) ==
                "ftn--asset_payload--field--option_2--condition"
 
@@ -77,11 +82,17 @@ defmodule Formentation.Phoenix.DOMIdentityTest do
 
     test "rejects unsupported parts" do
       assert_raise ArgumentError, ~r/invalid field DOM identity part/, fn ->
-        DOMIdentity.field(@namespace, path(["email"]), :container)
+        DOMIdentity.field(@namespace, path(["email"]), :legend)
       end
 
       assert_raise ArgumentError, ~r/invalid group DOM identity part/, fn ->
         DOMIdentity.group(@namespace, "/#details", path([]), :errors)
+      end
+    end
+
+    test "reports invalid layout ids accurately" do
+      assert_raise ArgumentError, ~r/layout id must be a binary/, fn ->
+        DOMIdentity.group(@namespace, :details, path([]), :container)
       end
     end
   end
