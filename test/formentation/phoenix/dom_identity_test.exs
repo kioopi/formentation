@@ -112,6 +112,7 @@ defmodule Formentation.Phoenix.DOMIdentityTest do
   describe "test decoder" do
     test "funnels malformed ids through one actionable error" do
       for id <- [
+            "ftn----field--control--x",
             "ftn--ns--field--legend--x",
             "ftn--ns--object--errors",
             "ftn--ns--field--option_--x",

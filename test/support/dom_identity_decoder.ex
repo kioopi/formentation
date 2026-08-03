@@ -38,7 +38,10 @@ defmodule Formentation.Phoenix.DOMIdentityDecoder do
   defp decode_tokens(_tokens), do: :error
 
   defp namespace(token) do
-    with {:ok, namespace} when byte_size(namespace) > 0 <- unescape(token), do: {:ok, namespace}
+    case unescape(token) do
+      {:ok, namespace} when byte_size(namespace) > 0 -> {:ok, namespace}
+      _other -> :error
+    end
   end
 
   defp field_part("control"), do: {:ok, :control}
