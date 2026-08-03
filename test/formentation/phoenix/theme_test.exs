@@ -494,7 +494,7 @@ defmodule Formentation.Phoenix.ThemeTest do
 
     test "nested groups recurse" do
       inner = %RenderNode.Group{
-        legend: "Inner",
+        legend: "Details",
         help: "Inner help.",
         dom: %RenderNode.GroupDOM{
           container: group_id("inner", :container),
@@ -504,7 +504,7 @@ defmodule Formentation.Phoenix.ThemeTest do
       }
 
       outer = %RenderNode.Group{
-        legend: "Outer",
+        legend: "Details",
         help: "Outer help.",
         dom: %RenderNode.GroupDOM{
           container: group_id("outer", :container),
@@ -516,6 +516,12 @@ defmodule Formentation.Phoenix.ThemeTest do
       doc = parse!(render_component(&Reference.node/1, node: outer))
 
       assert [_outer, _inner] = Floki.find(doc, "fieldset.ftn-group")
+
+      assert doc |> Floki.find("fieldset.ftn-group legend") |> Enum.map(&Floki.text/1) == [
+               "Details",
+               "Details"
+             ]
+
       assert_no_duplicate_ids(doc)
       assert describedby(doc, outer.dom.container) == [outer.dom.help]
       assert describedby(doc, inner.dom.container) == [inner.dom.help]

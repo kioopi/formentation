@@ -25,6 +25,8 @@ defmodule Formentation.Phoenix.Theme.Reference do
   attr(:node, :any, required: true, doc: "a RenderNode.Field or RenderNode.Group")
 
   def node(%{node: %RenderNode.Group{}} = assigns) do
+    # Keep these elements contiguous: HEEx removes :if elements but retains
+    # surrounding whitespace, and the no-help snapshot is byte-exact.
     ~H"""
     <fieldset
       id={@node.dom.container}

@@ -282,9 +282,10 @@ defmodule Formentation.Phoenix.ProjectorTest do
     test "preserves root object help in the render plan" do
       definition = compile!(%{kind: :object, help: "Record one pump.", properties: []})
       form = FormData.to_form(Form.new(definition), as: "payload")
+      plan = Projector.project(definition, form)
 
-      assert %RenderNode.Group{help: "Record one pump."} =
-               Projector.project(definition, form).root
+      assert %RenderNode.Group{help: "Record one pump."} = plan.root
+      assert Projector.project_at(definition, form, []) == plan.root
     end
 
     test "preserves native presentation-group help" do
@@ -466,6 +467,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
             {"address",
              %{
                kind: :object,
+               help: "Where the asset is installed.",
                properties: [{"street", %{kind: :string}}],
                groups: [%{id: "details", title: "Details", fields: ["street"]}]
              }}

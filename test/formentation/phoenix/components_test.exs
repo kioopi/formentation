@@ -192,9 +192,15 @@ defmodule Formentation.Phoenix.ComponentsTest do
       form = FormData.to_form(Form.new(definition), as: "payload")
       html = render_fields(definition, form)
       doc = parse!(html)
+      notes_control_id = field_id("payload", ["notes"], :control)
+      notes_help_id = field_id("payload", ["notes"], :help)
       address_id = DOMIdentity.object("payload", InstancePath.new!(["address"]), :container)
       address_help_id = DOMIdentity.object("payload", InstancePath.new!(["address"]), :help)
 
+      assert Floki.text(find_one(doc, ~s(p[id="#{notes_help_id}"].ftn-help))) |> String.trim() ==
+               "Field help."
+
+      assert describedby(doc, notes_control_id) == [notes_help_id]
       assert Floki.text(find_one(doc, ".ftn-group-help")) |> String.trim() == "Group help."
       assert describedby(doc, address_id) == [address_help_id]
       refute html =~ "Root help."

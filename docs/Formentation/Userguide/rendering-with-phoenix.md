@@ -11,8 +11,9 @@ status: current
 
 # Rendering with Phoenix
 
-*Covers Formentation as of 2026-08-03. Every HTML fragment below was
-produced by the version described.*
+*Covers Formentation as of 2026-08-03. Every HTML fragment below represents
+output from the version described; whitespace may be lightly reformatted for
+readability.*
 
 Formentation ships two function components and one built-in theme.
 Rendering is a pure function of the definition and the form state — the
@@ -154,6 +155,13 @@ Presentation groups and nested objects both render as fieldsets:
 The difference is invisible in the markup and decisive in the data: a
 nested object's input is `payload[address][city]`; a presentation group's
 member stays `payload[voltage]`.
+
+The example is a nested object: Map `:help` and JSON Schema `"description"`
+can supply its help through the built-in adapters. A native or prepared
+presentation group that already carries help renders the same associated
+markup, but the built-in Map `groups:` and JSON UI-group vocabularies do not
+currently accept a public group-help key. Exposing that declaration capability
+is separate future work.
 
 The class names — `ftn-form`, `ftn-field`, `ftn-group`, `ftn-help`, `ftn-group-help`,
 `ftn-errors`, `ftn-error-summary`, `ftn-radio-group`, `ftn-radio` — are
