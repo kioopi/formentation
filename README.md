@@ -152,8 +152,9 @@ is a later phase. See the [rendering guide](docs/Formentation/Userguide/renderin
 
 ```sh
 mix test    # the suite: unit, property, and end-to-end example tests
-mix ci      # full gate: compile with warnings-as-errors, format check, tests,
-            # credo --strict, dialyzer, duplication and architecture checks
+mix ci      # full gate: compile with warnings-as-errors, format check, vault
+            # wikilinks, docs with warnings-as-errors, tests, credo --strict,
+            # dialyzer, duplication and architecture checks
 mix test.browser # the [browser test suite](docs/Formentation/Techdocs/browser-testing.md)
 
 ```

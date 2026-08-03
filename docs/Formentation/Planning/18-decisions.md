@@ -721,6 +721,31 @@ now includes group help without changing the stored definition format, field
 names, or DOM identity grammar. A future root/page-help API and group-summary
 linking work can build on the preserved content and prepared container ids.
 
+## D-035 — Documentation generation is a `mix ci` gate
+
+*2026-08-03*
+
+**Context.** The project rule "keep `mix docs` warning-free" was a manual habit
+with nothing enforcing it, so a broken reference or a link to a moved file could
+land and only surface at release time — while every other quality property
+(formatting, credo, types, duplication, architecture, vault wikilinks) was
+already a gate.
+
+**Decision.** `mix ci` runs `mix docs --warnings-as-errors` after
+`vault.links` and before `test`. Because `mix ci` runs in `MIX_ENV=test`,
+`ex_doc` becomes a `[:dev, :test]` dependency, and `docs.filter_modules` now
+selects modules by compile source — only those under `lib/` are documented —
+instead of naming the demo modules explicitly. That keeps the gated doc surface
+identical to the `mix docs` a maintainer runs in `:dev`, where
+`elixirc_paths/1` also compiles `demo/` and, under `:test`, `test/support/`.
+
+**Consequences.** Documentation breakage fails the same gate as a compiler
+warning, so the manual check disappears from the workflow rules. `mix ci` gets
+slower by one doc build, and `doc/` is written on every run (already
+gitignored). Filtering by compile source means a new non-shipping module under
+`demo/` or `test/support/` is excluded automatically, with no filter list to
+maintain; a module that should be documented must live in `lib/`.
+
 ## Related notes
 
 - [[19-north-star-architecture|North-star architecture]]

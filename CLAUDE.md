@@ -13,7 +13,8 @@
 - Public functions carry `@doc`, with a doctest example where the function is
   practically doctestable (pure data in/out, or a cheap `render_component`
   check for components). Wire doctests via `doctest TheModule` in the module's
-  test file. Keep `mix docs` warning-free.
+  test file. `mix ci` runs `mix docs --warnings-as-errors`, so documentation
+  warnings fail the build like compiler warnings do — no separate manual check.
 
 ## Documentation vault
 

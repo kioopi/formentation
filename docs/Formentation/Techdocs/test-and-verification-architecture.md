@@ -12,7 +12,7 @@ status: current
 
 # Test and verification architecture
 
-> [!note] As of 2026-07-26 · step 7 + browser-testing suite + vault link gate
+> [!note] As of 2026-08-03 · step 7 + browser-testing suite + vault link and docs gates
 > Describes the verification setup as built: the kinds of test in the
 > suite, what each one pins, and the static gates in `mix ci` — including
 > the demo's `Phoenix.LiveViewTest` suite and, now, the opt-in browser-real
@@ -179,8 +179,9 @@ real `.json` files rather than inline heredocs — they are also what
 
 Tests are only half the verification. `mix ci` runs, in order:
 `compile --warnings-as-errors`, `format --check-formatted`, `vault.links`,
-`test`, `credo --strict`, `dialyzer`, `ex_dna --max-clones 0`, and
-`reach.check --arch --smells`. Three of those deserve explanation.
+`docs --warnings-as-errors`, `test`, `credo --strict`, `dialyzer`,
+`ex_dna --max-clones 0`, and `reach.check --arch --smells`. Four of those
+deserve explanation.
 
 **`mix vault.links`** fails on any `[[wikilink]]` that contains a line
 break. Obsidian does not parse those, so a hard-wrapped link renders as
@@ -200,6 +201,19 @@ an optional path argument, which is what lets
 the line-scanning itself is a pure `split_links/1` covered by unit tests
 and doctests. Being outside a layer, it carries a `layer_coverage.ignore`
 entry in `.reach.exs` alongside the other `test/support` modules.
+
+**`mix docs --warnings-as-errors`** makes the published documentation a
+gate rather than a manual check: a link to a file that does not exist, a
+reference to a module excluded from the docs, or any other `ex_doc`
+warning fails the build the same way a compiler warning does. Two
+wrinkles come from `mix
+ci` running in `MIX_ENV=test`. `ex_doc` is therefore a `[:dev, :test]`
+dependency, not `:dev`-only; and `elixirc_paths(:test)` compiles `demo/`
+and `test/support/` alongside `lib/`, which would otherwise pull
+non-shipping modules into the doc surface — so `filter_modules` keeps
+only modules whose compile source lives under `lib/`, making the gated
+output equal to the `mix docs` a maintainer runs in `:dev`. Doctests
+themselves are not this gate's business; they run under `mix test`.
 
 **`ex_dna --max-clones 0`** fails on *any* duplicated code block. In a
 project with two adapters translating different vocabularies into the

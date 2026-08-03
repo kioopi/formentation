@@ -54,7 +54,9 @@ defmodule Formentation.MixProject do
       {:reach, "~> 2.0", only: [:dev, :test], runtime: false},
       {:ex_dna, "~> 1.0", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
-      {:ex_doc, "~> 0.38", only: :dev, runtime: false},
+      # Also in :test so `mix ci` (which runs in MIX_ENV=test) can gate on
+      # `mix docs --warnings-as-errors`.
+      {:ex_doc, "~> 0.38", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.0", only: [:dev, :test], runtime: false},
       {:six, "~> 0.4", only: :test, runtime: false},
       {:vibe_kit, "~> 0.1"},
@@ -77,6 +79,7 @@ defmodule Formentation.MixProject do
         "compile --warnings-as-errors",
         "format --check-formatted",
         "vault.links",
+        "docs --warnings-as-errors",
         "test",
         "credo --strict",
         "dialyzer",
@@ -96,6 +99,17 @@ defmodule Formentation.MixProject do
     Mix.Task.run("test", ["--only", "browser" | args])
   end
 
+  defp library_module?(module) do
+    with true <- Code.ensure_loaded?(module),
+         [_ | _] = source <- module.module_info(:compile)[:source] do
+      source
+      |> List.to_string()
+      |> String.starts_with?(Path.join(File.cwd!(), "lib") <> "/")
+    else
+      _ -> false
+    end
+  end
+
   defp package do
     [
       licenses: ["MIT"],
@@ -108,12 +122,11 @@ defmodule Formentation.MixProject do
       main: "Formentation",
       source_url: @source_url,
       source_ref: "v#{@version}",
-      filter_modules: fn module, _metadata ->
-        name = Atom.to_string(module)
-
-        not String.starts_with?(name, "Elixir.FormentationDemo") and
-          name != "Elixir.Mix.Tasks.Demo"
-      end,
+      # Only the library itself is published API. `elixirc_paths/1` also
+      # compiles `demo/` (:dev, :test) and `test/support/` (:test), and
+      # `mix ci` runs `mix docs` in MIX_ENV=test — filtering on the compile
+      # source keeps the gated doc surface equal to the published one.
+      filter_modules: fn module, _metadata -> library_module?(module) end,
       groups_for_modules: [
         "Compile & query": [
           Formentation,
