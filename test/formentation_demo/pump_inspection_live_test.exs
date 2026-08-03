@@ -7,6 +7,8 @@ defmodule FormentationDemo.PumpInspectionLiveTest do
 
   @endpoint FormentationDemo.Endpoint
 
+  alias Formentation.{InstancePath, Phoenix.DOMIdentity}
+
   @valid_payload %{
     "serial_number" => "PX-2044",
     "condition" => "worn",
@@ -21,6 +23,8 @@ defmodule FormentationDemo.PumpInspectionLiveTest do
     {:ok, lv, html} = live(build_conn(), "/")
     {lv, html}
   end
+
+  defp field_id(path, part), do: DOMIdentity.field("asset_payload", InstancePath.new!(path), part)
 
   describe "initial render" do
     test "shows initial data under the parent namespace with unique ids" do
@@ -79,7 +83,7 @@ defmodule FormentationDemo.PumpInspectionLiveTest do
 
       doc = parse!(html)
       # serial_number was resent blank by the full-form serialization: visible immediately
-      assert [_errors] = Floki.find(doc, "#asset_payload_serial_number_errors")
+      assert [_errors] = Floki.find(doc, "##{field_id(["serial_number"], :errors)}")
       assert [serial] = Floki.find(doc, "input[name='asset[payload][serial_number]']")
       assert Floki.attribute(serial, "aria-invalid") == ["true"]
 
@@ -90,7 +94,7 @@ defmodule FormentationDemo.PumpInspectionLiveTest do
 
       doc = parse!(html)
       # still too short (minLength 4): stays visible, control marked invalid
-      assert [_errors] = Floki.find(doc, "#asset_payload_serial_number_errors")
+      assert [_errors] = Floki.find(doc, "##{field_id(["serial_number"], :errors)}")
       assert [serial] = Floki.find(doc, "input[name='asset[payload][serial_number]']")
       assert Floki.attribute(serial, "aria-invalid") == ["true"]
     end
@@ -106,7 +110,7 @@ defmodule FormentationDemo.PumpInspectionLiveTest do
       doc = parse!(html)
       assert [hours] = Floki.find(doc, "input[name='asset[payload][operating_hours]']")
       assert Floki.attribute(hours, "value") == ["51o2"]
-      assert [_errors] = Floki.find(doc, "#asset_payload_operating_hours_errors")
+      assert [_errors] = Floki.find(doc, "##{field_id(["operating_hours"], :errors)}")
       refute html =~ "decoded-candidate"
     end
 
@@ -146,7 +150,7 @@ defmodule FormentationDemo.PumpInspectionLiveTest do
       end
 
       # the untouched blank serial number is now visible (submit gate)
-      assert [_errors] = Floki.find(doc, "#asset_payload_serial_number_errors")
+      assert [_errors] = Floki.find(doc, "##{field_id(["serial_number"], :errors)}")
       refute html =~ "decoded-candidate"
     end
 
@@ -188,7 +192,7 @@ defmodule FormentationDemo.PumpInspectionLiveTest do
       assert Floki.find(doc, "pre#decoded-candidate") == []
       assert [hours] = Floki.find(doc, "input[name='asset[payload][operating_hours]']")
       assert Floki.attribute(hours, "value") == ["51o2"]
-      assert [_errors] = Floki.find(doc, "#asset_payload_operating_hours_errors")
+      assert [_errors] = Floki.find(doc, "##{field_id(["operating_hours"], :errors)}")
     end
 
     test "after a failed submit, edits keep field errors visible and drop the summary" do
@@ -211,7 +215,7 @@ defmodule FormentationDemo.PumpInspectionLiveTest do
       # too, so the prior submit already marked every path :used. Errors
       # therefore survive this post-submit :change regardless of which field
       # it names:
-      assert [_errors] = Floki.find(doc, "#asset_payload_serial_number_errors")
+      assert [_errors] = Floki.find(doc, "##{field_id(["serial_number"], :errors)}")
       # ...while the submit-gated summary hides again
       assert Floki.find(doc, ".ftn-error-summary") == []
     end
@@ -273,7 +277,7 @@ defmodule FormentationDemo.PumpInspectionLiveTest do
         [hours] = Floki.find(doc, "input[name='asset[payload][operating_hours]']")
 
         {Floki.attribute(hours, "value"),
-         Floki.find(doc, "#asset_payload_operating_hours_errors") != []}
+         Floki.find(doc, "##{field_id(["operating_hours"], :errors)}") != []}
       end
 
       assert extract.(html1) == {["51o2"], true}

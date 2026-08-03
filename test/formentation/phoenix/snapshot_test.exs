@@ -4,8 +4,8 @@ defmodule Formentation.Phoenix.SnapshotTest do
   import Formentation.HTMLAssertions
   import Phoenix.LiveViewTest, only: [render_component: 2]
 
-  alias Formentation.Fixtures.PumpInspection
-  alias Formentation.Form
+  alias Formentation.{Fixtures.PumpInspection, Form, InstancePath}
+  alias Formentation.Phoenix.DOMIdentity
   alias Phoenix.HTML.FormData
 
   @snapshot Path.expand("../../support/fixtures/pump_inspection/static_render.html", __DIR__)
@@ -38,9 +38,13 @@ defmodule Formentation.Phoenix.SnapshotTest do
 
     doc = parse!(html)
     assert_no_duplicate_ids(doc)
-    assert_labelled(doc, "asset_payload_serial_number")
-    assert_labelled(doc, "asset_payload_notes")
-    assert describedby(doc, "asset_payload_notes") == ["asset_payload_notes_help"]
+    serial_id = DOMIdentity.field("asset_payload", InstancePath.new!(["serial_number"]), :control)
+    notes_id = DOMIdentity.field("asset_payload", InstancePath.new!(["notes"]), :control)
+    notes_help_id = DOMIdentity.field("asset_payload", InstancePath.new!(["notes"]), :help)
+
+    assert_labelled(doc, serial_id)
+    assert_labelled(doc, notes_id)
+    assert describedby(doc, notes_id) == [notes_help_id]
     assert Floki.text(find_one(doc, "fieldset.ftn-group legend")) == "Electrical"
     assert Floki.find(doc, "form") == []
 

@@ -26,7 +26,7 @@ defmodule Formentation.Phoenix.Theme.Reference do
 
   def node(%{node: %RenderNode.Group{}} = assigns) do
     ~H"""
-    <fieldset class="ftn-group">
+    <fieldset id={@node.dom.container} class="ftn-group">
       <legend>{@node.legend}</legend>
       <.node :for={child <- @node.children} node={child} />
     </fieldset>
@@ -76,7 +76,7 @@ defmodule Formentation.Phoenix.Theme.Reference do
 
   def field(%{node: %RenderNode.Field{widget: :hidden_input}} = assigns) do
     ~H"""
-    <input type="hidden" name={@node.field.name} id={@node.field.id} value={@node.field.value} />
+    <input type="hidden" name={@node.field.name} id={@node.dom.control} value={@node.field.value} />
     """
   end
 
@@ -85,10 +85,10 @@ defmodule Formentation.Phoenix.Theme.Reference do
 
     ~H"""
     <div class="ftn-field">
-      <label :if={@node.widget not in [:checkbox, :radio_group]} for={@node.field.id}>{@node.label}</label>
+      <label :if={@node.widget not in [:checkbox, :radio_group]} for={@node.dom.control}>{@node.label}</label>
       <.control node={@node} describedby={@describedby} />
-      <p :if={@node.help} id={help_id(@node)} class="ftn-help">{@node.help}</p>
-      <ul :if={@node.show_errors?} id={errors_id(@node)} class="ftn-errors">
+      <p :if={@node.help} id={@node.dom.help} class="ftn-help">{@node.help}</p>
+      <ul :if={@node.show_errors?} id={@node.dom.errors} class="ftn-errors">
         <li :for={{message, _opts} <- @node.errors}>{message}</li>
       </ul>
     </div>
@@ -107,7 +107,7 @@ defmodule Formentation.Phoenix.Theme.Reference do
     <input :if={not @node.read_only?} type="hidden" name={@node.field.name} value="false" />
     <input
       type="checkbox"
-      id={@node.field.id}
+      id={@node.dom.control}
       name={@node.field.name}
       value="true"
       checked={@node.field.value in [true, "true"]}
@@ -116,14 +116,14 @@ defmodule Formentation.Phoenix.Theme.Reference do
       aria-invalid={@node.show_errors? && "true"}
       {validation_attrs(@node, [:required])}
     />
-    <label for={@node.field.id}>{@node.label}</label>
+    <label for={@node.dom.control}>{@node.label}</label>
     """
   end
 
   defp control(%{node: %RenderNode.Field{widget: :textarea}} = assigns) do
     ~H"""
     <textarea
-      id={@node.field.id}
+      id={@node.dom.control}
       name={@node.field.name}
       readonly={@node.read_only?}
       aria-describedby={@describedby}
@@ -138,7 +138,7 @@ defmodule Formentation.Phoenix.Theme.Reference do
 
     ~H"""
     <select
-      id={@node.field.id}
+      id={@node.dom.control}
       name={@node.field.name}
       disabled={@node.read_only?}
       aria-describedby={@describedby}
@@ -164,17 +164,17 @@ defmodule Formentation.Phoenix.Theme.Reference do
       aria-invalid={@node.show_errors? && "true"}
     >
       <legend>{@node.label}</legend>
-      <div :for={{option, index} <- Enum.with_index(@node.options)} class="ftn-radio">
+      <div :for={{option, id} <- Enum.zip(@node.options, @node.dom.options)} class="ftn-radio">
         <input
           type="radio"
-          id={"#{@node.field.id}_#{index}"}
+          id={id}
           name={@node.field.name}
           value={option}
           checked={option == @current}
           disabled={@node.read_only?}
           {required_attr(@node)}
         />
-        <label for={"#{@node.field.id}_#{index}"}>{option}</label>
+        <label for={id}>{option}</label>
       </div>
     </fieldset>
     """
@@ -185,7 +185,7 @@ defmodule Formentation.Phoenix.Theme.Reference do
     <input
       type={input_type(@node.widget)}
       inputmode={inputmode(@node.widget)}
-      id={@node.field.id}
+      id={@node.dom.control}
       name={@node.field.name}
       value={@node.field.value}
       readonly={@node.read_only?}
@@ -209,15 +209,12 @@ defmodule Formentation.Phoenix.Theme.Reference do
   defp inputmode(:number_input), do: "numeric"
   defp inputmode(_widget), do: nil
 
-  defp help_id(node), do: "#{node.field.id}_help"
-  defp errors_id(node), do: "#{node.field.id}_errors"
-
   defp describedby(node) do
     ids =
       Enum.filter(
         [
-          node.help && help_id(node),
-          node.show_errors? && node.errors != [] && errors_id(node)
+          node.help && node.dom.help,
+          node.show_errors? && node.errors != [] && node.dom.errors
         ],
         &is_binary/1
       )

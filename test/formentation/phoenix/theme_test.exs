@@ -19,6 +19,12 @@ defmodule Formentation.Phoenix.ThemeTest do
       widget: :text_input,
       field: form_field(),
       label: "Notes",
+      dom: %RenderNode.FieldDOM{
+        control: "ftn--payload--field--control--notes",
+        help: "ftn--payload--field--help--notes",
+        errors: "ftn--payload--field--errors--notes",
+        options: []
+      },
       help: nil,
       options: nil,
       validations: [],
@@ -38,7 +44,13 @@ defmodule Formentation.Phoenix.ThemeTest do
     defaults = [
       widget: :checkbox,
       field: form_field(id: "insulation_ok", name: "insulation_ok", field: :insulation_ok),
-      label: "Insulation test passed"
+      label: "Insulation test passed",
+      dom: %RenderNode.FieldDOM{
+        control: "ftn--payload--field--control--insulation_ok",
+        help: "ftn--payload--field--help--insulation_ok",
+        errors: "ftn--payload--field--errors--insulation_ok",
+        options: []
+      }
     ]
 
     field_node(Keyword.merge(defaults, overrides))
@@ -49,7 +61,13 @@ defmodule Formentation.Phoenix.ThemeTest do
       widget: :select,
       field: form_field(id: "condition", name: "condition", field: :condition),
       label: "Condition",
-      options: ["good", "worn", "defective"]
+      options: ["good", "worn", "defective"],
+      dom: %RenderNode.FieldDOM{
+        control: "ftn--payload--field--control--condition",
+        help: "ftn--payload--field--help--condition",
+        errors: "ftn--payload--field--errors--condition",
+        options: []
+      }
     ]
 
     field_node(Keyword.merge(defaults, overrides))
@@ -60,7 +78,16 @@ defmodule Formentation.Phoenix.ThemeTest do
       widget: :radio_group,
       field: form_field(id: "condition", name: "condition", field: :condition),
       label: "Condition",
-      options: ["good", "worn"]
+      options: ["good", "worn"],
+      dom: %RenderNode.FieldDOM{
+        control: "ftn--payload--field--control--condition",
+        help: "ftn--payload--field--help--condition",
+        errors: "ftn--payload--field--errors--condition",
+        options: [
+          "ftn--payload--field--option_0--condition",
+          "ftn--payload--field--option_1--condition"
+        ]
+      }
     ]
 
     field_node(Keyword.merge(defaults, overrides))
@@ -70,20 +97,23 @@ defmodule Formentation.Phoenix.ThemeTest do
     test "labels the control and renders name and value" do
       doc = render_field(field: form_field(value: "PX-2044"))
 
-      assert_labelled(doc, "notes")
+      assert_labelled(doc, "ftn--payload--field--control--notes")
       input = find_one(doc, "div.ftn-field input[type=text]")
       assert Floki.attribute(input, "name") == ["notes"]
       assert Floki.attribute(input, "value") == ["PX-2044"]
-      assert describedby(doc, "notes") == []
+      assert describedby(doc, "ftn--payload--field--control--notes") == []
       assert Floki.attribute(input, "aria-invalid") == []
     end
 
     test "links help text through aria-describedby" do
       doc = render_field(help: "Visible to all technicians.")
 
-      help = find_one(doc, "p.ftn-help#notes_help")
+      help = find_one(doc, "p.ftn-help#ftn--payload--field--help--notes")
       assert Floki.text(help) == "Visible to all technicians."
-      assert describedby(doc, "notes") == ["notes_help"]
+
+      assert describedby(doc, "ftn--payload--field--control--notes") == [
+               "ftn--payload--field--help--notes"
+             ]
     end
 
     test "renders visible errors linked and flagged" do
@@ -94,9 +124,14 @@ defmodule Formentation.Phoenix.ThemeTest do
           show_errors?: true
         )
 
-      errors = find_one(doc, "ul.ftn-errors#notes_errors")
+      errors = find_one(doc, "ul.ftn-errors#ftn--payload--field--errors--notes")
       assert Floki.text(errors) =~ "is too short"
-      assert describedby(doc, "notes") == ["notes_help", "notes_errors"]
+
+      assert describedby(doc, "ftn--payload--field--control--notes") == [
+               "ftn--payload--field--help--notes",
+               "ftn--payload--field--errors--notes"
+             ]
+
       input = find_one(doc, "input")
       assert Floki.attribute(input, "aria-invalid") == ["true"]
     end
@@ -183,9 +218,9 @@ defmodule Formentation.Phoenix.ThemeTest do
       assert html =~ "Runs &lt;fine&gt;."
 
       doc = parse!(html)
-      textarea = find_one(doc, "textarea#notes")
+      textarea = find_one(doc, "textarea#ftn--payload--field--control--notes")
       assert Floki.attribute(textarea, "readonly") == ["readonly"]
-      assert_labelled(doc, "notes")
+      assert_labelled(doc, "ftn--payload--field--control--notes")
     end
 
     test "textarea escapes hostile content — no tag breakout" do
@@ -225,7 +260,7 @@ defmodule Formentation.Phoenix.ThemeTest do
       assert Floki.attribute(checkbox, "type") == ["checkbox"]
       assert Floki.attribute(checkbox, "value") == ["true"]
       assert Floki.attribute(checkbox, "checked") == []
-      assert_labelled(doc, "insulation_ok")
+      assert_labelled(doc, "ftn--payload--field--control--insulation_ok")
     end
 
     test "boolean true and transport 'true' both check the box" do
@@ -276,8 +311,8 @@ defmodule Formentation.Phoenix.ThemeTest do
           )
         )
 
-      assert_labelled(doc, "condition")
-      options = Floki.find(doc, "select#condition option")
+      assert_labelled(doc, "ftn--payload--field--control--condition")
+      options = Floki.find(doc, "select#ftn--payload--field--control--condition option")
       assert [{"option", _, []} | _] = options
       assert Floki.attribute(hd(options), "value") == [""]
       assert [_, _, _, _] = options
@@ -310,13 +345,16 @@ defmodule Formentation.Phoenix.ThemeTest do
 
       fieldset = find_one(doc, "fieldset.ftn-radio-group")
       assert Floki.text(find_one(doc, "legend")) == "Condition"
-      assert Floki.attribute(fieldset, "aria-describedby") == ["condition_help"]
+
+      assert Floki.attribute(fieldset, "aria-describedby") == [
+               "ftn--payload--field--help--condition"
+             ]
 
       radios = Floki.find(doc, "input[type=radio]")
       assert [_, _] = radios
       assert Enum.flat_map(radios, &Floki.attribute(&1, "name")) == ["condition", "condition"]
-      assert_labelled(doc, "condition_0")
-      assert_labelled(doc, "condition_1")
+      assert_labelled(doc, "ftn--payload--field--option_0--condition")
+      assert_labelled(doc, "ftn--payload--field--option_1--condition")
 
       [checked] = Floki.find(doc, "input[type=radio][checked]")
       assert Floki.attribute(checked, "value") == ["worn"]
@@ -366,6 +404,10 @@ defmodule Formentation.Phoenix.ThemeTest do
     test "a group renders a fieldset with legend and its children" do
       group = %RenderNode.Group{
         legend: "Electrical",
+        dom: %RenderNode.GroupDOM{
+          container: "ftn--payload--group--container--electrical",
+          help: "ftn--payload--group--help--electrical"
+        },
         children: [field_node(), checkbox_node()]
       }
 
@@ -377,8 +419,23 @@ defmodule Formentation.Phoenix.ThemeTest do
     end
 
     test "nested groups recurse" do
-      inner = %RenderNode.Group{legend: "Inner", children: [field_node()]}
-      outer = %RenderNode.Group{legend: "Outer", children: [inner]}
+      inner = %RenderNode.Group{
+        legend: "Inner",
+        dom: %RenderNode.GroupDOM{
+          container: "ftn--payload--group--container--inner",
+          help: "ftn--payload--group--help--inner"
+        },
+        children: [field_node()]
+      }
+
+      outer = %RenderNode.Group{
+        legend: "Outer",
+        dom: %RenderNode.GroupDOM{
+          container: "ftn--payload--group--container--outer",
+          help: "ftn--payload--group--help--outer"
+        },
+        children: [inner]
+      }
 
       doc = parse!(render_component(&Reference.node/1, node: outer))
 

@@ -187,7 +187,7 @@ defmodule Formentation.Phoenix.UsedInputContractTest do
     # t2's payload drops "title" entirely; only "other" changes.
     form_t2 = Form.transition(form_t1, %Params{values: %{"other" => "y"}, event: :change})
 
-    phoenix_form_t2 = FormData.to_form(form_t2, [])
+    phoenix_form_t2 = FormData.to_form(form_t2, as: "payload")
 
     # used_input? forgets "title" was ever touched...
     refute used_input?(phoenix_form_t2[:title])

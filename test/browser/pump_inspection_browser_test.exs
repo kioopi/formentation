@@ -40,6 +40,10 @@ defmodule FormentationDemo.PumpInspectionBrowserTest do
   # timeout above is generous rather than tight.
   @connect_timeout to_timeout(second: 15)
 
+  alias Formentation.{InstancePath, Phoenix.DOMIdentity}
+
+  defp field_id(path, part), do: DOMIdentity.field("asset_payload", InstancePath.new!(path), part)
+
   defp visit_connected(conn, path) do
     conn |> visit(path) |> assert_has(".phx-connected", timeout: @connect_timeout)
   end
@@ -60,20 +64,20 @@ defmodule FormentationDemo.PumpInspectionBrowserTest do
     |> visit_connected("/")
     |> assert_has("form#asset-form")
     # pristine mount: the blank required serial_number shows no error
-    |> refute_has("#asset_payload_serial_number_errors")
+    |> refute_has("##{field_id(["serial_number"], :errors)}")
     # touch ONLY operating_hours; serial_number stays :unused via the LiveSocket _unused_
     # markers, so its error remains hidden. (Under LiveViewTest the whole form re-serializes
     # and this same assertion would FAIL — that is the divergence this test pins.)
     |> fill_in("Operating hours", with: "4800")
-    |> assert_has("#asset_payload_operating_hours", value: "4800")
-    |> refute_has("#asset_payload_serial_number_errors")
+    |> assert_has("##{field_id(["operating_hours"], :control)}", value: "4800")
+    |> refute_has("##{field_id(["serial_number"], :errors)}")
     # turn OFF native browser validation so the blank submit reaches the server; anchor on the
     # novalidate patch landing before clicking Save (else native validation blocks the submit)
     |> uncheck("Native browser validation")
     |> assert_has("form#asset-form[novalidate]")
     # submitting now gates every field's error open, including the untouched serial_number
     |> click_button("Save")
-    |> assert_has("#asset_payload_serial_number_errors")
+    |> assert_has("##{field_id(["serial_number"], :errors)}")
   end
 
   test "the number field keeps raw non-numeric text after the live round-trip (D-021)", %{
@@ -84,9 +88,9 @@ defmodule FormentationDemo.PumpInspectionBrowserTest do
     # operating_hours renders type="text" inputmode="numeric", so the browser accepts "51o2"
     |> fill_in("Operating hours", with: "51o2")
     # the decode fails and its error appears (also anchors the assertion to the live patch)
-    |> assert_has("#asset_payload_operating_hours_errors")
+    |> assert_has("##{field_id(["operating_hours"], :errors)}")
     # ...and the raw text survives the round-trip instead of being sanitized away
-    |> assert_has("#asset_payload_operating_hours", value: "51o2")
+    |> assert_has("##{field_id(["operating_hours"], :control)}", value: "51o2")
   end
 
   test "clicking an error-summary link focuses the offending control", %{conn: conn} do
@@ -99,6 +103,6 @@ defmodule FormentationDemo.PumpInspectionBrowserTest do
     |> click_button("Save")
     |> assert_has(".ftn-error-summary[role='alert']")
     |> click_link(nil, "Serial number:", exact: false)
-    |> assert_has("#asset_payload_serial_number:focus")
+    |> assert_has("##{field_id(["serial_number"], :control)}:focus")
   end
 end

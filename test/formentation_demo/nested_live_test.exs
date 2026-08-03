@@ -7,10 +7,14 @@ defmodule FormentationDemo.NestedLiveTest do
 
   @endpoint FormentationDemo.Endpoint
 
+  alias Formentation.{InstancePath, Phoenix.DOMIdentity}
+
   defp mount! do
     {:ok, lv, html} = live(build_conn(), "/nested")
     {lv, html}
   end
+
+  defp field_id(path, part), do: DOMIdentity.field("payload", InstancePath.new!(path), part)
 
   test "renders the nested object under nested names with unique ids" do
     {_lv, html} = mount!()
@@ -33,17 +37,17 @@ defmodule FormentationDemo.NestedLiveTest do
     assert [street] = Floki.find(doc, "input[name='payload[address][street]']")
     assert Floki.attribute(street, "value") == ["ab"]
     # touched and below minLength 3: visible on the nested node
-    assert [_errors] = Floki.find(doc, "#payload_address_street_errors")
+    assert [_errors] = Floki.find(doc, "##{field_id(["address", "street"], :errors)}")
     # nested sibling stays quiet: `number` is not part of this change, so
     # `Phoenix.LiveViewTest`'s form serialization resends it as "" (its current
     # DOM value); for an integer field that decodes as :unset (D-010), which
     # produces no issue at all — quiet because there is nothing to report, not
     # because usage-gating is hiding an issue.
-    assert Floki.find(doc, "#payload_address_number_errors") == []
+    assert Floki.find(doc, "##{field_id(["address", "number"], :errors)}") == []
     # Whole-form re-serialization also delivers title as "" — a string, so
     # D-010 decodes {:set, ""} (unlike number's unset) and the real minLength
     # violation renders on the marker-less, therefore :used, field.
-    assert [_title_errors] = Floki.find(doc, "#payload_title_errors")
+    assert [_title_errors] = Floki.find(doc, "##{field_id(["title"], :errors)}")
   end
 
   test "editing after a successful submit clears the decoded candidate" do
@@ -77,7 +81,7 @@ defmodule FormentationDemo.NestedLiveTest do
     doc = parse!(html)
     assert [number] = Floki.find(doc, "input[name='payload[address][number]']")
     assert Floki.attribute(number, "value") == ["12x"]
-    assert [_errors] = Floki.find(doc, "#payload_address_number_errors")
+    assert [_errors] = Floki.find(doc, "##{field_id(["address", "number"], :errors)}")
 
     html =
       lv
@@ -118,6 +122,6 @@ defmodule FormentationDemo.NestedLiveTest do
     assert Floki.find(doc, "pre#decoded-candidate") == []
     assert [number] = Floki.find(doc, "input[name='payload[address][number]']")
     assert Floki.attribute(number, "value") == ["12x"]
-    assert [_errors] = Floki.find(doc, "#payload_address_number_errors")
+    assert [_errors] = Floki.find(doc, "##{field_id(["address", "number"], :errors)}")
   end
 end

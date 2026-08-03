@@ -40,9 +40,15 @@ defmodule Formentation.Phoenix do
   """
   attr(:definition, Formentation.Definition, required: true)
   attr(:form, Phoenix.HTML.Form, required: true)
+  attr(:dom_namespace, :string, default: nil, doc: "override for renderer-owned DOM ids")
 
   def fields(assigns) do
-    assigns = assign(assigns, :plan, Projector.project(assigns.definition, assigns.form))
+    assigns =
+      assign(
+        assigns,
+        :plan,
+        Projector.project(assigns.definition, assigns.form, projector_opts(assigns))
+      )
 
     ~H"""
     <div class="ftn-form">
@@ -68,6 +74,7 @@ defmodule Formentation.Phoenix do
   """
   attr(:definition, Formentation.Definition, required: true)
   attr(:form, Phoenix.HTML.Form, required: true)
+  attr(:dom_namespace, :string, default: nil, doc: "override for renderer-owned DOM ids")
 
   attr(:path, :list,
     required: true,
@@ -76,10 +83,22 @@ defmodule Formentation.Phoenix do
 
   def field(assigns) do
     assigns =
-      assign(assigns, :node, Projector.project_at(assigns.definition, assigns.form, assigns.path))
+      assign(
+        assigns,
+        :node,
+        Projector.project_at(
+          assigns.definition,
+          assigns.form,
+          assigns.path,
+          projector_opts(assigns)
+        )
+      )
 
     ~H"""
     <Reference.node :if={@node} node={@node} />
     """
   end
+
+  defp projector_opts(%{dom_namespace: nil}), do: []
+  defp projector_opts(%{dom_namespace: namespace}), do: [dom_namespace: namespace]
 end
