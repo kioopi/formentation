@@ -5,13 +5,23 @@ defmodule Formentation.Phoenix.ProjectorTest do
 
   doctest Formentation.Phoenix.Projector
 
-  alias Formentation.{Form, InstancePath}
+  alias Formentation.{Form, InstancePath, NodeId, TemplatePath}
+  alias Formentation.Definition.Finalizer
+  alias Formentation.Presentation, as: NativePresentation
+  alias Formentation.Semantic
   alias Formentation.Phoenix.{DOMIdentity, Projector, RenderNode, RenderPlan}
   alias Phoenix.HTML.FormData
 
   defp compile!(declaration) do
     {:ok, definition, _diagnostics} =
       Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
+    definition
+  end
+
+  defp compile_json!(schema) do
+    {:ok, definition, _diagnostics} =
+      Formentation.compile(schema, adapter: Formentation.JSONSchema)
 
     definition
   end
@@ -230,6 +240,91 @@ defmodule Formentation.Phoenix.ProjectorTest do
   end
 
   describe "groups and non-rendering nodes" do
+    test "preserves Map object help in a nested render group" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"address",
+             %{
+               kind: :object,
+               help: "Where the asset is installed.",
+               properties: [{"street", %{kind: :string}}]
+             }}
+          ]
+        })
+
+      form = FormData.to_form(Form.new(definition), as: "payload")
+
+      assert %RenderNode.Group{help: "Where the asset is installed."} =
+               Projector.project(definition, form).root.children |> List.first()
+    end
+
+    test "preserves JSON Schema object descriptions in nested render groups" do
+      definition =
+        compile_json!(%{
+          "type" => "object",
+          "properties" => %{
+            "address" => %{
+              "type" => "object",
+              "description" => "Where the asset is installed.",
+              "properties" => %{"street" => %{"type" => "string"}}
+            }
+          }
+        })
+
+      form = FormData.to_form(Form.new(definition), as: "payload")
+
+      assert %RenderNode.Group{help: "Where the asset is installed."} =
+               Projector.project(definition, form).root.children |> List.first()
+    end
+
+    test "preserves root object help in the render plan" do
+      definition = compile!(%{kind: :object, help: "Record one pump.", properties: []})
+      form = FormData.to_form(Form.new(definition), as: "payload")
+
+      assert %RenderNode.Group{help: "Record one pump."} =
+               Projector.project(definition, form).root
+    end
+
+    test "preserves native presentation-group help" do
+      path = TemplatePath.new!(["serial_number"])
+      field = Semantic.Field.new("serial_number", path, :string)
+      semantic = Semantic.Object.new(nil, TemplatePath.new!([]), [field])
+
+      presentation =
+        NativePresentation.Object.new(semantic.id, [
+          NativePresentation.Group.new(
+            NodeId.group(TemplatePath.new!([]), "details"),
+            [NativePresentation.Field.new(field.id, label: "Serial number")],
+            label: "Details",
+            help: "Identification details."
+          )
+        ])
+
+      assert {:ok, definition} = Finalizer.finalize(semantic, presentation)
+      form = FormData.to_form(Form.new(definition), as: "payload")
+
+      assert [%RenderNode.Group{help: "Identification details."}] =
+               Projector.project(definition, form).root.children
+    end
+
+    test "keeps missing group help nil while preparing DOM identities" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [{"address", %{kind: :object, properties: []}}]
+        })
+
+      form = FormData.to_form(Form.new(definition), as: "payload")
+
+      assert %RenderNode.Group{help: nil, dom: %{container: container, help: help}} =
+               Projector.project(definition, form).root.children |> List.first()
+
+      assert is_binary(container)
+      assert is_binary(help)
+    end
+
     test "DOM identities are deterministic and independent of display text and sibling order" do
       declaration = fn properties, title ->
         %{
