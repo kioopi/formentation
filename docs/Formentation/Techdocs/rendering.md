@@ -12,7 +12,7 @@ status: current
 
 # Rendering
 
-*As of 2026-07-27 (native presentation traversal and semantic-index-backed
+*As of 2026-08-03 (native presentation traversal and semantic-index-backed
 projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
 
 ## Projector data flow (`Formentation.Phoenix.Projector`)
@@ -196,6 +196,50 @@ nor either component takes an adapter argument — dispatch is entirely on
 [[18-decisions#D-017 — Phoenix integration ships in-tree behind a namespace boundary|D-017]]/[[18-decisions#D-018 — Reach is the architecture gate|D-018]] directory boundary —
 [[18-decisions#D-019 — Projection is Phoenix-generic|D-019]],
 [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]].
+
+## DOM identity
+
+Transport names and renderer-owned DOM identities are distinct facts. A
+`Phoenix.HTML.FormField.name` remains the browser's submitted parameter name;
+the renderer mints the ids it owns for controls, help, errors, containers, and
+radio options. This avoids treating Phoenix's underscore-joined `FormField.id`
+as a collision-proof DOM namespace.
+
+`Formentation.Phoenix.DOMIdentity` is the internal primitive. It takes a
+non-empty binary namespace plus a typed occurrence and emits this stable,
+selector-safe contract:
+
+```text
+ftn--<namespace>--<kind>--<part>--<identity token>...
+```
+
+`kind` is `field`, `object`, or `group`. Field identities contain their
+absolute instance-path segments; object identities contain their occurrence
+path (none for the root); group identities contain the opaque layout id and
+the enclosing object's occurrence path. `part` is `control`, `help`, `errors`,
+`container`, or `option_<index>`. These are separate token positions, so a
+field called `notes_help` and the help for `notes` cannot share an id.
+
+Identity and namespace bytes are escaped byte by byte: ASCII letters, digits,
+and `_` remain literal except that a leading digit is encoded; every other byte
+is `-XX` with uppercase hexadecimal bytes. Therefore `--` appears only as the
+token delimiter. The grammar preserves both path boundaries (`["a_b"]` versus
+`["a", "b"]`) and segment type (`[0]` versus `["0"]`). Its output alphabet is
+`[A-Za-z0-9_-]` and the `ftn` prefix makes it usable as an unescaped HTML/CSS
+identifier in browser, Floki, and LazyHTML selectors.
+
+The spelling is deliberately readable and stable: applications may use these
+ids in tests, styles, and scripts. It changes only as a compatibility change.
+The guarantee covers ids minted through this system within a render namespace;
+it cannot prevent an application from manually writing the same id elsewhere
+on the page. There is no hash, counter, traversal index, random value, or
+occupied-id registry.
+
+This is a foundation-only change: the current reference components still emit
+Phoenix-derived ids. [[18-decisions#D-034 — Phoenix renderer DOM identities are typed and injective|D-034]]
+records the contract; [issue #30](https://github.com/kioopi/formentation/issues/30)
+will resolve component namespace selection and adopt it across the render plan
+and markup.
 
 ## Reference theme (`Formentation.Phoenix.Theme.Reference`)
 

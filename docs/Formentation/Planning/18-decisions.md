@@ -647,6 +647,41 @@ specializes this invariant. The invariant also gives adapters and future query
 indexes a simple lookup contract: a supported semantic occurrence has at most
 one layout descriptor in the built-in editable layout.
 
+## D-034 — Phoenix renderer DOM identities are typed and injective
+
+*2026-08-03*
+
+**Context.** The Phase 1 reference components inherited Phoenix's
+underscore-joined field ids and derived help, error, and radio-option ids by
+string suffix. That creates collisions: `notes_help` can collide with the help
+for `notes`, and `a_b` can collide with a nested `a.b` occurrence. A prefix
+for new group ids cannot solve the general problem because source field names
+remain arbitrary strings. Collections also require occurrence identity rather
+than a template-only layout identity. Resolves [GitHub issue #29](https://github.com/kioopi/formentation/issues/29).
+
+**Decision.** `Formentation.Phoenix.DOMIdentity` mints every renderer-owned
+DOM id from a non-empty render namespace, a closed owner kind, a closed element
+part, and typed occurrence identity. Its documented stable format is
+`ftn--namespace--kind--part--identity...`. Binary tokens use a byte-wise,
+fixed-width `-XX` escape, so `--` is structural only; leading digits are
+escaped to preserve the distinction between string and integer instance-path
+segments. Fields use absolute instance paths, objects their occurrence paths,
+and groups their layout id plus enclosing object occurrence path. Field parts
+are control, help, errors, and indexed radio options; object/group parts are
+container and help. No hash, random value, counter, traversal index, or
+occupied-id allocation participates in uniqueness.
+
+**Consequences.** DOM identity is renderer-owned rather than a side effect of
+Phoenix transport naming: `Phoenix.HTML.FormField.name` remains unchanged, and
+its `id` is no longer the authoritative identity for renderer markup. Exact ID
+spelling is a public compatibility contract so applications can use it in
+tests, selectors, and styles. The primitive itself is internal pending the
+Phase 3 prepared-view contract. This decision adds no markup migration; [issue
+#30](https://github.com/kioopi/formentation/issues/30) owns namespace resolution
+and adoption by render nodes/components, after which [issue
+#7](https://github.com/kioopi/formentation/issues/7) can add group help without
+inventing a parallel group-id scheme.
+
 ## Related notes
 
 - [[19-north-star-architecture|North-star architecture]]
