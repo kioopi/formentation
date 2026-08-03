@@ -49,6 +49,12 @@ defmodule Formentation.Phoenix.DOMIdentityTest do
       assert DOMIdentity.field(@namespace, path(["condition"]), {:option, 2}) ==
                "ftn--asset_payload--field--option_2--condition"
 
+      assert DOMIdentity.field(@namespace, path(["condition"]), {:option, 0}) ==
+               "ftn--asset_payload--field--option_0--condition"
+
+      assert DOMIdentity.field(@namespace, path(["condition"]), {:option, 10}) ==
+               "ftn--asset_payload--field--option_10--condition"
+
       assert DOMIdentity.field(@namespace, path(["serial-number"]), :control) ==
                "ftn--asset_payload--field--control--serial-2Dnumber"
 
@@ -57,6 +63,9 @@ defmodule Formentation.Phoenix.DOMIdentityTest do
 
       assert DOMIdentity.field(@namespace, path(["a--b"]), :control) ==
                "ftn--asset_payload--field--control--a-2D-2Db"
+
+      assert DOMIdentity.field(@namespace, path(["first name"]), :control) ==
+               "ftn--asset_payload--field--control--first-20name"
     end
 
     test "distinguishes objects and occurrence-scoped groups" do
@@ -68,6 +77,51 @@ defmodule Formentation.Phoenix.DOMIdentityTest do
 
       assert DOMIdentity.group(@namespace, "/#electrical", path([]), :container) ==
                "ftn--asset_payload--group--container---2F-23electrical"
+
+      assert DOMIdentity.group(@namespace, "/#electrical", path(["addresses", 0]), :container) ==
+               "ftn--asset_payload--group--container---2F-23electrical--addresses--0"
+
+      assert DOMIdentity.group(@namespace, "/#electrical", path(["addresses", 1]), :container) ==
+               "ftn--asset_payload--group--container---2F-23electrical--addresses--1"
+    end
+
+    test "pins empty, leading-digit, and escape boundaries" do
+      assert DOMIdentity.field(@namespace, path(["0abc"]), :control) ==
+               "ftn--asset_payload--field--control---30abc"
+
+      assert DOMIdentity.field(@namespace, path([""]), :control) ==
+               "ftn--asset_payload--field--control--"
+
+      assert DOMIdentity.field(@namespace, path(["-"]), :control) ==
+               "ftn--asset_payload--field--control---2D"
+
+      assert DOMIdentity.field(@namespace, path(["-start"]), :control) ==
+               "ftn--asset_payload--field--control---2Dstart"
+
+      assert DOMIdentity.field(@namespace, path(["end-"]), :control) ==
+               "ftn--asset_payload--field--control--end-2D"
+
+      assert DOMIdentity.field("asset-form_", path(["notes"]), :control) ==
+               "ftn--asset-2Dform_--field--control--notes"
+
+      assert DOMIdentity.group(@namespace, "/a~0b~1c~2d", path([]), :container) ==
+               "ftn--asset_payload--group--container---2Fa-7E0b-7E1c-7E2d"
+    end
+  end
+
+  describe "test decoder" do
+    test "funnels malformed ids through one actionable error" do
+      for id <- [
+            "ftn--ns--field--legend--x",
+            "ftn--ns--object--errors",
+            "ftn--ns--field--option_--x",
+            "ftn--ns--field--option_007--x",
+            "ftn--ns--field--option_+1--x",
+            "ftn--ns--field--control--a-"
+          ] do
+        error = assert_raise ArgumentError, fn -> DOMIdentityDecoder.decode(id) end
+        assert error.message == "invalid DOM identity: #{inspect(id)}"
+      end
     end
   end
 
@@ -105,7 +159,8 @@ defmodule Formentation.Phoenix.DOMIdentityTest do
 
       assert Enum.map(ids, &DOMIdentityDecoder.decode/1) == identities
       assert Enum.uniq(ids) == ids
-      assert Enum.all?(ids, &Regex.match?(~r/^ftn(--[A-Za-z0-9_-]*)*$/, &1))
+      assert Enum.all?(ids, &String.starts_with?(&1, "ftn--"))
+      assert Enum.all?(ids, &Regex.match?(~r/\A[A-Za-z0-9_-]+\z/, &1))
     end
   end
 
@@ -154,7 +209,7 @@ defmodule Formentation.Phoenix.DOMIdentityTest do
 
   defp field_part_gen do
     StreamData.one_of([
-      StreamData.member_of([:control, :help, :errors]),
+      StreamData.member_of([:control, :container, :help, :errors]),
       StreamData.map(StreamData.integer(0..20), &{:option, &1})
     ])
   end
