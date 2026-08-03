@@ -679,11 +679,13 @@ Phoenix transport naming: `Phoenix.HTML.FormField.name` remains unchanged, and
 its `id` is no longer the authoritative identity for renderer markup. Exact ID
 spelling is a public compatibility contract so applications can use it in
 tests, selectors, and styles. The primitive itself is internal pending the
-Phase 3 prepared-view contract. This decision adds no markup migration; [issue
-#30](https://github.com/kioopi/formentation/issues/30) owns namespace resolution
-and adoption by render nodes/components, after which [issue
-#7](https://github.com/kioopi/formentation/issues/7) can add group help without
-inventing a parallel group-id scheme.
+Phase 3 prepared-view contract. *Amended:* [issue #30](https://github.com/kioopi/formentation/issues/30)
+adopts the primitive: projection resolves explicit `dom_namespace`, then
+`form.id || form.name`, and otherwise raises; `FieldDOM`/`GroupDOM` carry exact
+ids; reference components consume them without suffix derivation; summaries
+target prepared controls; and transport names remain unchanged. [Issue
+#7](https://github.com/kioopi/formentation/issues/7) can now add group help
+without inventing a parallel group-id scheme.
 
 ## Related notes
 

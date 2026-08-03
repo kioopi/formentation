@@ -27,7 +27,10 @@ defmodule Formentation.Phoenix.Projector do
   source's `StateView` (D-027), falling back to the Phoenix
   action/`used_input?` rule (D-014) only when the source has no opinion.
   `plan.summary` is non-empty only once the source's `StateView` reports
-  semantic submission.
+  semantic submission. It also prepares exact renderer-owned DOM identities:
+  `FieldDOM` carries control/help/errors/option ids and `GroupDOM` carries
+  container/help ids. Namespace resolution is explicit `:dom_namespace`, then
+  `form.id || form.name`; projection raises if neither is available.
 
   ## Example
 
@@ -65,7 +68,8 @@ defmodule Formentation.Phoenix.Projector do
   Projects the single subtree at `segments` (an instance path — fields
   and data-nesting groups; presentational groups have no instance path).
   Returns `nil` when the node deliberately renders nothing
-  (hidden + read-only). Raises on unknown or unsupported paths.
+  (hidden + read-only). Raises on unknown or unsupported paths, or when it
+  cannot resolve a DOM namespace.
 
   ## Example
 
@@ -405,11 +409,14 @@ defmodule Formentation.Phoenix.Projector do
         namespace
 
       :error ->
+        message = ~S"""
+        Formentation cannot mint DOM ids without a namespace. Give the form a name or an id
+        (`to_form(state, as: "payload")` or `to_form(state, id: "payload")`), or pass
+        `dom_namespace:` to Formentation.Phoenix.fields/1 or Formentation.Phoenix.field/1.
+        """
+
         form.id || form.name ||
-          raise ArgumentError,
-                "Formentation cannot mint DOM ids without a namespace. Give the form a name or an id\n" <>
-                  "(`to_form(state, as: \"payload\")` or `to_form(state, id: \"payload\")`), or pass\n" <>
-                  "`dom_namespace:` to Formentation.Phoenix.fields/1 or Formentation.Phoenix.field/1."
+          raise ArgumentError, String.trim(message)
     end
   end
 end
