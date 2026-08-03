@@ -13,14 +13,20 @@ defmodule Formentation.Fixtures.PumpInspection do
     %{
       kind: :object,
       title: "Pump inspection",
-      required: ["serial_number", "condition"],
+      required: ["serial_number", "condition", "mounting"],
       properties: [
         {"serial_number", %{kind: :string, title: "Serial number", min_length: 4}},
         {"condition",
          %{
            kind: :string,
            title: "Condition",
-           one_of: ["good", "worn", "defective"],
+           one_of: ["good", "worn", "defective"]
+         }},
+        {"mounting",
+         %{
+           kind: :string,
+           title: "Mounting",
+           one_of: ["floor", "wall"],
            widget: :radio
          }},
         {"last_service", %{kind: :string, title: "Last service", role: :date}},
@@ -50,6 +56,7 @@ defmodule Formentation.Fixtures.PumpInspection do
     [
       "serial_number",
       "condition",
+      "mounting",
       "last_service",
       "operating_hours",
       "voltage",

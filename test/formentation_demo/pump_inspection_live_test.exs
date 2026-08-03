@@ -12,6 +12,7 @@ defmodule FormentationDemo.PumpInspectionLiveTest do
   @valid_payload %{
     "serial_number" => "PX-2044",
     "condition" => "worn",
+    "mounting" => "wall",
     "last_service" => "2026-06-30",
     "operating_hours" => "4800",
     "voltage" => "230.0",
@@ -168,6 +169,7 @@ defmodule FormentationDemo.PumpInspectionLiveTest do
       assert JSON.decode!(Floki.text(pre)) == %{
                "serial_number" => "PX-2044",
                "condition" => "worn",
+               "mounting" => "wall",
                "last_service" => "2026-06-30",
                "operating_hours" => 4800,
                "voltage" => 230.0,

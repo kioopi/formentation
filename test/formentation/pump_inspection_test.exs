@@ -65,7 +65,7 @@ defmodule Formentation.PumpInspectionTest do
       assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
       assert schema["type"] == "object"
       assert Enum.sort(Map.keys(schema["properties"])) == Enum.sort(PumpInspection.field_names())
-      assert schema["required"] == ["serial_number", "condition"]
+      assert schema["required"] == ["serial_number", "condition", "mounting"]
     end
 
     test "the ui fixture references only known field names" do

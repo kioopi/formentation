@@ -22,6 +22,7 @@ defmodule Formentation.Phoenix.SnapshotTest do
     data = %{
       "serial_number" => "PX-2044",
       "condition" => "worn",
+      "mounting" => "wall",
       "last_service" => "2026-06-30",
       "operating_hours" => 5102,
       "voltage" => 230.0,

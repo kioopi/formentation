@@ -49,12 +49,13 @@ defmodule FormentationDemo.PumpInspectionBrowserTest do
   end
 
   test "a fully valid submit renders the decoded candidate", %{conn: conn} do
-    # serial_number and condition are blank initially (required); the rest have
+    # serial_number, condition, and mounting are blank initially (required); the rest have
     # valid initial values (operating_hours 5102, voltage 230.0, insulation_ok true).
     conn
     |> visit_connected("/")
     |> fill_in("Serial number", with: "PX-2044")
-    |> check("worn")
+    |> select("Condition", option: "worn")
+    |> choose("wall")
     |> click_button("Save")
     |> assert_has("pre#decoded-candidate", text: "PX-2044")
   end
@@ -113,7 +114,7 @@ defmodule FormentationDemo.PumpInspectionBrowserTest do
     |> assert_has("form#asset-form[novalidate]")
     |> click_button("Save")
     |> assert_has(".ftn-error-summary[role='alert']")
-    |> click_link(nil, "Condition:", exact: false)
-    |> assert_has("##{field_id(["condition"], :container)}:focus")
+    |> click_link(nil, "Mounting:", exact: false)
+    |> assert_has("##{field_id(["mounting"], :container)}:focus")
   end
 end
