@@ -1,8 +1,10 @@
 defmodule Formentation.Phoenix.DOMIdentityTest do
   use ExUnit.Case, async: true
+  use ExUnitProperties
 
   alias Formentation.InstancePath
   alias Formentation.Phoenix.DOMIdentity
+  alias Formentation.Phoenix.DOMIdentityDecoder
 
   @namespace "asset_payload"
 
@@ -81,6 +83,98 @@ defmodule Formentation.Phoenix.DOMIdentityTest do
       assert_raise ArgumentError, ~r/invalid group DOM identity part/, fn ->
         DOMIdentity.group(@namespace, "/#details", path([]), :errors)
       end
+    end
+  end
+
+  property "round-trips hostile typed identities without collisions" do
+    check all(
+            identities <- StreamData.uniq_list_of(identity_gen(), min_length: 2, max_length: 20)
+          ) do
+      ids = Enum.map(identities, &encode/1)
+
+      assert Enum.map(ids, &DOMIdentityDecoder.decode/1) == identities
+      assert Enum.uniq(ids) == ids
+      assert Enum.all?(ids, &Regex.match?(~r/^ftn(--[A-Za-z0-9_-]*)*$/, &1))
+    end
+  end
+
+  property "is deterministic and namespaces domain-separate the same identity" do
+    check all(
+            identity <- identity_gen(),
+            namespace <- namespace_gen(),
+            other <- namespace_gen(),
+            namespace != other
+          ) do
+      assert encode(identity) == encode(identity)
+      refute encode(identity, namespace) == encode(identity, other)
+    end
+  end
+
+  defp identity_gen do
+    StreamData.one_of([
+      StreamData.map({namespace_gen(), path_gen(), field_part_gen()}, fn {namespace, path, part} ->
+        {:field, namespace, path, part}
+      end),
+      StreamData.map({namespace_gen(), path_gen(), container_part_gen()}, fn {namespace, path,
+                                                                              part} ->
+        {:object, namespace, path, part}
+      end),
+      StreamData.map(
+        {namespace_gen(), hostile_string_gen(), path_gen(), container_part_gen()},
+        fn {namespace, layout_id, path, part} ->
+          {:group, namespace, layout_id, path, part}
+        end
+      )
+    ])
+  end
+
+  defp namespace_gen do
+    hostile_string_gen()
+    |> StreamData.filter(&(&1 != ""))
+  end
+
+  defp path_gen do
+    StreamData.list_of(
+      StreamData.one_of([hostile_string_gen(), StreamData.integer(0..100)]),
+      max_length: 5
+    )
+    |> StreamData.map(&path/1)
+  end
+
+  defp field_part_gen do
+    StreamData.one_of([
+      StreamData.member_of([:control, :help, :errors]),
+      StreamData.map(StreamData.integer(0..20), &{:option, &1})
+    ])
+  end
+
+  defp container_part_gen, do: StreamData.member_of([:container, :help])
+
+  defp hostile_string_gen do
+    StreamData.list_of(
+      StreamData.member_of([?a, ?Z, ?0, ?_, ?-, ?#, ?/, ?~, ?\s, ?[, ?], 0x00DF, 0x4E2D]),
+      max_length: 8
+    )
+    |> StreamData.map(&List.to_string/1)
+  end
+
+  defp encode({:field, namespace, path, part}), do: DOMIdentity.field(namespace, path, part)
+
+  defp encode({:object, namespace, path, part}), do: DOMIdentity.object(namespace, path, part)
+
+  defp encode({:group, namespace, layout_id, path, part}),
+    do: DOMIdentity.group(namespace, layout_id, path, part)
+
+  defp encode(identity, namespace) do
+    case identity do
+      {:field, _old_namespace, path, part} ->
+        DOMIdentity.field(namespace, path, part)
+
+      {:object, _old_namespace, path, part} ->
+        DOMIdentity.object(namespace, path, part)
+
+      {:group, _old_namespace, layout_id, path, part} ->
+        DOMIdentity.group(namespace, layout_id, path, part)
     end
   end
 
