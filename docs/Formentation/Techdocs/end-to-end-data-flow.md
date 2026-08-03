@@ -12,7 +12,7 @@ status: current
 
 # End-to-end data flow
 
-> [!note] As of 2026-07-26 · submit decision result (D-032)
+> [!note] As of 2026-08-03 · submit decision result (D-032), prepared DOM identities (D-035)
 > Follows one form through every layer that exists today, and stops
 > where the built system stops. Each layer has its own deep-dive note;
 > this one is about the **joins between them** — what crosses each
@@ -116,9 +116,10 @@ from schema constraints. The private instance-path entry it puts in
 `options` is how one flat Phoenix form struct stays anchored in a tree.
 
 The example passes `as: "asset[payload]"`, and that single option is what
-makes the whole form compose under a parent namespace — every name below
-becomes `asset[payload][serial_number]` and every id
-`asset_payload_serial_number`, with no other layer aware it happened.
+makes submitted names compose under a parent namespace — every name below
+becomes `asset[payload][serial_number]`. Renderer-owned ids are separately
+prepared from `dom_namespace`, then the Phoenix form id/name, so the same
+control id is `ftn--asset_payload--field--control--serial_number`.
 
 ## 4 · `%Phoenix.HTML.Form{}` → `RenderPlan`
 
@@ -171,8 +172,8 @@ artifact:
 
 ```html
 <div class="ftn-field">
-  <label for="asset_payload_serial_number">Serial number</label>
-  <input type="text" id="asset_payload_serial_number"
+  <label for="ftn--asset_payload--field--control--serial_number">Serial number</label>
+  <input type="text" id="ftn--asset_payload--field--control--serial_number"
          name="asset[payload][serial_number]" value="PX-2044"
          required minlength="4">
 </div>

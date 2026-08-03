@@ -3,8 +3,10 @@ defmodule Formentation.Phoenix do
   The public rendering surface: whole-body and subtree rendering of a
   compiled definition against any `Phoenix.HTML.FormData` form. Both
   components compose *inside* an enclosing hand-written `<form>` — they
-  never emit a `<form>` element, and all names and ids work under a
-  parent namespace such as `asset[payload][...]` (use-case req. 5).
+  never emit a `<form>` element. Submitted names still compose under a parent
+  namespace such as `asset[payload][...]` (use-case req. 5). Renderer-owned DOM
+  ids are separate: `dom_namespace`, then `form.id`, then `form.name`; rendering
+  raises with guidance if none is available.
 
   Phase 1 renders through the reference theme directly; a pluggable
   theme contract is Phase 3.
@@ -25,6 +27,9 @@ defmodule Formentation.Phoenix do
   </.form>
   ```
 
+  Pass `dom_namespace` only to override the namespace used for renderer-owned
+  DOM ids. It does not change Phoenix field names or the enclosing form's id.
+
   ## Example
 
       iex> {:ok, definition, []} =
@@ -40,9 +45,15 @@ defmodule Formentation.Phoenix do
   """
   attr(:definition, Formentation.Definition, required: true)
   attr(:form, Phoenix.HTML.Form, required: true)
+  attr(:dom_namespace, :string, default: nil, doc: "override for renderer-owned DOM ids")
 
   def fields(assigns) do
-    assigns = assign(assigns, :plan, Projector.project(assigns.definition, assigns.form))
+    assigns =
+      assign(
+        assigns,
+        :plan,
+        Projector.project(assigns.definition, assigns.form, projector_opts(assigns))
+      )
 
     ~H"""
     <div class="ftn-form">
@@ -56,7 +67,8 @@ defmodule Formentation.Phoenix do
   Renders the single subtree at an instance path — a field or a
   data-nesting group; presentational groups have no instance path.
   Renders nothing when the node deliberately does not render
-  (hidden + read-only). Raises on unknown or unsupported paths.
+  (hidden + read-only). Raises on unknown or unsupported paths. Its optional
+  `dom_namespace` has the same override role as on `fields/1`.
 
   ```heex
   <Formentation.Phoenix.field
@@ -68,6 +80,7 @@ defmodule Formentation.Phoenix do
   """
   attr(:definition, Formentation.Definition, required: true)
   attr(:form, Phoenix.HTML.Form, required: true)
+  attr(:dom_namespace, :string, default: nil, doc: "override for renderer-owned DOM ids")
 
   attr(:path, :list,
     required: true,
@@ -76,10 +89,22 @@ defmodule Formentation.Phoenix do
 
   def field(assigns) do
     assigns =
-      assign(assigns, :node, Projector.project_at(assigns.definition, assigns.form, assigns.path))
+      assign(
+        assigns,
+        :node,
+        Projector.project_at(
+          assigns.definition,
+          assigns.form,
+          assigns.path,
+          projector_opts(assigns)
+        )
+      )
 
     ~H"""
     <Reference.node :if={@node} node={@node} />
     """
   end
+
+  defp projector_opts(%{dom_namespace: nil}), do: []
+  defp projector_opts(%{dom_namespace: namespace}), do: [dom_namespace: namespace]
 end

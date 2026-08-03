@@ -5,11 +5,12 @@
   "properties": {
     "serial_number": { "type": "string", "title": "Serial number", "minLength": 4 },
     "condition": { "type": "string", "title": "Condition", "enum": ["good", "worn", "defective"] },
+    "mounting": { "type": "string", "title": "Mounting", "enum": ["floor", "wall"] },
     "last_service": { "type": "string", "format": "date", "title": "Last service" },
     "operating_hours": { "type": "integer", "title": "Operating hours", "minimum": 0 },
     "voltage": { "type": "number", "title": "Voltage (V)" },
     "insulation_ok": { "type": "boolean", "title": "Insulation test passed" },
     "notes": { "type": "string", "title": "Notes" }
   },
-  "required": ["serial_number", "condition"]
+  "required": ["serial_number", "condition", "mounting"]
 }

@@ -1,9 +1,10 @@
 {
-  "order": ["serial_number", "condition", "last_service", "operating_hours", "electrical", "notes"],
+  "order": ["serial_number", "condition", "mounting", "last_service", "operating_hours", "electrical", "notes"],
   "groups": [
     { "id": "electrical", "title": "Electrical", "fields": ["voltage", "insulation_ok"] }
   ],
   "fields": {
+    "mounting": { "widget": "radio" },
     "notes": { "widget": "textarea", "help": "Visible to all technicians." }
   }
 }

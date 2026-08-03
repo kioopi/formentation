@@ -679,11 +679,23 @@ Phoenix transport naming: `Phoenix.HTML.FormField.name` remains unchanged, and
 its `id` is no longer the authoritative identity for renderer markup. Exact ID
 spelling is a public compatibility contract so applications can use it in
 tests, selectors, and styles. The primitive itself is internal pending the
-Phase 3 prepared-view contract. This decision adds no markup migration; [issue
-#30](https://github.com/kioopi/formentation/issues/30) owns namespace resolution
-and adoption by render nodes/components, after which [issue
-#7](https://github.com/kioopi/formentation/issues/7) can add group help without
-inventing a parallel group-id scheme.
+Phase 3 prepared-view contract. [[18-decisions#D-035 — Phoenix rendering prepares and consumes DOM identities|D-035]]
+records its adoption by the Phoenix renderer. [Issue #7](https://github.com/kioopi/formentation/issues/7)
+can now add group help without inventing a parallel group-id scheme.
+
+## D-035 — Phoenix rendering prepares and consumes DOM identities
+
+*2026-08-03*
+
+**Decision.** Phoenix projection resolves one namespace per render: explicit
+`dom_namespace`, then `form.id || form.name`, otherwise an actionable error.
+`FieldDOM`/`GroupDOM` carry exact ids; reference components consume them without
+suffix derivation; radio summaries target their rendered container; and Phoenix
+transport names remain unchanged.
+
+**Consequences.** Submitted names still compose under a parent namespace such
+as `asset[payload][...]` (use-case req. 5), while renderer-owned DOM ids are
+collision-proof and occurrence-scoped. This completes [issue #30](https://github.com/kioopi/formentation/issues/30).
 
 ## Related notes
 

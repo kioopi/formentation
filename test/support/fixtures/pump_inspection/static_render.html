@@ -1,13 +1,13 @@
 <div class="ftn-form">
   
   <div class="ftn-field">
-  <label for="asset_payload_serial_number">Serial number</label>
-  <input type="text" id="asset_payload_serial_number" name="asset[payload][serial_number]" value="PX-2044" required minlength="4">
+  <label for="ftn--asset_payload--field--control--serial_number">Serial number</label>
+  <input type="text" id="ftn--asset_payload--field--control--serial_number" name="asset[payload][serial_number]" value="PX-2044" required minlength="4">
   
   
 </div><div class="ftn-field">
-  <label for="asset_payload_condition">Condition</label>
-  <select id="asset_payload_condition" name="asset[payload][condition]" required>
+  <label for="ftn--asset_payload--field--control--condition">Condition</label>
+  <select id="ftn--asset_payload--field--control--condition" name="asset[payload][condition]" required>
   <option value=""></option>
   <option value="good">
     good
@@ -20,34 +20,48 @@
   
   
 </div><div class="ftn-field">
-  <label for="asset_payload_last_service">Last service</label>
-  <input type="date" id="asset_payload_last_service" name="asset[payload][last_service]" value="2026-06-30">
+  
+  <fieldset id="ftn--asset_payload--field--container--mounting" tabindex="-1" class="ftn-radio-group" role="radiogroup">
+  <legend>Mounting</legend>
+  <div class="ftn-radio">
+    <input type="radio" id="ftn--asset_payload--field--option_0--mounting" name="asset[payload][mounting]" value="floor" required>
+    <label for="ftn--asset_payload--field--option_0--mounting">floor</label>
+  </div><div class="ftn-radio">
+    <input type="radio" id="ftn--asset_payload--field--option_1--mounting" name="asset[payload][mounting]" value="wall" checked required>
+    <label for="ftn--asset_payload--field--option_1--mounting">wall</label>
+  </div>
+</fieldset>
   
   
 </div><div class="ftn-field">
-  <label for="asset_payload_operating_hours">Operating hours</label>
-  <input type="text" inputmode="numeric" id="asset_payload_operating_hours" name="asset[payload][operating_hours]" value="5102">
+  <label for="ftn--asset_payload--field--control--last_service">Last service</label>
+  <input type="date" id="ftn--asset_payload--field--control--last_service" name="asset[payload][last_service]" value="2026-06-30">
   
   
-</div><fieldset class="ftn-group">
+</div><div class="ftn-field">
+  <label for="ftn--asset_payload--field--control--operating_hours">Operating hours</label>
+  <input type="text" inputmode="numeric" id="ftn--asset_payload--field--control--operating_hours" name="asset[payload][operating_hours]" value="5102">
+  
+  
+</div><fieldset id="ftn--asset_payload--group--container---2F-23electrical" class="ftn-group">
   <legend>Electrical</legend>
   <div class="ftn-field">
-  <label for="asset_payload_voltage">Voltage (V)</label>
-  <input type="text" inputmode="numeric" id="asset_payload_voltage" name="asset[payload][voltage]" value="230.0">
+  <label for="ftn--asset_payload--field--control--voltage">Voltage (V)</label>
+  <input type="text" inputmode="numeric" id="ftn--asset_payload--field--control--voltage" name="asset[payload][voltage]" value="230.0">
   
   
 </div><div class="ftn-field">
   
   <input type="hidden" name="asset[payload][insulation_ok]" value="false">
-<input type="checkbox" id="asset_payload_insulation_ok" name="asset[payload][insulation_ok]" value="true" checked>
-<label for="asset_payload_insulation_ok">Insulation test passed</label>
+<input type="checkbox" id="ftn--asset_payload--field--control--insulation_ok" name="asset[payload][insulation_ok]" value="true" checked>
+<label for="ftn--asset_payload--field--control--insulation_ok">Insulation test passed</label>
   
   
 </div>
 </fieldset><div class="ftn-field">
-  <label for="asset_payload_notes">Notes</label>
-  <textarea id="asset_payload_notes" name="asset[payload][notes]" aria-describedby="asset_payload_notes_help">Runs fine.</textarea>
-  <p id="asset_payload_notes_help" class="ftn-help">Visible to all technicians.</p>
+  <label for="ftn--asset_payload--field--control--notes">Notes</label>
+  <textarea id="ftn--asset_payload--field--control--notes" name="asset[payload][notes]" aria-describedby="ftn--asset_payload--field--help--notes">Runs fine.</textarea>
+  <p id="ftn--asset_payload--field--help--notes" class="ftn-help">Visible to all technicians.</p>
   
 </div>
 </div>

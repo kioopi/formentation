@@ -20,7 +20,10 @@ projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurr
 `Projector.project(definition, %Phoenix.HTML.Form{})` returns a
 `%Formentation.Phoenix.RenderPlan{}`. It is pure — the same definition and
 form state always produce the same plan, with no side effects and no
-mutation of form state. `Projector.project_at(definition, form, path)`
+mutation of form state. Both have options variants (`project/3`,
+`project_at/4`) for an explicit `dom_namespace`. Otherwise the projector uses
+`form.id || form.name`; it raises with an actionable error when neither exists.
+`Projector.project_at(definition, form, path)`
 projects the single subtree at an instance path (a field or a
 data-nesting group), returning `nil` when the node deliberately renders
 nothing, and raising for an unknown or unsupported path.
@@ -63,13 +66,18 @@ One struct per render node shape:
   `:widget_fallback`). Planning-note fields with no Phase 1 behavior
   (fingerprint, active branches, item identities) are omitted, not
   stubbed.
-- `Formentation.Phoenix.RenderNode.Group` — `legend`, `children`. Semantic
-  objects and presentation groups both project to this one render shape.
+- `Formentation.Phoenix.RenderNode.Group` — `legend`, `dom`, `children`.
+  `dom` is a `GroupDOM{container, help}` prepared even for the structural root.
+  Semantic objects and presentation groups both project to this one render shape.
 - `Formentation.Phoenix.RenderNode.Field` — `widget`, `field` (the
-  `%Phoenix.HTML.FormField{}`, carrying id/name/value), `label`, `help`,
+  `%Phoenix.HTML.FormField{}`, carrying Phoenix id/name/value), `label`, `dom`,
+  `help`,
   `options`, `validations` (`Phoenix.HTML.Form.input_validations/2`,
   precomputed so the theme never calls back), `errors`, `show_errors?`,
-  `read_only?`.
+  `read_only?`. `dom` is a `FieldDOM{control, container, help, errors,
+  options}`. `control` names scalar controls (and hidden inputs); `container`
+  names a composite widget's container, currently a radio group's fieldset.
+  Option ids are positionally parallel to field options.
 
 `show_errors?` is computed once, in the projector, so themes never
 inspect `_unused_` markers or `form.action` (D-014, D-027). The source's
@@ -126,7 +134,10 @@ means `form.action == :submit`, the same rule as before D-027
 It combines two sources:
 
 - **Field entries** — every rendered field with `show_errors?: true`
-  contributes one entry per error message, linkable to `field.id`.
+  contributes one entry per error message. Scalar fields link to their prepared
+  control id; radio groups link to their prepared container id, the rendered
+  fieldset. That fieldset has `tabindex="-1"`, so following its summary anchor
+  moves focus to a meaningful, non-tab-stop group boundary.
 - **Object entries** — root and object-level issues never appear in
   Phoenix's per-field `field.errors` convention. The projector asks the
   source's `StateView.issues/2` for the complete, normalized, adapter-ordered
@@ -173,8 +184,8 @@ There is no slot to reposition it; that is a
 
 `Formentation.Phoenix` exposes two function components, both composing
 *inside* an enclosing hand-written `<form>` — neither renders a `<form>`
-element, and names/ids work under a parent namespace such as
-`asset[payload][...]`:
+  element. Their optional `dom_namespace` overrides only renderer-owned DOM
+  identities; it never changes Phoenix names or form ids:
 
 - `<Formentation.Phoenix.fields definition={@definition} form={@form} />`
   — the whole payload body: the error summary, then the projected tree.
@@ -247,11 +258,19 @@ it cannot prevent an application from manually writing the same id elsewhere
 on the page. There is no hash, counter, traversal index, random value, or
 occupied-id registry.
 
-This is a foundation-only change: the current reference components still emit
-Phoenix-derived ids. [[18-decisions#D-034 — Phoenix renderer DOM identities are typed and injective|D-034]]
-records the contract; [issue #30](https://github.com/kioopi/formentation/issues/30)
-will resolve component namespace selection and adopt it across the render plan
-and markup.
+Projection resolves one namespace per render: explicit `dom_namespace`, then
+`form.id || form.name`, otherwise an actionable error. It mints all identities
+before markup: fields use absolute instance paths, objects use their own
+occurrence paths, and presentation groups combine their layout id with the
+enclosing object occurrence path. Whole-form and subtree projection therefore
+prepare byte-identical ids for the same occurrence and namespace.
+
+The reference components consume these prepared values verbatim. They do not
+use `Phoenix.HTML.FormField.id` as a uniqueness contract or append `_help`,
+`_errors`, or radio indexes. Phoenix names remain transport-authoritative;
+renderer ids are the control/label/help/error/fieldset/summary relationship
+surface. Group help content is still absent, but every group already carries
+its prepared help id for the follow-up feature.
 
 ## Reference theme (`Formentation.Phoenix.Theme.Reference`)
 

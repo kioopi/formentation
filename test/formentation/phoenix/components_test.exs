@@ -6,7 +6,8 @@ defmodule Formentation.Phoenix.ComponentsTest do
   import Formentation.HTMLAssertions
   import Phoenix.LiveViewTest, only: [render_component: 2]
 
-  alias Formentation.{Form, Params}
+  alias Formentation.{Form, InstancePath, Params}
+  alias Formentation.Phoenix.DOMIdentity
   alias Phoenix.HTML.FormData
 
   defp compile!(declaration) do
@@ -33,7 +34,112 @@ defmodule Formentation.Phoenix.ComponentsTest do
     render_component(&Formentation.Phoenix.fields/1, definition: definition, form: form)
   end
 
+  defp field_id(namespace, path, part),
+    do: DOMIdentity.field(namespace, InstancePath.new!(path), part)
+
+  defp assert_all_references_resolve(doc) do
+    ids = doc |> Floki.find("[id]") |> Enum.flat_map(&Floki.attribute(&1, "id")) |> MapSet.new()
+
+    label_targets = doc |> Floki.find("label[for]") |> Enum.flat_map(&Floki.attribute(&1, "for"))
+
+    describedby_targets =
+      doc
+      |> Floki.find("[aria-describedby]")
+      |> Enum.flat_map(&Floki.attribute(&1, "aria-describedby"))
+      |> Enum.flat_map(&String.split(&1, " ", trim: true))
+
+    summary_targets =
+      doc
+      |> Floki.find("a[href^='#']")
+      |> Enum.flat_map(&Floki.attribute(&1, "href"))
+      |> Enum.map(&String.replace_prefix(&1, "#", ""))
+
+    dangling =
+      MapSet.difference(MapSet.new(label_targets ++ describedby_targets ++ summary_targets), ids)
+
+    assert MapSet.to_list(dangling) == []
+  end
+
   describe "fields/1" do
+    test "an invalid radio summary links to the rendered radio container" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [{"condition", %{kind: :string, one_of: ["yes", "no"], widget: :radio}}]
+        })
+
+      source = %Formentation.SourceFixture{
+        params: %{"condition" => ""},
+        errors: [condition: {"is required", []}],
+        submitted?: true,
+        visibility: %{
+          ["condition"] => :show
+        }
+      }
+
+      doc = parse!(render_fields(definition, FormData.to_form(source, as: "payload")))
+      target = DOMIdentity.field("payload", InstancePath.new!(["condition"]), :container)
+
+      find_one(doc, ~s(a[href="##{target}"]))
+      find_one(doc, ~s(fieldset[id="#{target}"]))
+      assert_all_references_resolve(doc)
+    end
+
+    test "a hidden field error does not produce an unusable summary link" do
+      definition =
+        compile!(%{kind: :object, properties: [{"token", %{kind: :string, hidden: true}}]})
+
+      source = %Formentation.SourceFixture{
+        params: %{"token" => ""},
+        errors: [token: {"is invalid", []}],
+        submitted?: true,
+        visibility: %{["token"] => :show}
+      }
+
+      doc = parse!(render_fields(definition, FormData.to_form(source, as: "payload")))
+
+      assert Floki.find(doc, ".ftn-error-summary") == []
+      assert_all_references_resolve(doc)
+    end
+
+    test "every reference-theme widget with an error has one resolvable summary target" do
+      widgets = [
+        {"text", :text, %{kind: :string}, :control},
+        {"textarea", :textarea, %{kind: :string, widget: :textarea}, :control},
+        {"select", :select, %{kind: :string, one_of: ["one", "two"]}, :control},
+        {"radio", :radio, %{kind: :string, one_of: ["one", "two"], widget: :radio}, :container},
+        {"checkbox", :checkbox, %{kind: :boolean}, :control},
+        {"number", :number, %{kind: :integer}, :control},
+        {"date", :date, %{kind: :string, role: :date}, :control},
+        {"email", :email, %{kind: :string, role: :email}, :control},
+        {"url", :url, %{kind: :string, role: :uri}, :control}
+      ]
+
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: Enum.map(widgets, fn {name, _key, field, _part} -> {name, field} end)
+        })
+
+      source = %Formentation.SourceFixture{
+        params: Map.new(widgets, fn {name, _key, _field, _part} -> {name, ""} end),
+        errors:
+          Enum.map(widgets, fn {_name, key, _field, _part} -> {key, {"is invalid", []}} end),
+        submitted?: true,
+        visibility: Map.new(widgets, fn {name, _key, _field, _part} -> {[name], :show} end)
+      }
+
+      doc = parse!(render_fields(definition, FormData.to_form(source, as: "payload")))
+
+      for {name, _key, _field, part} <- widgets do
+        target = field_id("payload", [name], part)
+        assert [_] = Floki.find(doc, ~s(a[href="##{target}"]))
+        assert [_] = Floki.find(doc, ~s([id="#{target}"]))
+      end
+
+      assert_all_references_resolve(doc)
+    end
+
     test "renders the whole body under a parent namespace without a form element" do
       definition = nested_definition()
 
@@ -49,11 +155,18 @@ defmodule Formentation.Phoenix.ComponentsTest do
       assert Floki.find(doc, "form") == []
       find_one(doc, "div.ftn-form")
 
-      serial = find_one(doc, "input#asset_payload_serial_number")
-      assert Floki.attribute(serial, "name") == ["asset[payload][serial_number]"]
-      assert_labelled(doc, "asset_payload_serial_number")
+      serial =
+        find_one(doc, ~s(input[id="#{field_id("asset_payload", ["serial_number"], :control)}"]))
 
-      street = find_one(doc, "input#asset_payload_address_street")
+      assert Floki.attribute(serial, "name") == ["asset[payload][serial_number]"]
+      assert_labelled(doc, field_id("asset_payload", ["serial_number"], :control))
+
+      street =
+        find_one(
+          doc,
+          ~s(input[id="#{field_id("asset_payload", ["address", "street"], :control)}"])
+        )
+
       assert Floki.attribute(street, "name") == ["asset[payload][address][street]"]
       assert Floki.attribute(street, "value") == ["Elm"]
 
@@ -79,7 +192,8 @@ defmodule Formentation.Phoenix.ComponentsTest do
       doc = parse!(render_fields(definition, form))
 
       find_one(doc, "div.ftn-error-summary[role=alert]")
-      find_one(doc, "a[href='#payload_operating_hours']")
+      target = field_id("payload", ["operating_hours"], :control)
+      find_one(doc, ~s(a[href="##{target}"]))
     end
 
     test "renders reordered groups in presentation order without changing names" do
@@ -113,17 +227,153 @@ defmodule Formentation.Phoenix.ComponentsTest do
         |> Enum.map(fn input -> input |> Floki.attribute("id") |> List.first() end)
 
       assert names == ["payload[a]", "payload[d]", "payload[b]", "payload[c]"]
-      assert ids == ["payload_a", "payload_d", "payload_b", "payload_c"]
+
+      assert ids == Enum.map(["a", "d", "b", "c"], &field_id("payload", [&1], :control))
+
       refute Enum.any?(names, &String.contains?(&1, "late"))
+    end
+
+    test "uses an explicit DOM namespace without changing Phoenix transport names" do
+      definition = nested_definition()
+      form = FormData.to_form(Form.new(definition), as: "payload")
+
+      doc =
+        render_component(&Formentation.Phoenix.fields/1,
+          definition: definition,
+          form: form,
+          dom_namespace: "asset_payload"
+        )
+        |> parse!()
+
+      input = find_one(doc, ~s([id="#{field_id("asset_payload", ["serial_number"], :control)}"]))
+      assert Floki.attribute(input, "name") == ["payload[serial_number]"]
     end
 
     test "before any action there is no summary and no visible error" do
       definition = nested_definition()
-      form = FormData.to_form(Form.new(definition), [])
+      form = FormData.to_form(Form.new(definition), as: "payload")
       doc = parse!(render_fields(definition, form))
 
       assert Floki.find(doc, ".ftn-error-summary") == []
       assert Floki.find(doc, ".ftn-errors") == []
+    end
+
+    test "raises with namespace guidance when the form has neither name nor id" do
+      definition = nested_definition()
+      form = FormData.to_form(Form.new(definition), [])
+
+      assert_raise ArgumentError, ~r/Formentation cannot mint DOM ids without a namespace/, fn ->
+        render_fields(definition, form)
+      end
+    end
+
+    test "adversarial names, paths, roles, and group ids remain separately addressable" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"notes", %{kind: :string, help: "Notes help"}},
+            {"notes_help", %{kind: :string}},
+            {"notes_errors", %{kind: :string}},
+            {"a_b", %{kind: :string}},
+            {"a", %{kind: :object, properties: [{"b", %{kind: :string}}]}},
+            {"condition", %{kind: :string, one_of: ["yes", "no"], widget: :radio}},
+            {"condition--option_0", %{kind: :string}},
+            {"serial-number", %{kind: :string}},
+            {"first name", %{kind: :string}},
+            {"0starts_with_a_digit", %{kind: :string}},
+            {"left",
+             %{
+               kind: :object,
+               properties: [{"value", %{kind: :string}}],
+               groups: [%{id: "details", title: "Details", fields: ["value"]}]
+             }},
+            {"right",
+             %{
+               kind: :object,
+               properties: [{"value", %{kind: :string}}],
+               groups: [%{id: "details", title: "Details", fields: ["value"]}]
+             }}
+          ],
+          groups: [%{id: "notes_help", fields: ["notes", "notes_help"]}]
+        })
+
+      doc =
+        definition
+        |> Form.new()
+        |> FormData.to_form(as: "payload")
+        |> then(&render_fields(definition, &1))
+        |> parse!()
+
+      notes_control = DOMIdentity.field("payload", InstancePath.new!(["notes"]), :control)
+      notes_help = DOMIdentity.field("payload", InstancePath.new!(["notes"]), :help)
+
+      notes_help_control =
+        DOMIdentity.field("payload", InstancePath.new!(["notes_help"]), :control)
+
+      notes_errors_control =
+        DOMIdentity.field("payload", InstancePath.new!(["notes_errors"]), :control)
+
+      flat_path = DOMIdentity.field("payload", InstancePath.new!(["a_b"]), :control)
+      nested_path = DOMIdentity.field("payload", InstancePath.new!(["a", "b"]), :control)
+      radio_option = DOMIdentity.field("payload", InstancePath.new!(["condition"]), {:option, 0})
+
+      option_like_field =
+        DOMIdentity.field("payload", InstancePath.new!(["condition--option_0"]), :control)
+
+      assert_no_duplicate_ids(doc)
+
+      for id <- doc |> Floki.find("[id]") |> Enum.flat_map(&Floki.attribute(&1, "id")) do
+        assert [_] = Floki.find(doc, "##{id}")
+      end
+
+      assert_labelled(doc, notes_control)
+      assert describedby(doc, notes_control) == [notes_help]
+      assert_labelled(doc, notes_help_control)
+      assert_labelled(doc, notes_errors_control)
+      assert_labelled(doc, flat_path)
+      assert_labelled(doc, nested_path)
+      assert_labelled(doc, radio_option)
+      assert_labelled(doc, option_like_field)
+
+      assert_labelled(
+        doc,
+        DOMIdentity.field("payload", InstancePath.new!(["serial-number"]), :control)
+      )
+
+      assert_labelled(
+        doc,
+        DOMIdentity.field("payload", InstancePath.new!(["first name"]), :control)
+      )
+
+      assert_labelled(
+        doc,
+        DOMIdentity.field("payload", InstancePath.new!(["0starts_with_a_digit"]), :control)
+      )
+
+      assert_all_references_resolve(doc)
+
+      assert 2 ==
+               doc
+               |> Floki.find("fieldset.ftn-group legend")
+               |> Enum.count(&(Floki.text(&1) == "Details"))
+    end
+
+    test "two occurrences of one definition can coexist under distinct namespaces" do
+      definition = nested_definition()
+      form = FormData.to_form(Form.new(definition), as: "payload")
+
+      doc =
+        (render_fields(definition, form) <>
+           render_component(&Formentation.Phoenix.fields/1,
+             definition: definition,
+             form: form,
+             dom_namespace: "comparison_payload"
+           ))
+        |> parse!()
+
+      assert_no_duplicate_ids(doc)
+      assert_all_references_resolve(doc)
     end
   end
 
@@ -140,14 +390,17 @@ defmodule Formentation.Phoenix.ComponentsTest do
         )
 
       doc = parse!(html)
-      street = find_one(doc, "input#payload_address_street")
+
+      street =
+        find_one(doc, ~s(input[id="#{field_id("payload", ["address", "street"], :control)}"]))
+
       assert Floki.attribute(street, "name") == ["payload[address][street]"]
-      assert Floki.find(doc, "#payload_serial_number") == []
+      assert Floki.find(doc, ~s([id="#{field_id("payload", ["serial_number"], :control)}"])) == []
     end
 
     test "raises on an unknown path" do
       definition = nested_definition()
-      form = FormData.to_form(Form.new(definition), [])
+      form = FormData.to_form(Form.new(definition), as: "payload")
 
       assert_raise ArgumentError, ~r/no node at instance path/, fn ->
         render_component(&Formentation.Phoenix.field/1,
@@ -173,7 +426,7 @@ defmodule Formentation.Phoenix.ComponentsTest do
           groups: [%{id: "g", title: hostile, fields: ["b"]}]
         })
 
-      form = FormData.to_form(Form.new(definition), [])
+      form = FormData.to_form(Form.new(definition), as: "payload")
       html = render_fields(definition, form)
 
       refute html =~ "<script>"

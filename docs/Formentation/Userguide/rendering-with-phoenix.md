@@ -11,7 +11,7 @@ status: current
 
 # Rendering with Phoenix
 
-*Covers Formentation as of 2026-07-24. Every HTML fragment below was
+*Covers Formentation as of 2026-08-03. Every HTML fragment below was
 produced by the version described.*
 
 Formentation ships two function components and one built-in theme.
@@ -42,8 +42,16 @@ Formentation form live inside a larger form you wrote by hand:
 ```elixir
 to_form(form_state, as: "asset[payload]", id: "asset_payload")
 # names become  asset[payload][serial_number]
-# ids become    asset_payload_serial_number
+# DOM ids become ftn--asset_payload--field--control--serial_number
 ```
+
+Phoenix remains authoritative for submitted `name` values. Formentation owns
+the ids emitted by its renderer: they are readable, collision-proof values
+such as `ftn--asset_payload--field--control--serial_number`. Rendering resolves
+their namespace from `dom_namespace`, then the Phoenix form's `id` or `name`;
+it raises with guidance if none is available. Pass `dom_namespace="..."` to
+either rendering component only when you need to override that DOM namespace;
+it never changes submitted names.
 
 `:action` and `:errors` are **owned by the form state** and raise if you
 pass them — drive them through `Formentation.Form.transition/2` instead.
@@ -121,8 +129,8 @@ Given a required email field with a minimum length:
 
 ```html
 <div class="ftn-field">
-  <label for="payload_email">Email</label>
-  <input type="email" id="payload_email" name="payload[email]"
+  <label for="ftn--payload--field--control--email">Email</label>
+  <input type="email" id="ftn--payload--field--control--email" name="payload[email]"
          value="ada@example.com" required minlength="3">
 </div>
 ```
@@ -130,11 +138,11 @@ Given a required email field with a minimum length:
 Presentation groups and nested objects both render as fieldsets:
 
 ```html
-<fieldset class="ftn-group">
+<fieldset id="ftn--payload--object--container--address" class="ftn-group">
   <legend>Address</legend>
   <div class="ftn-field">
-    <label for="payload_address_city">City</label>
-    <input type="text" id="payload_address_city" name="payload[address][city]" value="">
+    <label for="ftn--payload--field--control--address--city">City</label>
+    <input type="text" id="ftn--payload--field--control--address--city" name="payload[address][city]" value="">
   </div>
 </fieldset>
 ```
@@ -151,8 +159,8 @@ the styling hooks. There is no CSS in the package; style them yourself.
 
 ```html
 <input type="hidden" name="payload[subscribed]" value="false">
-<input type="checkbox" id="payload_subscribed" name="payload[subscribed]" value="true">
-<label for="payload_subscribed">Subscribe to the newsletter</label>
+<input type="checkbox" id="ftn--payload--field--control--subscribed" name="payload[subscribed]" value="true">
+<label for="ftn--payload--field--control--subscribed">Subscribe to the newsletter</label>
 ```
 
 An unchecked HTML checkbox submits nothing, which is indistinguishable
@@ -167,7 +175,7 @@ the latter.
 ### Read-only and hidden fields
 
 ```html
-<input type="text" id="payload_locked" name="payload[locked]" value="from-db" readonly>
+<input type="text" id="ftn--payload--field--control--locked" name="payload[locked]" value="from-db" readonly>
 ```
 
 Read-only fields render `readonly` on text-like controls and `disabled`
@@ -196,16 +204,16 @@ Errors appear only once there is something to show them for. Given a
 <div class="ftn-error-summary" role="alert">
   <h2>This form has errors</h2>
   <ul>
-    <li><a href="#payload_age">Age: value 10 is lower than minimum 18</a></li>
-    <li><a href="#payload_email">Email: value length must be at least 3 but is 1</a></li>
+    <li><a href="#ftn--payload--field--control--age">Age: value 10 is lower than minimum 18</a></li>
+    <li><a href="#ftn--payload--field--control--email">Email: value length must be at least 3 but is 1</a></li>
   </ul>
 </div>
 ...
 <div class="ftn-field">
-  <label for="payload_age">Age</label>
-  <input type="number" id="payload_age" name="payload[age]" value="10"
-         aria-describedby="payload_age_errors" aria-invalid="true" min="18" step="1">
-  <ul id="payload_age_errors" class="ftn-errors">
+  <label for="ftn--payload--field--control--age">Age</label>
+  <input type="text" inputmode="numeric" id="ftn--payload--field--control--age" name="payload[age]" value="10"
+         aria-describedby="ftn--payload--field--errors--age" aria-invalid="true" required>
+  <ul id="ftn--payload--field--errors--age" class="ftn-errors">
     <li>value 10 is lower than minimum 18</li>
   </ul>
 </div>
@@ -224,6 +232,11 @@ there is nothing to configure.
 Errors are rendered with a deterministic id and linked from the control
 via `aria-describedby`, composing with the help text's id when both are
 present.
+
+Integer and number fields deliberately render as `type="text"` with
+`inputmode="numeric"`: browsers can otherwise refuse or sanitize a raw
+non-numeric value after a failed decode. The renderer therefore preserves that
+raw text instead of emitting non-conforming `min`, `max`, or `step` attributes.
 
 ## Accessibility
 

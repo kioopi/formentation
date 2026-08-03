@@ -19,8 +19,8 @@ defmodule Formentation.HTMLAssertions do
 
   @doc "Contract item 1: the control has a non-empty <label for>."
   def assert_labelled(doc, id) do
-    find_one(doc, "##{id}")
-    label = find_one(doc, "label[for=#{id}]")
+    find_one(doc, ~s([id="#{id}"]))
+    label = find_one(doc, ~s(label[for="#{id}"]))
     assert Floki.text(label) != "", "label for ##{id} is empty"
     label
   end
@@ -28,7 +28,7 @@ defmodule Formentation.HTMLAssertions do
   @doc "The aria-describedby tokens of the element with `id` ([] when absent)."
   def describedby(doc, id) do
     doc
-    |> find_one("##{id}")
+    |> find_one(~s([id="#{id}"]))
     |> Floki.attribute("aria-describedby")
     |> case do
       [] -> []

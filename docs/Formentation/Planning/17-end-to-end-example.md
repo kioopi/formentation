@@ -24,13 +24,14 @@ The expert-authored schema, stored in the database:
   "properties": {
     "serial_number": { "type": "string", "title": "Serial number", "minLength": 4 },
     "condition": { "type": "string", "title": "Condition", "enum": ["good", "worn", "defective"] },
+    "mounting": { "type": "string", "title": "Mounting", "enum": ["floor", "wall"] },
     "last_service": { "type": "string", "format": "date", "title": "Last service" },
     "operating_hours": { "type": "integer", "title": "Operating hours", "minimum": 0 },
     "voltage": { "type": "number", "title": "Voltage (V)" },
     "insulation_ok": { "type": "boolean", "title": "Insulation test passed" },
     "notes": { "type": "string", "title": "Notes" }
   },
-  "required": ["serial_number", "condition"]
+  "required": ["serial_number", "condition", "mounting"]
 }
 ```
 
@@ -38,17 +39,18 @@ The companion UI-hints document (a first, provisional draft of the vocabulary Ph
 
 ```json
 {
-  "order": ["serial_number", "condition", "last_service", "operating_hours", "electrical", "notes"],
+  "order": ["serial_number", "condition", "mounting", "last_service", "operating_hours", "electrical", "notes"],
   "groups": [
     { "id": "electrical", "title": "Electrical", "fields": ["voltage", "insulation_ok"] }
   ],
   "fields": {
+    "mounting": { "widget": "radio" },
     "notes": { "widget": "textarea", "help": "Visible to all technicians." }
   }
 }
 ```
 
-Note what the hints do: they impose an order (JSON object member order is not reliable data), they create a presentation group over *flat* payload fields, and they override one widget.
+Note what the hints do: they impose an order (JSON object member order is not reliable data), they create a presentation group over *flat* payload fields, and they override widgets.
 
 ## Source 2: plain Elixir data
 
@@ -58,10 +60,11 @@ The same form declared through the core map source (working name `Formentation.S
 %{
   kind: :object,
   title: "Pump inspection",
-  required: ["serial_number", "condition"],
+  required: ["serial_number", "condition", "mounting"],
   properties: [
     {"serial_number", %{kind: :string, title: "Serial number", min_length: 4}},
     {"condition", %{kind: :string, title: "Condition", one_of: ["good", "worn", "defective"]}},
+    {"mounting", %{kind: :string, title: "Mounting", one_of: ["floor", "wall"], widget: :radio}},
     {"last_service", %{kind: :string, title: "Last service", role: :date}},
     {"operating_hours", %{kind: :integer, title: "Operating hours", min: 0}},
     {"voltage", %{kind: :number, title: "Voltage (V)"}},
@@ -81,7 +84,7 @@ Two instructive differences from JSON Schema: the property list is *natively ord
   Formentation.compile(schema, adapter: Formentation.JSONSchema, ui: ui_hints)
 
 Info.fields(definition) |> Enum.map(& &1.name)
-#=> ["serial_number", "condition", "last_service", "operating_hours",
+#=> ["serial_number", "condition", "mounting", "last_service", "operating_hours",
 #    "voltage", "insulation_ok", "notes"]
 
 Info.required?(definition, ["serial_number"])   #=> true
@@ -125,18 +128,25 @@ Expected output structure (built-in reference UI, styling elided):
 
 ```html
 <div class="ftn-field">
-  <label for="asset_payload_serial_number">Serial number</label>
-  <input type="text" name="asset[payload][serial_number]" id="asset_payload_serial_number" value="" />
+  <label for="ftn--asset_payload--field--control--serial_number">Serial number</label>
+  <input type="text" name="asset[payload][serial_number]" id="ftn--asset_payload--field--control--serial_number" value="" />
 </div>
 
 <div class="ftn-field">
-  <label for="asset_payload_condition">Condition</label>
-  <select name="asset[payload][condition]" id="asset_payload_condition">
+  <label for="ftn--asset_payload--field--control--condition">Condition</label>
+  <select name="asset[payload][condition]" id="ftn--asset_payload--field--control--condition">
     <option value=""></option>
     <option value="good">good</option>
     <option value="worn">worn</option>
     <option value="defective">defective</option>
   </select>
+</div>
+
+<div class="ftn-field">
+  <fieldset id="ftn--asset_payload--field--container--mounting" tabindex="-1" class="ftn-radio-group" role="radiogroup">
+    <legend>Mounting</legend>
+    <!-- radio inputs use prepared option ids -->
+  </fieldset>
 </div>
 
 <!-- last_service, operating_hours ... -->
@@ -147,10 +157,10 @@ Expected output structure (built-in reference UI, styling elided):
 </fieldset>
 
 <div class="ftn-field">
-  <label for="asset_payload_notes">Notes</label>
-  <textarea name="asset[payload][notes]" id="asset_payload_notes"
-            aria-describedby="asset_payload_notes_help"></textarea>
-  <p id="asset_payload_notes_help">Visible to all technicians.</p>
+  <label for="ftn--asset_payload--field--control--notes">Notes</label>
+  <textarea name="asset[payload][notes]" id="ftn--asset_payload--field--control--notes"
+            aria-describedby="ftn--asset_payload--field--help--notes"></textarea>
+  <p id="ftn--asset_payload--field--help--notes">Visible to all technicians.</p>
 </div>
 ```
 

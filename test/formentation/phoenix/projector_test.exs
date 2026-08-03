@@ -5,8 +5,8 @@ defmodule Formentation.Phoenix.ProjectorTest do
 
   doctest Formentation.Phoenix.Projector
 
-  alias Formentation.Form
-  alias Formentation.Phoenix.{Projector, RenderNode, RenderPlan}
+  alias Formentation.{Form, InstancePath}
+  alias Formentation.Phoenix.{DOMIdentity, Projector, RenderNode, RenderPlan}
   alias Phoenix.HTML.FormData
 
   defp compile!(declaration) do
@@ -40,7 +40,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
     form_state =
       Form.transition(Form.new(definition), %Formentation.Params{values: values, event: event})
 
-    {definition, FormData.to_form(form_state, [])}
+    {definition, FormData.to_form(form_state, as: "payload")}
   end
 
   describe "project/2 with flat scalar fields" do
@@ -69,9 +69,65 @@ defmodule Formentation.Phoenix.ProjectorTest do
       assert notes.help == "Visible to all technicians."
     end
 
+    test "prepares exact field and root identities from the form namespace" do
+      definition = flat_definition()
+      form = FormData.to_form(Form.new(definition), as: "payload")
+
+      plan = Projector.project(definition, form)
+      [serial | _] = plan.root.children
+
+      root_path = InstancePath.new!([])
+      serial_path = InstancePath.new!(["serial_number"])
+
+      assert plan.root.dom.container == DOMIdentity.object("payload", root_path, :container)
+      assert plan.root.dom.help == DOMIdentity.object("payload", root_path, :help)
+      assert serial.dom.control == DOMIdentity.field("payload", serial_path, :control)
+      assert serial.dom.container == DOMIdentity.field("payload", serial_path, :container)
+      assert serial.dom.help == DOMIdentity.field("payload", serial_path, :help)
+      assert serial.dom.errors == DOMIdentity.field("payload", serial_path, :errors)
+      assert serial.dom.options == []
+    end
+
+    test "an explicit namespace overrides the Phoenix form namespace" do
+      definition = flat_definition()
+      form = FormData.to_form(Form.new(definition), as: "payload")
+
+      [field | _] =
+        Projector.project(definition, form, dom_namespace: "asset_payload").root.children
+
+      assert field.dom.control ==
+               DOMIdentity.field("asset_payload", InstancePath.new!(["serial_number"]), :control)
+    end
+
+    test "raises clearly when no DOM namespace can be resolved" do
+      definition = flat_definition()
+      form = FormData.to_form(Form.new(definition), [])
+
+      assert_raise ArgumentError,
+                   ~r/Formentation cannot mint DOM ids without a namespace/,
+                   fn -> Projector.project(definition, form) end
+    end
+
+    test "a nil override falls back to the Phoenix form namespace" do
+      definition = flat_definition()
+      form = FormData.to_form(Form.new(definition), as: "payload")
+
+      assert Projector.project(definition, form, dom_namespace: nil) ==
+               Projector.project(definition, form)
+    end
+
+    test "an empty explicit override remains invalid" do
+      definition = flat_definition()
+      form = FormData.to_form(Form.new(definition), as: "payload")
+
+      assert_raise ArgumentError, ~r/non-empty binary namespace/, fn ->
+        Projector.project(definition, form, dom_namespace: "")
+      end
+    end
+
     test "label falls back to the humanized field name" do
       definition = compile!(%{kind: :object, properties: [{"serial_number", %{kind: :string}}]})
-      form = FormData.to_form(Form.new(definition), [])
+      form = FormData.to_form(Form.new(definition), as: "payload")
 
       plan = Projector.project(definition, form)
 
@@ -93,7 +149,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
           event: :submit
         })
 
-      form = FormData.to_form(form_state, [])
+      form = FormData.to_form(form_state, as: "payload")
       plan = Projector.project(definition, form)
 
       [_serial, hours, _notes] = plan.root.children
@@ -107,7 +163,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
 
   defp single_field_plan(spec) do
     definition = compile!(%{kind: :object, properties: [{"f", spec}]})
-    form = FormData.to_form(Form.new(definition), [])
+    form = FormData.to_form(Form.new(definition), as: "payload")
     Projector.project(definition, form)
   end
 
@@ -142,6 +198,19 @@ defmodule Formentation.Phoenix.ProjectorTest do
                single_widget(%{kind: :string, widget: :textarea, hidden: true})
     end
 
+    test "prepares one radio option id per option" do
+      plan = single_field_plan(%{kind: :string, one_of: ["yes", "no"], widget: :radio})
+      [%RenderNode.Field{options: options, dom: dom}] = plan.root.children
+
+      assert dom.options ==
+               Enum.map(0..1, fn index ->
+                 DOMIdentity.field("payload", InstancePath.new!(["f"]), {:option, index})
+               end)
+
+      assert length(dom.options) == length(options)
+      assert Enum.uniq(dom.options) == dom.options
+    end
+
     test "nonsense hints fall back to the inferred widget with a diagnostic" do
       # :checkbox on a non-boolean (D-011 is boolean-shaped), optionless
       # :select/:radio, and unknown atoms from the unvalidated map source.
@@ -161,6 +230,49 @@ defmodule Formentation.Phoenix.ProjectorTest do
   end
 
   describe "groups and non-rendering nodes" do
+    test "DOM identities are deterministic and independent of display text and sibling order" do
+      declaration = fn properties, title ->
+        %{
+          kind: :object,
+          properties: properties,
+          groups: [%{id: "panel", title: title, fields: ["a", "b"]}]
+        }
+      end
+
+      first =
+        declaration.(
+          [
+            {"a", %{kind: :string, title: "Alpha"}},
+            {"b", %{kind: :string, title: "Beta"}}
+          ],
+          "First legend"
+        )
+        |> compile!()
+
+      second =
+        declaration.(
+          [
+            {"b", %{kind: :string, title: "Different beta"}},
+            {"a", %{kind: :string, title: "Different alpha"}}
+          ],
+          "Changed legend"
+        )
+        |> compile!()
+
+      form = FormData.to_form(Form.new(first), as: "payload")
+      assert Projector.project(first, form) == Projector.project(first, form)
+
+      identities = fn definition ->
+        definition
+        |> Projector.project(form)
+        |> Map.fetch!(:root)
+        |> flatten_fields()
+        |> Map.new(&{&1.field.name, &1.dom})
+      end
+
+      assert identities.(first) == identities.(second)
+    end
+
     test "presentation order can differ from semantic declaration order" do
       definition =
         compile!(%{
@@ -169,11 +281,15 @@ defmodule Formentation.Phoenix.ProjectorTest do
           groups: [%{id: "reordered", fields: ["c", "a"]}]
         })
 
-      form = FormData.to_form(Form.new(definition), [])
+      form = FormData.to_form(Form.new(definition), as: "payload")
       plan = Projector.project(definition, form)
 
       assert definition |> Formentation.Info.fields() |> Enum.map(& &1.name) == ["a", "c"]
-      assert plan.root |> flatten_fields() |> Enum.map(& &1.field.name) == ["c", "a"]
+
+      assert plan.root |> flatten_fields() |> Enum.map(& &1.field.name) == [
+               "payload[c]",
+               "payload[a]"
+             ]
     end
 
     test "non-adjacent grouped members keep current layout placement and group order" do
@@ -189,16 +305,16 @@ defmodule Formentation.Phoenix.ProjectorTest do
           groups: [%{id: "late", title: "Late", fields: ["d", "b"]}]
         })
 
-      form = FormData.to_form(Form.new(definition), [])
+      form = FormData.to_form(Form.new(definition), as: "payload")
       plan = Projector.project(definition, form)
 
       assert [
-               %RenderNode.Field{field: %{name: "a"}},
+               %RenderNode.Field{field: %{name: "payload[a]"}},
                %RenderNode.Group{legend: "Late", children: grouped},
-               %RenderNode.Field{field: %{name: "c"}}
+               %RenderNode.Field{field: %{name: "payload[c]"}}
              ] = plan.root.children
 
-      assert Enum.map(grouped, & &1.field.name) == ["d", "b"]
+      assert Enum.map(grouped, & &1.field.name) == ["payload[d]", "payload[b]"]
     end
 
     test "a presentational group nests render nodes without name nesting" do
@@ -247,6 +363,41 @@ defmodule Formentation.Phoenix.ProjectorTest do
       assert street.field.value == "Elm"
     end
 
+    test "nested objects and presentation groups use their full occurrence identities" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"address",
+             %{
+               kind: :object,
+               properties: [{"street", %{kind: :string}}],
+               groups: [%{id: "details", title: "Details", fields: ["street"]}]
+             }}
+          ]
+        })
+
+      form = FormData.to_form(Form.new(definition), as: "payload")
+
+      %RenderNode.Group{children: [%RenderNode.Group{} = address]} =
+        Projector.project(definition, form).root
+
+      [%RenderNode.Group{} = presentation_group] = address.children
+
+      assert presentation_group.dom.container ==
+               DOMIdentity.group(
+                 "payload",
+                 "/address#details",
+                 InstancePath.new!(["address"]),
+                 :container
+               )
+
+      assert address.dom.container ==
+               DOMIdentity.object("payload", InstancePath.new!(["address"]), :container)
+
+      assert Projector.project_at(definition, form, ["address"]) == address
+    end
+
     test "a nested object inside a presentation group still descends semantically" do
       definition =
         compile!(%{
@@ -293,7 +444,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
           ]
         })
 
-      form = FormData.to_form(Form.new(definition), [])
+      form = FormData.to_form(Form.new(definition), as: "payload")
       plan = Projector.project(definition, form)
 
       assert [%RenderNode.Field{label: "Name"}] = plan.root.children
@@ -352,7 +503,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
           groups: [%{id: "main", fields: ["title"]}]
         })
 
-      form = FormData.to_form(Form.new(definition), [])
+      form = FormData.to_form(Form.new(definition), as: "payload")
 
       assert_raise ArgumentError, ~r/no node at instance path/, fn ->
         Projector.project_at(definition, form, ["main"])
@@ -361,7 +512,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
 
     test "an unsupported node's path raises" do
       definition = subtree_definition()
-      form = FormData.to_form(Form.new(definition), [])
+      form = FormData.to_form(Form.new(definition), as: "payload")
 
       assert_raise ArgumentError, ~r/unsupported/, fn ->
         Projector.project_at(definition, form, ["gadget"])
@@ -370,13 +521,37 @@ defmodule Formentation.Phoenix.ProjectorTest do
 
     test "a hidden read-only field's path renders nothing" do
       definition = subtree_definition()
-      form = FormData.to_form(Form.new(definition), [])
+      form = FormData.to_form(Form.new(definition), as: "payload")
 
       assert Projector.project_at(definition, form, ["secret"]) == nil
     end
   end
 
   describe "error visibility and the summary" do
+    test "a radio summary targets the rendered radio container" do
+      definition =
+        compile!(%{
+          kind: :object,
+          required: ["condition"],
+          properties: [{"condition", %{kind: :string, one_of: ["yes", "no"], widget: :radio}}]
+        })
+
+      source = %Formentation.SourceFixture{
+        params: %{"condition" => ""},
+        errors: [condition: {"is required", []}],
+        submitted?: true,
+        visibility: %{
+          ["condition"] => :show
+        }
+      }
+
+      plan = Projector.project(definition, FormData.to_form(source, as: "payload"))
+      [%RenderNode.Field{widget: :radio_group, dom: dom}] = plan.root.children
+
+      assert [%{id: summary_target}] = plan.summary
+      assert summary_target == dom.container
+    end
+
     test "on submit every field error is visible and summarized" do
       {definition, form} = decode_error_form(:submit)
       plan = Projector.project(definition, form)
@@ -384,7 +559,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
       [_serial, hours, _notes] = plan.root.children
       assert hours.show_errors?
       assert [%{id: id, label: "Operating hours", message: message}] = plan.summary
-      assert id == hours.field.id
+      assert id == hours.dom.control
       assert is_binary(message)
     end
 
@@ -444,7 +619,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
       {:ok, definition, []} = Formentation.compile(schema, adapter: Formentation.JSONSchema)
 
       form_state = submitted_form(Form.new(definition), %{"title" => "t"})
-      plan = Projector.project(definition, FormData.to_form(form_state, []))
+      plan = Projector.project(definition, FormData.to_form(form_state, as: "payload"))
 
       assert [%{id: nil, label: nil, message: message}] = plan.summary
       assert message =~ "required"
@@ -474,7 +649,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
           overrides
         )
 
-      Phoenix.HTML.FormData.to_form(source, [])
+      Phoenix.HTML.FormData.to_form(source, as: "payload")
     end
 
     test "a source whose semantic submit is :commit reveals an unused field's error" do
@@ -486,7 +661,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
 
     test "the generic fallback does not treat :commit as submitted" do
       form = %{
-        Phoenix.HTML.FormData.to_form(unused_params(), [])
+        Phoenix.HTML.FormData.to_form(unused_params(), as: "payload")
         | action: :commit,
           errors: [operating_hours: {"is invalid", []}]
       }
@@ -545,7 +720,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
           overrides
         )
 
-      Phoenix.HTML.FormData.to_form(source, [])
+      Phoenix.HTML.FormData.to_form(source, as: "payload")
     end
 
     test "a root issue appears once, unlinked, and never enters a field's errors" do
@@ -585,7 +760,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
       assert [%{id: nil, label: nil, message: "is incomplete"}] = plan.summary
       assert [%RenderNode.Group{children: [street]}] = plan.root.children
       assert %RenderNode.Field{errors: [], show_errors?: false} = street
-      assert street.field.name == "address[street]"
+      assert street.field.name == "payload[address][street]"
       assert street.field.value == "Main"
     end
 
@@ -678,7 +853,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
           values: %{"operating_hours" => "51o2"},
           event: :submit
         })
-        |> then(&Projector.project(definition, FormData.to_form(&1, [])))
+        |> then(&Projector.project(definition, FormData.to_form(&1, as: "payload")))
 
       # Whatever decode message Formentation produced, hand the same one to
       # a source that calls its submit state :commit and enumerates nothing.
@@ -712,7 +887,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
         Formentation.compile(schema, adapter: Formentation.JSONSchema)
 
       form_state = definition |> Form.new(data) |> submitted_form(params)
-      Projector.project(definition, FormData.to_form(form_state, []))
+      Projector.project(definition, FormData.to_form(form_state, as: "payload"))
     end
 
     test "a required unsupported property is explained once, labelled, and unlinked" do
@@ -773,7 +948,9 @@ defmodule Formentation.Phoenix.ProjectorTest do
       form_state = Form.validate(Form.new(definition), %{})
 
       assert {:blocked, [_]} = Form.submission_status(form_state)
-      assert Projector.project(definition, FormData.to_form(form_state, [])).summary == []
+
+      assert Projector.project(definition, FormData.to_form(form_state, as: "payload")).summary ==
+               []
     end
   end
 
@@ -808,7 +985,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
           event: :change
         })
 
-      form = FormData.to_form(form_state, [])
+      form = FormData.to_form(form_state, as: "payload")
       plan = Projector.project(definition, form)
 
       [address] = plan.root.children
@@ -846,7 +1023,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
           event: :submit
         })
 
-      form = FormData.to_form(form_state, [])
+      form = FormData.to_form(form_state, as: "payload")
 
       # ["address", "geo", "lat"] is a decode failure; hiding exactly that
       # path proves the projector reached it with its absolute segments.
@@ -855,7 +1032,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
       [_street, geo] = address.children
       [lat] = geo.children
 
-      assert lat.field.name == "address[geo][lat]"
+      assert lat.field.name == "payload[address][geo][lat]"
       assert lat.errors != []
       assert lat.show_errors?
     end
@@ -874,7 +1051,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
           event: :submit
         })
 
-      plan = Projector.project(definition, FormData.to_form(form_state, []))
+      plan = Projector.project(definition, FormData.to_form(form_state, as: "payload"))
 
       # Whatever the group nesting looks like, the field's Phoenix name —
       # which mirrors the data path — must not gain the group id.
@@ -883,7 +1060,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
         |> flatten_fields()
         |> Enum.map(& &1.field.name)
 
-      assert names == ["title"]
+      assert names == ["payload[title]"]
     end
 
     defp flatten_fields(%RenderNode.Group{children: children}),
@@ -960,6 +1137,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
       assert from_at.field.name == "payload[address][street]"
       assert from_at.field.id == "payload_address_street"
       assert from_at.field.value == "ab"
+      assert from_at.dom == from_whole.dom
       assert from_at.errors == from_whole.errors
       assert from_at.show_errors? == from_whole.show_errors?
       assert from_at.show_errors? == true
@@ -982,12 +1160,12 @@ defmodule Formentation.Phoenix.ProjectorTest do
           event: :change
         })
 
-      form = FormData.to_form(form_state, [])
+      form = FormData.to_form(form_state, as: "payload")
 
       from_whole =
         Projector.project(definition, form).root
         |> flatten_fields()
-        |> Enum.find(&(&1.field.name == "address[geo][lat]"))
+        |> Enum.find(&(&1.field.name == "payload[address][geo][lat]"))
 
       from_at = Projector.project_at(definition, form, ["address", "geo", "lat"])
 
@@ -998,7 +1176,7 @@ defmodule Formentation.Phoenix.ProjectorTest do
 
     test "project_at/3 raises for an unknown path" do
       definition = nested_path_definition()
-      form = FormData.to_form(Form.new(definition), [])
+      form = FormData.to_form(Form.new(definition), as: "payload")
 
       assert_raise ArgumentError, ~r/no node at instance path/, fn ->
         Projector.project_at(definition, form, ["nope"])
