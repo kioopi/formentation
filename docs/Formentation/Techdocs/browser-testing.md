@@ -183,10 +183,9 @@ All four live in `test/browser/pump_inspection_browser_test.exs`, driving
    (`.ftn-error-summary[role='alert']`), and asserts keyboard focus lands
    on `#ftn--asset_payload--field--control--serial_number`. This is an end-to-end interaction
    (`click` → focus movement) with no server-side equivalent to assert.
-   The same browser regression clicks `Condition:` and verifies focus lands on
+   The same browser regression clicks `Mounting:` and verifies focus lands on
    the radio fieldset's prepared container id; the fieldset is programmatically
    focusable with `tabindex="-1"` without entering ordinary tab order.
-   against.
 
 ## The native-validation finding and its toggle (D-023)
 

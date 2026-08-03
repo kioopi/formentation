@@ -1,5 +1,4 @@
 browser? = !!System.get_env("PLAYWRIGHT_E2E")
-browser_port = System.get_env("FORMENTATION_BROWSER_PORT", "4002") |> String.to_integer()
 
 endpoint_base = [
   secret_key_base: String.duplicate("formentation-demo-", 4),
@@ -12,8 +11,8 @@ endpoint_server =
     [
       adapter: Bandit.PhoenixAdapter,
       server: true,
-      http: [ip: {127, 0, 0, 1}, port: browser_port],
-      url: [host: "localhost", port: browser_port]
+      http: [ip: {127, 0, 0, 1}, port: 4002],
+      url: [host: "localhost", port: 4002]
     ]
   else
     [server: false]

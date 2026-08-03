@@ -679,8 +679,8 @@ Phoenix transport naming: `Phoenix.HTML.FormField.name` remains unchanged, and
 its `id` is no longer the authoritative identity for renderer markup. Exact ID
 spelling is a public compatibility contract so applications can use it in
 tests, selectors, and styles. The primitive itself is internal pending the
-Phase 3 prepared-view contract. [D-035](#D-035) records its adoption by the
-Phoenix renderer. [Issue #7](https://github.com/kioopi/formentation/issues/7)
+Phase 3 prepared-view contract. [[18-decisions#D-035 — Phoenix rendering prepares and consumes DOM identities|D-035]]
+records its adoption by the Phoenix renderer. [Issue #7](https://github.com/kioopi/formentation/issues/7)
 can now add group help without inventing a parallel group-id scheme.
 
 ## D-035 — Phoenix rendering prepares and consumes DOM identities
