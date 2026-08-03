@@ -8,11 +8,14 @@ defmodule Formentation.Phoenix.RenderNode.Field do
   themes never inspect `_unused_` markers or `form.action` themselves.
   """
 
-  @enforce_keys [:widget, :field, :label]
+  alias Formentation.Phoenix.RenderNode
+
+  @enforce_keys [:widget, :field, :label, :dom]
   defstruct [
     :widget,
     :field,
     :label,
+    :dom,
     :help,
     :options,
     validations: [],
@@ -25,6 +28,7 @@ defmodule Formentation.Phoenix.RenderNode.Field do
           widget: atom(),
           field: Phoenix.HTML.FormField.t(),
           label: String.t(),
+          dom: RenderNode.FieldDOM.t(),
           help: String.t() | nil,
           options: [String.t()] | nil,
           validations: keyword(),

@@ -8,8 +8,12 @@ defmodule Formentation.Phoenix.RenderNode.Group do
 
   alias Formentation.Phoenix.RenderNode
 
-  @enforce_keys [:legend]
-  defstruct [:legend, children: []]
+  @enforce_keys [:legend, :dom]
+  defstruct [:legend, :dom, children: []]
 
-  @type t :: %__MODULE__{legend: String.t() | nil, children: [RenderNode.t()]}
+  @type t :: %__MODULE__{
+          legend: String.t() | nil,
+          dom: RenderNode.GroupDOM.t(),
+          children: [RenderNode.t()]
+        }
 end

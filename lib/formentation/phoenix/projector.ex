@@ -15,7 +15,7 @@ defmodule Formentation.Phoenix.Projector do
 
   alias Formentation.{Definition, Diagnostic, Info, InstancePath, Semantic}
   alias Formentation.Info.Presentation
-  alias Formentation.Phoenix.{RenderNode, RenderPlan, StateView}
+  alias Formentation.Phoenix.{DOMIdentity, RenderNode, RenderPlan, StateView}
 
   @doc """
   Projects the whole definition against `form` into a render plan.
@@ -43,8 +43,20 @@ defmodule Formentation.Phoenix.Projector do
       {:email_input, "Email", "payload[email]"}
   """
   @spec project(Definition.t(), Phoenix.HTML.Form.t()) :: RenderPlan.t()
-  def project(%Definition{} = definition, %Phoenix.HTML.Form{} = form) do
-    ctx = context(definition, form, [], Info.semantic_node_index(definition))
+  def project(%Definition{} = definition, %Phoenix.HTML.Form{} = form),
+    do: project(definition, form, [])
+
+  @spec project(Definition.t(), Phoenix.HTML.Form.t(), keyword()) :: RenderPlan.t()
+  def project(%Definition{} = definition, %Phoenix.HTML.Form{} = form, opts) when is_list(opts) do
+    ctx =
+      context(
+        definition,
+        form,
+        [],
+        Info.semantic_node_index(definition),
+        dom_namespace!(form, opts)
+      )
+
     {root, diagnostics} = project_descriptor(Info.presentation_root(definition), form, ctx)
     %RenderPlan{root: root, summary: summary(root, ctx), diagnostics: diagnostics}
   end
@@ -62,14 +74,20 @@ defmodule Formentation.Phoenix.Projector do
       ...>     %{kind: :object, properties: [{"email", %{kind: :string, role: :email}}]},
       ...>     adapter: Formentation.Source.Map
       ...>   )
-      iex> form = Phoenix.HTML.FormData.to_form(%{}, [])
+      iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
       iex> node = Formentation.Phoenix.Projector.project_at(definition, form, ["email"])
       iex> {node.widget, node.field.name}
-      {:email_input, "email"}
+      {:email_input, "payload[email]"}
   """
   @spec project_at(Definition.t(), Phoenix.HTML.Form.t(), [String.t()]) ::
           RenderNode.t() | nil
   def project_at(%Definition{} = definition, %Phoenix.HTML.Form{} = form, segments)
+      when is_list(segments),
+      do: project_at(definition, form, segments, [])
+
+  @spec project_at(Definition.t(), Phoenix.HTML.Form.t(), [String.t()], keyword()) ::
+          RenderNode.t() | nil
+  def project_at(%Definition{} = definition, %Phoenix.HTML.Form{} = form, segments, opts)
       when is_list(segments) do
     %InstancePath{segments: segments} = InstancePath.new!(segments)
 
@@ -82,7 +100,16 @@ defmodule Formentation.Phoenix.Projector do
 
       {:ok, descriptor} ->
         parent = descriptor_parent_path(descriptor)
-        ctx = context(definition, form, parent, Info.semantic_node_index(definition))
+
+        ctx =
+          context(
+            definition,
+            form,
+            parent,
+            Info.semantic_node_index(definition),
+            dom_namespace!(form, opts)
+          )
+
         {render, _diagnostics} = project_descriptor(descriptor, descend(form, parent), ctx)
         render
     end
@@ -92,13 +119,14 @@ defmodule Formentation.Phoenix.Projector do
   # is built only where a path crosses into StateView — and `root_form`
   # and `source` stay pinned to the form handed to project/2 or
   # project_at/3, never a nested form built during traversal.
-  defp context(definition, form, path, semantic_nodes) do
+  defp context(definition, form, path, semantic_nodes, dom_namespace) do
     %{
       definition: definition,
       root_form: form,
       source: form.source,
       path: path,
-      semantic_nodes: semantic_nodes
+      semantic_nodes: semantic_nodes,
+      dom_namespace: dom_namespace
     }
   end
 
@@ -112,12 +140,25 @@ defmodule Formentation.Phoenix.Projector do
   defp project_descriptor(%Presentation.Object{semantic_path: path} = object, form, ctx) do
     {form, ctx} = object_context(object, path.segments, form, ctx)
     {children, diagnostics} = project_children(object.children, form, ctx)
-    {%RenderNode.Group{legend: object_legend(object), children: children}, diagnostics}
+
+    dom = %RenderNode.GroupDOM{
+      container: DOMIdentity.object(ctx.dom_namespace, path, :container),
+      help: DOMIdentity.object(ctx.dom_namespace, path, :help)
+    }
+
+    {%RenderNode.Group{legend: object_legend(object), dom: dom, children: children}, diagnostics}
   end
 
   defp project_descriptor(%Presentation.Group{} = group, form, ctx) do
     {children, diagnostics} = project_children(group.children, form, ctx)
-    {%RenderNode.Group{legend: group_legend(group), children: children}, diagnostics}
+    enclosing = InstancePath.new!(ctx.path)
+
+    dom = %RenderNode.GroupDOM{
+      container: DOMIdentity.group(ctx.dom_namespace, group.id, enclosing, :container),
+      help: DOMIdentity.group(ctx.dom_namespace, group.id, enclosing, :help)
+    }
+
+    {%RenderNode.Group{legend: group_legend(group), dom: dom, children: children}, diagnostics}
   end
 
   defp project_descriptor(%Presentation.Field{} = field, form, ctx) do
@@ -164,11 +205,20 @@ defmodule Formentation.Phoenix.Projector do
     field = form[access_key(node.name)]
     {widget, diagnostics} = resolve_widget(presentation, node)
     path = presentation.semantic_path.segments
+    instance_path = InstancePath.new!(path)
+
+    dom = %RenderNode.FieldDOM{
+      control: DOMIdentity.field(ctx.dom_namespace, instance_path, :control),
+      help: DOMIdentity.field(ctx.dom_namespace, instance_path, :help),
+      errors: DOMIdentity.field(ctx.dom_namespace, instance_path, :errors),
+      options: option_ids(node.options, ctx.dom_namespace, instance_path)
+    }
 
     {%RenderNode.Field{
        widget: widget,
        field: field,
        label: presentation.label || humanize(node.name),
+       dom: dom,
        help: presentation.help,
        options: node.options,
        validations: Phoenix.HTML.Form.input_validations(form, field.field),
@@ -210,6 +260,15 @@ defmodule Formentation.Phoenix.Projector do
   defp infer_widget(%Semantic.Field{role: :email}), do: :email_input
   defp infer_widget(%Semantic.Field{role: :uri}), do: :url_input
   defp infer_widget(%Semantic.Field{}), do: :text_input
+
+  defp option_ids(nil, _namespace, _path), do: []
+  defp option_ids([], _namespace, _path), do: []
+
+  defp option_ids(options, namespace, path) do
+    Enum.map(Enum.with_index(options), fn {_option, index} ->
+      DOMIdentity.field(namespace, path, {:option, index})
+    end)
+  end
 
   defp fallback_diagnostic(hint, node, widget) do
     %Diagnostic{
@@ -291,7 +350,7 @@ defmodule Formentation.Phoenix.Projector do
 
   defp field_entries(%RenderNode.Field{show_errors?: true} = node) do
     for {message, _opts} <- node.errors do
-      summary_entry(node.field.id, node.label, message)
+      summary_entry(node.dom.control, node.label, message)
     end
   end
 
@@ -339,4 +398,18 @@ defmodule Formentation.Phoenix.Projector do
   end
 
   defp summary_entry(id, label, message), do: %{id: id, label: label, message: message}
+
+  defp dom_namespace!(form, opts) do
+    case Keyword.fetch(opts, :dom_namespace) do
+      {:ok, namespace} ->
+        namespace
+
+      :error ->
+        form.id || form.name ||
+          raise ArgumentError,
+                "Formentation cannot mint DOM ids without a namespace. Give the form a name or an id\n" <>
+                  "(`to_form(state, as: \"payload\")` or `to_form(state, id: \"payload\")`), or pass\n" <>
+                  "`dom_namespace:` to Formentation.Phoenix.fields/1 or Formentation.Phoenix.field/1."
+    end
+  end
 end
