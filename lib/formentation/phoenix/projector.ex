@@ -35,7 +35,7 @@ defmodule Formentation.Phoenix.Projector do
   action/`used_input?` rule (D-014) only when the source has no opinion.
   `plan.summary` is non-empty only once the source's `StateView` reports
   semantic submission. It also prepares exact renderer-owned DOM identities:
-  `FieldDOM` carries control/help/errors/option ids and `GroupDOM` carries
+  `FieldDOM` carries control/container/help/errors/option ids and `GroupDOM` carries
   container/help ids. Namespace resolution is explicit `:dom_namespace`, then
   `form.id || form.name`; projection raises if neither is available.
 

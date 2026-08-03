@@ -254,6 +254,7 @@ defmodule Formentation.Phoenix.ThemeTest do
       input = find_one(doc, "input[type=hidden]")
       assert Floki.attribute(input, "value") == ["abc"]
       assert Floki.attribute(input, "name") == ["notes"]
+      assert Floki.attribute(input, "id") == ["ftn--payload--field--control--notes"]
     end
   end
 

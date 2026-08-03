@@ -34,6 +34,29 @@ defmodule Formentation.Phoenix.ComponentsTest do
     render_component(&Formentation.Phoenix.fields/1, definition: definition, form: form)
   end
 
+  defp assert_all_references_resolve(doc) do
+    ids = doc |> Floki.find("[id]") |> Enum.flat_map(&Floki.attribute(&1, "id")) |> MapSet.new()
+
+    label_targets = doc |> Floki.find("label[for]") |> Enum.flat_map(&Floki.attribute(&1, "for"))
+
+    describedby_targets =
+      doc
+      |> Floki.find("[aria-describedby]")
+      |> Enum.flat_map(&Floki.attribute(&1, "aria-describedby"))
+      |> Enum.flat_map(&String.split(&1, " ", trim: true))
+
+    summary_targets =
+      doc
+      |> Floki.find(".ftn-error-summary a[href]")
+      |> Enum.flat_map(&Floki.attribute(&1, "href"))
+      |> Enum.map(&String.trim_leading(&1, "#"))
+
+    assert MapSet.subset?(
+             MapSet.new(label_targets ++ describedby_targets ++ summary_targets),
+             ids
+           )
+  end
+
   describe "fields/1" do
     test "an invalid radio summary links to the rendered radio container" do
       definition =
@@ -56,6 +79,7 @@ defmodule Formentation.Phoenix.ComponentsTest do
 
       find_one(doc, ~s(a[href="##{target}"]))
       find_one(doc, ~s(fieldset[id="#{target}"]))
+      assert_all_references_resolve(doc)
     end
 
     test "renders the whole body under a parent namespace without a form element" do
@@ -193,7 +217,10 @@ defmodule Formentation.Phoenix.ComponentsTest do
             {"a_b", %{kind: :string}},
             {"a", %{kind: :object, properties: [{"b", %{kind: :string}}]}},
             {"condition", %{kind: :string, one_of: ["yes", "no"], widget: :radio}},
-            {"condition--option_0", %{kind: :string}}
+            {"condition--option_0", %{kind: :string}},
+            {"serial-number", %{kind: :string}},
+            {"first name", %{kind: :string}},
+            {"0starts_with_a_digit", %{kind: :string}}
           ],
           groups: [%{id: "notes_help", fields: ["notes", "notes_help"]}]
         })
@@ -221,18 +248,6 @@ defmodule Formentation.Phoenix.ComponentsTest do
       option_like_field =
         DOMIdentity.field("payload", InstancePath.new!(["condition--option_0"]), :control)
 
-      assert Enum.uniq([
-               notes_control,
-               notes_help,
-               notes_help_control,
-               notes_errors_control,
-               flat_path,
-               nested_path,
-               radio_option,
-               option_like_field
-             ])
-             |> length() == 8
-
       assert_no_duplicate_ids(doc)
 
       for id <- doc |> Floki.find("[id]") |> Enum.flat_map(&Floki.attribute(&1, "id")) do
@@ -247,6 +262,40 @@ defmodule Formentation.Phoenix.ComponentsTest do
       assert_labelled(doc, nested_path)
       assert_labelled(doc, radio_option)
       assert_labelled(doc, option_like_field)
+
+      assert_labelled(
+        doc,
+        DOMIdentity.field("payload", InstancePath.new!(["serial-number"]), :control)
+      )
+
+      assert_labelled(
+        doc,
+        DOMIdentity.field("payload", InstancePath.new!(["first name"]), :control)
+      )
+
+      assert_labelled(
+        doc,
+        DOMIdentity.field("payload", InstancePath.new!(["0starts_with_a_digit"]), :control)
+      )
+
+      assert_all_references_resolve(doc)
+    end
+
+    test "two occurrences of one definition can coexist under distinct namespaces" do
+      definition = nested_definition()
+      form = FormData.to_form(Form.new(definition), as: "payload")
+
+      doc =
+        (render_fields(definition, form) <>
+           render_component(&Formentation.Phoenix.fields/1,
+             definition: definition,
+             form: form,
+             dom_namespace: "comparison_payload"
+           ))
+        |> parse!()
+
+      assert_no_duplicate_ids(doc)
+      assert_all_references_resolve(doc)
     end
   end
 

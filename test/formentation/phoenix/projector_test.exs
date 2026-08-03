@@ -320,6 +320,41 @@ defmodule Formentation.Phoenix.ProjectorTest do
       assert street.field.value == "Elm"
     end
 
+    test "nested objects and presentation groups use their full occurrence identities" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"address",
+             %{
+               kind: :object,
+               properties: [{"street", %{kind: :string}}],
+               groups: [%{id: "details", title: "Details", fields: ["street"]}]
+             }}
+          ]
+        })
+
+      form = FormData.to_form(Form.new(definition), as: "payload")
+
+      %RenderNode.Group{children: [%RenderNode.Group{} = address]} =
+        Projector.project(definition, form).root
+
+      [%RenderNode.Group{} = presentation_group] = address.children
+
+      assert presentation_group.dom.container ==
+               DOMIdentity.group(
+                 "payload",
+                 "/address#details",
+                 InstancePath.new!(["address"]),
+                 :container
+               )
+
+      assert address.dom.container ==
+               DOMIdentity.object("payload", InstancePath.new!(["address"]), :container)
+
+      assert Projector.project_at(definition, form, ["address"]) == address
+    end
+
     test "a nested object inside a presentation group still descends semantically" do
       definition =
         compile!(%{

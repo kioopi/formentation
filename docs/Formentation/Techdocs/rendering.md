@@ -74,8 +74,10 @@ One struct per render node shape:
   `help`,
   `options`, `validations` (`Phoenix.HTML.Form.input_validations/2`,
   precomputed so the theme never calls back), `errors`, `show_errors?`,
-  `read_only?`. `dom` is a `FieldDOM{control, help, errors, options}` whose
-  option ids are positionally parallel to field options.
+  `read_only?`. `dom` is a `FieldDOM{control, container, help, errors,
+  options}`. `control` names scalar controls (and hidden inputs); `container`
+  names a composite widget's container, currently a radio group's fieldset.
+  Option ids are positionally parallel to field options.
 
 `show_errors?` is computed once, in the projector, so themes never
 inspect `_unused_` markers or `form.action` (D-014, D-027). The source's
@@ -132,7 +134,9 @@ means `form.action == :submit`, the same rule as before D-027
 It combines two sources:
 
 - **Field entries** — every rendered field with `show_errors?: true`
-  contributes one entry per error message, linkable to its prepared control id.
+  contributes one entry per error message. Scalar fields link to their prepared
+  control id; radio groups link to their prepared container id, the rendered
+  fieldset.
 - **Object entries** — root and object-level issues never appear in
   Phoenix's per-field `field.errors` convention. The projector asks the
   source's `StateView.issues/2` for the complete, normalized, adapter-ordered
