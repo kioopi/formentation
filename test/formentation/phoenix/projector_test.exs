@@ -5,11 +5,11 @@ defmodule Formentation.Phoenix.ProjectorTest do
 
   doctest Formentation.Phoenix.Projector
 
-  alias Formentation.{Form, InstancePath, NodeId, TemplatePath}
   alias Formentation.Definition.Finalizer
+  alias Formentation.{Form, InstancePath, NodeId, TemplatePath}
+  alias Formentation.Phoenix.{DOMIdentity, Projector, RenderNode, RenderPlan}
   alias Formentation.Presentation, as: NativePresentation
   alias Formentation.Semantic
-  alias Formentation.Phoenix.{DOMIdentity, Projector, RenderNode, RenderPlan}
   alias Phoenix.HTML.FormData
 
   defp compile!(declaration) do

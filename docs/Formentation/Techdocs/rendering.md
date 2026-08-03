@@ -13,7 +13,7 @@ status: current
 # Rendering
 
 *As of 2026-08-03 (native presentation traversal and semantic-index-backed
-projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]; DOM identity, [[18-decisions#D-034 — Phoenix renderer DOM identities are typed and injective|D-034]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
+projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]; DOM identity, [[18-decisions#D-034 — Phoenix renderer DOM identities are typed and injective|D-034]]; group help, [[18-decisions#D-036 — Group help uses prepared Phoenix identities|D-036]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
 
 ## Projector data flow (`Formentation.Phoenix.Projector`)
 
@@ -66,9 +66,11 @@ One struct per render node shape:
   `:widget_fallback`). Planning-note fields with no Phase 1 behavior
   (fingerprint, active branches, item identities) are omitted, not
   stubbed.
-- `Formentation.Phoenix.RenderNode.Group` — `legend`, `dom`, `children`.
+- `Formentation.Phoenix.RenderNode.Group` — `legend`, `help`, `dom`, `children`.
   `dom` is a `GroupDOM{container, help}` prepared even for the structural root.
   Semantic objects and presentation groups both project to this one render shape.
+  The root retains its help in the plan; `fields/1` renders only its children,
+  while `field path={[]}` renders the root group itself.
 - `Formentation.Phoenix.RenderNode.Field` — `widget`, `field` (the
   `%Phoenix.HTML.FormField{}`, carrying Phoenix id/name/value), `label`, `dom`,
   `help`,
@@ -269,8 +271,8 @@ The reference components consume these prepared values verbatim. They do not
 use `Phoenix.HTML.FormField.id` as a uniqueness contract or append `_help`,
 `_errors`, or radio indexes. Phoenix names remain transport-authoritative;
 renderer ids are the control/label/help/error/fieldset/summary relationship
-surface. Group help content is still absent, but every group already carries
-its prepared help id for the follow-up feature.
+surface. Groups render optional help with the already-prepared `GroupDOM.help`
+identity; components never derive help IDs themselves.
 
 ## Reference theme (`Formentation.Phoenix.Theme.Reference`)
 
@@ -291,13 +293,15 @@ components:
 
 1. Every control has a `<label for>` pointing at its id; placeholder text
    is never the only label.
-2. Help text renders with a deterministic id, linked via
-   `aria-describedby`.
+2. Field help renders with a deterministic id and is linked from the control;
+   group help uses its prepared deterministic id and is linked from the
+   fieldset via `aria-describedby`.
 3. Visible errors render with deterministic ids, linked via
    `aria-describedby` (composing with the help id); the control carries
    `aria-invalid`. Errors render only when `show_errors?`.
 4. Groups render as `<fieldset>` with a `<legend>` (data-nesting and
-   presentational groups, and radio groups).
+   presentational groups, and radio groups). Data-nesting and presentation
+   groups use prepared fieldset IDs and optionally render associated help.
 5. The error summary appears only after submit; each entry with a field
    links (`href="#id"`) to its control; root/object-level entries render
    without a link.

@@ -422,6 +422,7 @@ defmodule Formentation.Phoenix.ThemeTest do
     test "a group renders a fieldset with legend and its children" do
       group = %RenderNode.Group{
         legend: "Electrical",
+        help: "Measurements and safety checks.",
         dom: %RenderNode.GroupDOM{
           container: group_id("electrical", :container),
           help: group_id("electrical", :help)
@@ -433,12 +434,68 @@ defmodule Formentation.Phoenix.ThemeTest do
 
       fieldset = find_one(doc, "fieldset.ftn-group")
       assert Floki.text(find_one(fieldset, "legend")) == "Electrical"
+
+      assert Floki.text(find_one(fieldset, ".ftn-group-help")) |> String.trim() ==
+               "Measurements and safety checks."
+
+      assert describedby(doc, group.dom.container) == [group.dom.help]
       assert [_, _] = Floki.find(doc, "fieldset.ftn-group div.ftn-field")
+    end
+
+    test "a group without help omits the help element and describedby attribute" do
+      group = %RenderNode.Group{
+        legend: "Electrical",
+        dom: %RenderNode.GroupDOM{
+          container: group_id("electrical", :container),
+          help: group_id("electrical", :help)
+        }
+      }
+
+      doc = parse!(render_component(&Reference.node/1, node: group))
+
+      assert Floki.find(doc, ".ftn-group-help") == []
+      assert describedby(doc, group.dom.container) == []
+      assert [_] = Floki.find(doc, ~s(fieldset[id="#{group.dom.container}"]))
+    end
+
+    test "an empty binary group help remains associated" do
+      group = %RenderNode.Group{
+        legend: "Electrical",
+        help: "",
+        dom: %RenderNode.GroupDOM{
+          container: group_id("electrical", :container),
+          help: group_id("electrical", :help)
+        }
+      }
+
+      doc = parse!(render_component(&Reference.node/1, node: group))
+
+      assert [_] = Floki.find(doc, ~s(p[id="#{group.dom.help}"].ftn-group-help))
+      assert describedby(doc, group.dom.container) == [group.dom.help]
+    end
+
+    test "group help is escaped" do
+      help = "</p><script>alert('group')</script>"
+
+      group = %RenderNode.Group{
+        legend: "Electrical",
+        help: help,
+        dom: %RenderNode.GroupDOM{
+          container: group_id("electrical", :container),
+          help: group_id("electrical", :help)
+        }
+      }
+
+      doc = parse!(render_component(&Reference.node/1, node: group))
+
+      assert Floki.find(doc, "script") == []
+      assert Floki.text(find_one(doc, ".ftn-group-help")) |> String.trim() == help
     end
 
     test "nested groups recurse" do
       inner = %RenderNode.Group{
         legend: "Inner",
+        help: "Inner help.",
         dom: %RenderNode.GroupDOM{
           container: group_id("inner", :container),
           help: group_id("inner", :help)
@@ -448,6 +505,7 @@ defmodule Formentation.Phoenix.ThemeTest do
 
       outer = %RenderNode.Group{
         legend: "Outer",
+        help: "Outer help.",
         dom: %RenderNode.GroupDOM{
           container: group_id("outer", :container),
           help: group_id("outer", :help)
@@ -458,6 +516,9 @@ defmodule Formentation.Phoenix.ThemeTest do
       doc = parse!(render_component(&Reference.node/1, node: outer))
 
       assert [_outer, _inner] = Floki.find(doc, "fieldset.ftn-group")
+      assert_no_duplicate_ids(doc)
+      assert describedby(doc, outer.dom.container) == [outer.dom.help]
+      assert describedby(doc, inner.dom.container) == [inner.dom.help]
     end
   end
 

@@ -2,8 +2,8 @@ defmodule Formentation.Phoenix.RenderNode.GroupDOM do
   @moduledoc """
   Exact renderer-owned DOM identities prepared for one group occurrence.
 
-  Group help content is not rendered yet, but its identity is prepared so a
-  future component cannot invent a parallel naming convention.
+  Reference components render group help with the prepared help identity, so
+  themes do not invent a parallel naming convention.
   """
 
   @enforce_keys [:container, :help]

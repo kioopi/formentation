@@ -138,8 +138,12 @@ Given a required email field with a minimum length:
 Presentation groups and nested objects both render as fieldsets:
 
 ```html
-<fieldset id="ftn--payload--object--container--address" class="ftn-group">
+<fieldset id="ftn--payload--object--container--address" class="ftn-group"
+          aria-describedby="ftn--payload--object--help--address">
   <legend>Address</legend>
+  <p id="ftn--payload--object--help--address" class="ftn-group-help">
+    Where the asset is installed.
+  </p>
   <div class="ftn-field">
     <label for="ftn--payload--field--control--address--city">City</label>
     <input type="text" id="ftn--payload--field--control--address--city" name="payload[address][city]" value="">
@@ -151,7 +155,7 @@ The difference is invisible in the markup and decisive in the data: a
 nested object's input is `payload[address][city]`; a presentation group's
 member stays `payload[voltage]`.
 
-The class names — `ftn-form`, `ftn-field`, `ftn-group`, `ftn-help`,
+The class names — `ftn-form`, `ftn-field`, `ftn-group`, `ftn-help`, `ftn-group-help`,
 `ftn-errors`, `ftn-error-summary`, `ftn-radio-group`, `ftn-radio` — are
 the styling hooks. There is no CSS in the package; style them yourself.
 
@@ -245,12 +249,14 @@ against the rendered DOM, not merely intended:
 
 1. Every control has a non-empty `<label for>` pointing at its id.
    Placeholder text is never the only label.
-2. Help text has a deterministic id and is linked via
+2. Field help has a deterministic id and is linked from its control; group
+   help has a prepared deterministic id and is linked from its fieldset via
    `aria-describedby`.
 3. Visible errors have deterministic ids, are linked via
    `aria-describedby`, and the control carries `aria-invalid`.
 4. Groups — nested objects, presentation groups, and radio groups —
-   render as `<fieldset>` with a `<legend>`.
+   render as `<fieldset>` with a `<legend>`. Nested-object and presentation
+   groups can render associated help.
 5. The error summary appears only after submit; each entry links to its
    control. Object-level errors that belong to no single field render
    without a link.
