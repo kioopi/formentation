@@ -15,7 +15,7 @@ defmodule Formentation.Phoenix.Theme.Reference do
 
   @doc """
   Dispatches one render node: a `RenderNode.Group` becomes a
-  `fieldset.ftn-group` with a legend and recursive children, a
+  `fieldset.ftn-group` with a legend, optional associated help, and recursive children, a
   `RenderNode.Field` delegates to `field/1`.
 
   ```heex
@@ -25,9 +25,17 @@ defmodule Formentation.Phoenix.Theme.Reference do
   attr(:node, :any, required: true, doc: "a RenderNode.Field or RenderNode.Group")
 
   def node(%{node: %RenderNode.Group{}} = assigns) do
+    # Keep these elements contiguous: HEEx removes :if elements but retains
+    # surrounding whitespace, and the no-help snapshot is byte-exact.
     ~H"""
-    <fieldset id={@node.dom.container} class="ftn-group">
-      <legend>{@node.legend}</legend>
+    <fieldset
+      id={@node.dom.container}
+      class="ftn-group"
+      aria-describedby={@node.help && @node.dom.help}
+    >
+      <legend>{@node.legend}</legend><p :if={@node.help} id={@node.dom.help} class="ftn-group-help">
+        {@node.help}
+      </p>
       <.node :for={child <- @node.children} node={child} />
     </fieldset>
     """

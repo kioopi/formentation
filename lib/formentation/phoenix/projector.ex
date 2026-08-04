@@ -35,9 +35,10 @@ defmodule Formentation.Phoenix.Projector do
   action/`used_input?` rule (D-014) only when the source has no opinion.
   `plan.summary` is non-empty only once the source's `StateView` reports
   semantic submission. It also prepares exact renderer-owned DOM identities:
-  `FieldDOM` carries control/container/help/errors/option ids and `GroupDOM` carries
-  container/help ids. Namespace resolution is explicit `:dom_namespace`, then
-  `form.id || form.name`; projection raises if neither is available.
+  `FieldDOM` carries control/container/help/errors/option ids and `GroupDOM`
+  carries container/help ids. Groups preserve their help text. Namespace
+  resolution is explicit `:dom_namespace`, then `form.id || form.name`;
+  projection raises if neither is available.
 
   ## Example
 
@@ -175,7 +176,12 @@ defmodule Formentation.Phoenix.Projector do
       help: DOMIdentity.object(ctx.dom_namespace, path, :help)
     }
 
-    {%RenderNode.Group{legend: object_legend(object), dom: dom, children: children}, diagnostics}
+    {%RenderNode.Group{
+       legend: object_legend(object),
+       help: object.help,
+       dom: dom,
+       children: children
+     }, diagnostics}
   end
 
   defp project_descriptor(%Presentation.Group{} = group, form, ctx) do
@@ -187,7 +193,12 @@ defmodule Formentation.Phoenix.Projector do
       help: DOMIdentity.group(ctx.dom_namespace, group.id, enclosing, :help)
     }
 
-    {%RenderNode.Group{legend: group_legend(group), dom: dom, children: children}, diagnostics}
+    {%RenderNode.Group{
+       legend: group_legend(group),
+       help: group.help,
+       dom: dom,
+       children: children
+     }, diagnostics}
   end
 
   defp project_descriptor(%Presentation.Field{} = field, form, ctx) do

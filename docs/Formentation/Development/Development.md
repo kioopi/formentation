@@ -95,6 +95,9 @@ Also as of 2026-07-26, the presentation traversal migration ([GitHub issue #17](
 
 Also as of 2026-08-03, collision-proof DOM identity adoption ([GitHub issue #30](https://github.com/kioopi/formentation/issues/30), [[18-decisions#D-035 — Phoenix rendering prepares and consumes DOM identities|D-035]]) is documented: [[rendering|Rendering]], [[end-to-end-data-flow|End-to-end data flow]], [[browser-testing|Browser testing]], and the rendering user guides now distinguish Phoenix transport names from renderer-owned ids, explain namespace resolution, and match the reviewed HTML fixture and browser selectors.
 
+Also as of 2026-08-03, group help is preserved through Phoenix preparation and
+rendered with prepared group identities ([GitHub issue #7](https://github.com/kioopi/formentation/issues/7)). Nested-object and native presentation-group help render as escaped, fieldset-associated text; whole-form `fields/1` deliberately keeps root help structural, while `field path={[]}` renders the root subtree. See [[18-decisions#D-036 — Group help uses prepared Phoenix identities|D-036]] and [[rendering|Rendering]].
+
 As of 2026-07-26, the project direction is additionally frozen in
 [[19-north-star-architecture|North-star architecture]],
 [[phase-1-north-star-alignment|the alignment plan]], and

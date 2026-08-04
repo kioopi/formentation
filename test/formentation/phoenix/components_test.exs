@@ -173,6 +173,41 @@ defmodule Formentation.Phoenix.ComponentsTest do
       assert_no_duplicate_ids(doc)
     end
 
+    test "renders nested group help while omitting root help" do
+      definition =
+        compile!(%{
+          kind: :object,
+          help: "Root help.",
+          properties: [
+            {"notes", %{kind: :string, help: "Field help."}},
+            {"address",
+             %{
+               kind: :object,
+               help: "Group help.",
+               properties: [{"street", %{kind: :string}}]
+             }}
+          ]
+        })
+
+      form = FormData.to_form(Form.new(definition), as: "payload")
+      html = render_fields(definition, form)
+      doc = parse!(html)
+      notes_control_id = field_id("payload", ["notes"], :control)
+      notes_help_id = field_id("payload", ["notes"], :help)
+      address_id = DOMIdentity.object("payload", InstancePath.new!(["address"]), :container)
+      address_help_id = DOMIdentity.object("payload", InstancePath.new!(["address"]), :help)
+
+      assert Floki.text(find_one(doc, ~s(p[id="#{notes_help_id}"].ftn-help))) |> String.trim() ==
+               "Field help."
+
+      assert describedby(doc, notes_control_id) == [notes_help_id]
+      assert Floki.text(find_one(doc, ".ftn-group-help")) |> String.trim() == "Group help."
+      assert describedby(doc, address_id) == [address_help_id]
+      refute html =~ "Root help."
+      assert_no_duplicate_ids(doc)
+      assert_all_references_resolve(doc)
+    end
+
     test "after submit the error summary links to the broken control" do
       # Map-source forms have no schema validator; the error is a decode
       # failure on the integer field.
@@ -378,6 +413,25 @@ defmodule Formentation.Phoenix.ComponentsTest do
   end
 
   describe "field/1" do
+    test "renders root help when explicitly projecting the root subtree" do
+      definition = compile!(%{kind: :object, help: "Root help.", properties: []})
+      form = FormData.to_form(Form.new(definition), as: "payload")
+
+      doc =
+        render_component(&Formentation.Phoenix.field/1,
+          definition: definition,
+          form: form,
+          path: []
+        )
+        |> parse!()
+
+      root_id = DOMIdentity.object("payload", InstancePath.new!([]), :container)
+      root_help_id = DOMIdentity.object("payload", InstancePath.new!([]), :help)
+
+      assert Floki.text(find_one(doc, ".ftn-group-help")) |> String.trim() == "Root help."
+      assert describedby(doc, root_id) == [root_help_id]
+    end
+
     test "renders a single field subtree at an instance path" do
       definition = nested_definition()
       form = FormData.to_form(Form.new(definition), as: "payload", id: "payload")
@@ -428,6 +482,28 @@ defmodule Formentation.Phoenix.ComponentsTest do
 
       form = FormData.to_form(Form.new(definition), as: "payload")
       html = render_fields(definition, form)
+
+      refute html =~ "<script>"
+      assert parse!(html) |> Floki.find("script") == []
+    end
+
+    test "hostile nested object help never becomes group markup" do
+      hostile = "</p><script>alert('group')</script>"
+
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"address",
+             %{kind: :object, help: hostile, properties: [{"street", %{kind: :string}}]}}
+          ]
+        })
+
+      html =
+        definition
+        |> Form.new()
+        |> FormData.to_form(as: "payload")
+        |> then(&render_fields(definition, &1))
 
       refute html =~ "<script>"
       assert parse!(html) |> Floki.find("script") == []

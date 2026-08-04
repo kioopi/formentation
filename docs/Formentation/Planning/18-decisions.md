@@ -697,6 +697,30 @@ transport names remain unchanged.
 as `asset[payload][...]` (use-case req. 5), while renderer-owned DOM ids are
 collision-proof and occurrence-scoped. This completes [issue #30](https://github.com/kioopi/formentation/issues/30).
 
+## D-036 — Group help uses prepared Phoenix identities
+
+*2026-08-03*
+
+**Context.** Presentation objects and presentation groups already owned help,
+but Phoenix preparation dropped it. D-034 and D-035 had already made exact
+container and help identities available on `GroupDOM`; a group-specific suffix
+or naming formula would duplicate and weaken that contract.
+
+**Decision.** `RenderNode.Group` carries help text from both presentation
+object and presentation-group descriptors. The reference theme renders it as
+escaped `.ftn-group-help` text immediately after the legend and associates the
+fieldset with the exact prepared `GroupDOM.help` id. `fields/1` preserves root
+help in the plan but intentionally renders only root children; explicit
+`field path={[]}` renders the root group and its help. Built-in source
+vocabularies do not gain presentation-group help keys, and group-level error
+summary links remain separate work. As with field help, an empty binary help
+value remains a rendered, associated help element.
+
+**Consequences.** The compiler-to-renderer information-preservation invariant
+now includes group help without changing the stored definition format, field
+names, or DOM identity grammar. A future root/page-help API and group-summary
+linking work can build on the preserved content and prepared container ids.
+
 ## Related notes
 
 - [[19-north-star-architecture|North-star architecture]]

@@ -11,8 +11,9 @@ status: current
 
 # Rendering with Phoenix
 
-*Covers Formentation as of 2026-08-03. Every HTML fragment below was
-produced by the version described.*
+*Covers Formentation as of 2026-08-03. Every HTML fragment below represents
+output from the version described; whitespace may be lightly reformatted for
+readability.*
 
 Formentation ships two function components and one built-in theme.
 Rendering is a pure function of the definition and the form state — the
@@ -138,8 +139,12 @@ Given a required email field with a minimum length:
 Presentation groups and nested objects both render as fieldsets:
 
 ```html
-<fieldset id="ftn--payload--object--container--address" class="ftn-group">
+<fieldset id="ftn--payload--object--container--address" class="ftn-group"
+          aria-describedby="ftn--payload--object--help--address">
   <legend>Address</legend>
+  <p id="ftn--payload--object--help--address" class="ftn-group-help">
+    Where the asset is installed.
+  </p>
   <div class="ftn-field">
     <label for="ftn--payload--field--control--address--city">City</label>
     <input type="text" id="ftn--payload--field--control--address--city" name="payload[address][city]" value="">
@@ -151,7 +156,14 @@ The difference is invisible in the markup and decisive in the data: a
 nested object's input is `payload[address][city]`; a presentation group's
 member stays `payload[voltage]`.
 
-The class names — `ftn-form`, `ftn-field`, `ftn-group`, `ftn-help`,
+The example is a nested object: Map `:help` and JSON Schema `"description"`
+can supply its help through the built-in adapters. A native or prepared
+presentation group that already carries help renders the same associated
+markup, but the built-in Map `groups:` and JSON UI-group vocabularies do not
+currently accept a public group-help key. Exposing that declaration capability
+is separate future work.
+
+The class names — `ftn-form`, `ftn-field`, `ftn-group`, `ftn-help`, `ftn-group-help`,
 `ftn-errors`, `ftn-error-summary`, `ftn-radio-group`, `ftn-radio` — are
 the styling hooks. There is no CSS in the package; style them yourself.
 
@@ -245,12 +257,14 @@ against the rendered DOM, not merely intended:
 
 1. Every control has a non-empty `<label for>` pointing at its id.
    Placeholder text is never the only label.
-2. Help text has a deterministic id and is linked via
+2. Field help has a deterministic id and is linked from its control; group
+   help has a prepared deterministic id and is linked from its fieldset via
    `aria-describedby`.
 3. Visible errors have deterministic ids, are linked via
    `aria-describedby`, and the control carries `aria-invalid`.
 4. Groups — nested objects, presentation groups, and radio groups —
-   render as `<fieldset>` with a `<legend>`.
+   render as `<fieldset>` with a `<legend>`. Nested-object and presentation
+   groups can render associated help.
 5. The error summary appears only after submit; each entry links to its
    control. Object-level errors that belong to no single field render
    without a link.
