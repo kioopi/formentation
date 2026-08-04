@@ -183,6 +183,9 @@
       ignore: [
         "Formentation.Fixture",
         "Formentation.Fixtures.*",
+        # Ephemeral-port probe for the browser lane's endpoint; test
+        # harness support, not library code.
+        "Formentation.FreePort",
         "Formentation.HTMLAssertions",
         "Formentation.SourceFixture",
         "Formentation.Test.FormHelpers",
