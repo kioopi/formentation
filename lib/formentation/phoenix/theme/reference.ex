@@ -239,9 +239,10 @@ defmodule Formentation.Phoenix.Theme.Reference do
 
   defp validation_attrs(node, except \\ [])
 
-  # Numeric semantic fields use a text fallback for :number_input, while
-  # textareas and selects do not accept min/max/step at all. Radio groups use
-  # their separate required-only policy below.
+  # Keyed to semantic type so an explicit widget cannot reintroduce these
+  # attributes: :number_input and :text_input render text controls, while
+  # textareas and selects do not accept min/max/step. Radio groups use their
+  # separate required-only policy below.
   defp validation_attrs(%RenderNode.Field{value_type: value_type} = node, except)
        when value_type in [:integer, :number] do
     node.validations |> Keyword.drop([:min, :max, :step | except]) |> Map.new()
@@ -261,5 +262,8 @@ defmodule Formentation.Phoenix.Theme.Reference do
   defp current_option(nil), do: nil
   defp current_option(value), do: option_value(value)
 
+  # Options retain their source scalar values, while Phoenix form values are
+  # strings. Both sides must use this representation; canonicalizing only one
+  # silently unselects non-string options after a round trip.
   defp option_value(value), do: to_string(value)
 end

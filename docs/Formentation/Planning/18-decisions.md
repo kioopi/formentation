@@ -764,8 +764,11 @@ keyboard hint. Resolves [GitHub issue #8](https://github.com/kioopi/formentation
 that widget with `value_type: :integer`, and `inputmode="decimal"` only for
 that widget with `value_type: :number`. Both remain `type="text"`; the codec
 is the sole authority for accepted grammar. Numeric semantic value types also
-drop `min`/`max`/`step` from number-input text fallbacks and from textareas or
-selects, where those attributes are unsupported.
+drop `min`/`max`/`step` from `:number_input` and explicit `:text_input` text
+controls, and from textareas or selects, where those attributes are
+unsupported. Prepared options retain declared scalar values; themes canonicalize
+both option and current control values to strings when emitting and comparing
+`selected`/`checked` state.
 
 **Consequences.** Custom themes can distinguish integer from number without
 consulting a definition or source adapter, while widget intent still wins: a
@@ -774,6 +777,8 @@ input mode. This does not preserve `role` or `required?` at the prepared-node
 boundary; [GitHub issue #37](https://github.com/kioopi/formentation/issues/37)
 owns preserving those semantic facts and deciding the schema-requiredness
 contract. No definition format change is required.
+Unsupported non-scalar option declarations are a source-validation concern
+owned by [GitHub issue #38](https://github.com/kioopi/formentation/issues/38).
 
 ## Related notes
 
