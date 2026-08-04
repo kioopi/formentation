@@ -118,6 +118,41 @@ defmodule Formentation.Phoenix.ComponentsTest do
       assert Floki.attribute(checked, "value") == ["2"]
     end
 
+    test "retains numeric option selections after a failed sibling decode" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"count", %{kind: :integer, one_of: [1, 2]}},
+            {"rating", %{kind: :integer, one_of: [1, 2], widget: :radio}},
+            {"fault", %{kind: :integer}}
+          ]
+        })
+
+      form_state =
+        Form.transition(Form.new(definition), %Params{
+          values: %{"count" => "2", "rating" => "2", "fault" => "broken"},
+          event: :change
+        })
+
+      doc = parse!(render_fields(definition, FormData.to_form(form_state, as: "payload")))
+
+      [selected] =
+        Floki.find(
+          doc,
+          ~s(select[id="#{field_id("payload", ["count"], :control)}"] option[selected])
+        )
+
+      [checked] =
+        Floki.find(
+          doc,
+          ~s(fieldset[id="#{field_id("payload", ["rating"], :container)}"] input[checked])
+        )
+
+      assert Floki.attribute(selected, "value") == ["2"]
+      assert Floki.attribute(checked, "value") == ["2"]
+    end
+
     test "renders integer and number fields with their distinct keyboard hints" do
       definition =
         compile!(%{
