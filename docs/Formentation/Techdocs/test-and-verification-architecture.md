@@ -12,7 +12,7 @@ status: current
 
 # Test and verification architecture
 
-> [!note] As of 2026-08-03 · step 7 + browser-testing suite + vault link and docs gates
+> [!note] As of 2026-08-04 · step 7 + browser-testing suite + vault link and docs gates + the test.dev inner loop
 > Describes the verification setup as built: the kinds of test in the
 > suite, what each one pins, and the static gates in `mix ci` — including
 > the demo's `Phoenix.LiveViewTest` suite and, now, the opt-in browser-real
@@ -303,6 +303,7 @@ pinned against accidental renaming by any registry.
 | CI pipeline | `mix.exs` — the `ci` alias |
 | LiveView demo suite | `test/formentation_demo/`, `demo/formentation_demo/` |
 | Browser-real suite | `test/browser/`, `mix test.browser` alias in `mix.exs` |
+| Inner-loop command | `test/support/mix/tasks/test_dev.ex`, `preferred_envs` entry in `mix.exs` |
 
 ## Related notes
 

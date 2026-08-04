@@ -780,6 +780,51 @@ contract. No definition format change is required.
 Unsupported non-scalar option declarations are a source-validation concern
 owned by [GitHub issue #38](https://github.com/kioopi/formentation/issues/38).
 
+## D-039 — `mix test.dev` is the development inner loop
+
+*2026-08-04*
+
+**Context.** Development commands were ad-hoc strings — `mix format <file> &&
+PORT=4447 mix test <file>` and variants. Every variant is a distinct command to
+approve, and the `PORT` prefix was cargo cult: nothing in the project reads
+`PORT`, and non-browser tests start the demo endpoint with `server: false`, so
+the suite binds no socket at all.
+
+**Decision.** One command, `mix test.dev`, formats the project and then runs
+`mix test`, adding `--stale` only when the caller named no test target. Naming a
+target suppresses `--stale`, because combining them selects the intersection —
+empty whenever the named file is not itself stale, which exits 0 having run
+nothing. The task lives in `test/support/`, so it never ships in the package,
+and `cli/0` runs it in `MIX_ENV=test`.
+
+**Consequences.** The workflow rule in `CLAUDE.md` names one command instead of
+a pattern to improvise on. Filename-based test selection was rejected: a naive
+`lib/x.ex` → `test/x_test.exs` map misses 29 of 49 lib modules, so it would
+report green having run nothing, and the whole suite takes 4.6 seconds anyway.
+That `--stale` selects nearly the whole suite for a change to a central module
+is a coupling signal worth investigating separately.
+
+## D-040 — Browser tests bind an ephemeral port
+
+*2026-08-04*
+
+**Context.** The browser lane hardcoded `127.0.0.1:4002`, the only socket the
+suite ever binds. Two concurrent browser runs collided, and the fix people
+reached for was an environment-variable prefix on the command.
+
+**Decision.** `Formentation.FreePort.pick/0` binds port 0, reads back the port
+the kernel assigned, and releases it; `test/test_helper.exs` configures the
+endpoint with that port before boot. Pre-boot rather than `http: [port: 0]` plus
+`Bandit.PhoenixAdapter.server_info/2`, because `Phoenix.Endpoint` caches `url/0`
+from the `:url` config at init and would otherwise report port 0 unless also
+driven through `config_change/2`.
+
+**Consequences.** Concurrent browser runs no longer collide and no command needs
+a `PORT` prefix. `base_url` and `test/browser/demo_http_smoke_test.exs` need no
+change, both reading the endpoint's own `url/0`. A small window remains between
+releasing the probe socket and the endpoint binding; losing that race fails
+loudly at boot rather than silently.
+
 ## Related notes
 
 - [[19-north-star-architecture|North-star architecture]]

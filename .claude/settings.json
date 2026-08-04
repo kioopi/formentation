@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(mix test.dev:*)",
+      "Bash(mix test:*)",
+      "Bash(mix test.browser:*)",
+      "Bash(mix ci:*)",
+      "Bash(mix format:*)",
+      "Bash(mix compile:*)",
+      "Bash(mix docs:*)",
+      "Bash(mix credo:*)",
+      "Bash(mix dialyzer:*)",
+      "Bash(mix vault.links:*)",
+      "Bash(mix usage_rules.docs:*)",
+      "Bash(mix usage_rules.search_docs:*)",
+      "Bash(jj st:*)",
+      "Bash(jj log:*)",
+      "Bash(jj diff:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git status:*)"
+    ]
+  }
+}
