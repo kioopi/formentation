@@ -61,6 +61,33 @@ defmodule Formentation.Phoenix.ComponentsTest do
   end
 
   describe "fields/1" do
+    test "numeric fields hinted to non-numeric widgets omit numeric constraint attributes" do
+      fields = [
+        {"count", %{kind: :integer, min: 0, max: 100, widget: :text}, "input"},
+        {"hours", %{kind: :integer, min: 0, max: 100, widget: :textarea}, "textarea"},
+        {"rating", %{kind: :integer, min: 0, max: 100, one_of: [1, 2]}, "select"}
+      ]
+
+      definition =
+        compile!(%{
+          kind: :object,
+          required: Enum.map(fields, &elem(&1, 0)),
+          properties: Enum.map(fields, fn {name, field, _selector} -> {name, field} end)
+        })
+
+      doc =
+        parse!(render_fields(definition, FormData.to_form(Form.new(definition), as: "payload")))
+
+      for {name, _field, selector} <- fields do
+        control = find_one(doc, ~s(#{selector}[id="#{field_id("payload", [name], :control)}"]))
+
+        assert Floki.attribute(control, "required") == ["required"]
+        assert Floki.attribute(control, "min") == []
+        assert Floki.attribute(control, "max") == []
+        assert Floki.attribute(control, "step") == []
+      end
+    end
+
     test "renders numeric select and radio options as selected after projection" do
       definition =
         compile!(%{
