@@ -38,6 +38,7 @@ defmodule Formentation.MixProject do
         "six.detail": :test,
         "six.html": :test,
         "test.browser": :test,
+        "test.dev": :test,
         # The task compiles on elixirc_paths(:test) so it stays out of the
         # published package.
         "vault.links": :test

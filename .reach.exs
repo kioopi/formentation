@@ -188,7 +188,9 @@
         "Formentation.Test.FormHelpers",
         # Documentation lint run by `mix ci`; build tooling, not library
         # code, so it participates in no layer.
-        "Mix.Tasks.Vault.Links"
+        "Mix.Tasks.Vault.Links",
+        # Development inner-loop command; build tooling, same reasoning.
+        "Mix.Tasks.Test.Dev"
       ]
     ]
   ],
