@@ -184,6 +184,31 @@ defmodule Formentation.Phoenix.ProjectorTest do
   end
 
   describe "widget resolution" do
+    test "retains normalized value type independently from the resolved widget" do
+      assert [%RenderNode.Field{widget: :text_input, value_type: :string}] =
+               single_field_plan(%{kind: :string}).root.children
+
+      assert [%RenderNode.Field{widget: :checkbox, value_type: :boolean}] =
+               single_field_plan(%{kind: :boolean}).root.children
+
+      assert [%RenderNode.Field{widget: :number_input, value_type: :integer}] =
+               single_field_plan(%{kind: :integer}).root.children
+
+      assert [%RenderNode.Field{widget: :number_input, value_type: :number}] =
+               single_field_plan(%{kind: :number}).root.children
+    end
+
+    test "retains numeric value type when widget resolution chooses another control" do
+      assert [%RenderNode.Field{widget: :text_input, value_type: :number}] =
+               single_field_plan(%{kind: :number, widget: :text}).root.children
+
+      assert [%RenderNode.Field{widget: :select, value_type: :integer}] =
+               single_field_plan(%{kind: :integer, one_of: [1, 2]}).root.children
+
+      assert [%RenderNode.Field{widget: :hidden_input, value_type: :number}] =
+               single_field_plan(%{kind: :number, hidden: true}).root.children
+    end
+
     test "infers from options, value type, and role" do
       assert {:text_input, []} = single_widget(%{kind: :string})
       assert {:select, []} = single_widget(%{kind: :string, one_of: ["a", "b"]})

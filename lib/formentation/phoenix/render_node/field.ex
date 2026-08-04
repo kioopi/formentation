@@ -10,12 +10,13 @@ defmodule Formentation.Phoenix.RenderNode.Field do
 
   alias Formentation.Phoenix.RenderNode
 
-  @enforce_keys [:widget, :field, :label, :dom]
+  @enforce_keys [:widget, :field, :label, :dom, :value_type]
   defstruct [
     :widget,
     :field,
     :label,
     :dom,
+    :value_type,
     :help,
     :options,
     validations: [],
@@ -29,6 +30,7 @@ defmodule Formentation.Phoenix.RenderNode.Field do
           field: Phoenix.HTML.FormField.t(),
           label: String.t(),
           dom: RenderNode.FieldDOM.t(),
+          value_type: Formentation.Semantic.Field.value_type(),
           help: String.t() | nil,
           options: [String.t()] | nil,
           validations: keyword(),

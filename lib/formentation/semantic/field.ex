@@ -44,11 +44,13 @@ defmodule Formentation.Semantic.Field do
     }
   end
 
+  @type value_type :: :string | :integer | :number | :boolean
+
   @type t :: %__MODULE__{
           id: String.t(),
           name: String.t(),
           role: atom() | nil,
-          value_type: :string | :integer | :number | :boolean,
+          value_type: value_type(),
           template_path: TemplatePath.t(),
           options: [String.t()] | nil,
           default: term() | nil,
