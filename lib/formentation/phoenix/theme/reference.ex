@@ -194,14 +194,14 @@ defmodule Formentation.Phoenix.Theme.Reference do
     ~H"""
     <input
       type={input_type(@node.widget)}
-      inputmode={inputmode(@node.widget)}
+      inputmode={inputmode(@node)}
       id={@node.dom.control}
       name={@node.field.name}
       value={@node.field.value}
       readonly={@node.read_only?}
       aria-describedby={@describedby}
       aria-invalid={@node.show_errors? && "true"}
-      {text_validation_attrs(@node)}
+      {validation_attrs(@node)}
     />
     """
   end
@@ -216,8 +216,9 @@ defmodule Formentation.Phoenix.Theme.Reference do
   defp input_type(:email_input), do: "email"
   defp input_type(:url_input), do: "url"
 
-  defp inputmode(:number_input), do: "numeric"
-  defp inputmode(_widget), do: nil
+  defp inputmode(%RenderNode.Field{widget: :number_input, value_type: :integer}), do: "numeric"
+  defp inputmode(%RenderNode.Field{widget: :number_input, value_type: :number}), do: "decimal"
+  defp inputmode(%RenderNode.Field{}), do: nil
 
   defp describedby(node) do
     ids =
@@ -232,18 +233,16 @@ defmodule Formentation.Phoenix.Theme.Reference do
     if ids == [], do: nil, else: Enum.join(ids, " ")
   end
 
-  defp validation_attrs(node, except \\ []) do
+  defp validation_attrs(node, except \\ [])
+
+  defp validation_attrs(%RenderNode.Field{value_type: value_type} = node, except)
+       when value_type in [:integer, :number] do
+    node.validations |> Keyword.drop([:min, :max, :step | except]) |> Map.new()
+  end
+
+  defp validation_attrs(node, except) do
     node.validations |> Keyword.drop(except) |> Map.new()
   end
-
-  # min/max/step are number-input attributes; on the type="text" fallback
-  # (see input_type/1) they are non-conforming and ignored, so the number
-  # widget passes through only its conforming validations.
-  defp text_validation_attrs(%RenderNode.Field{widget: :number_input} = node) do
-    node.validations |> Keyword.drop([:min, :max, :step]) |> Map.new()
-  end
-
-  defp text_validation_attrs(node), do: validation_attrs(node)
 
   # Radios take only :required from the validation set: constraint attrs
   # like minlength are not conforming on radio inputs, and required-on-radio

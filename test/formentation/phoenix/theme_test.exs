@@ -25,6 +25,7 @@ defmodule Formentation.Phoenix.ThemeTest do
       widget: :text_input,
       field: form_field(),
       label: "Notes",
+      value_type: :string,
       dom: %RenderNode.FieldDOM{
         control: field_id(["notes"], :control),
         container: field_id(["notes"], :container),
@@ -50,6 +51,7 @@ defmodule Formentation.Phoenix.ThemeTest do
   defp checkbox_node(overrides \\ []) do
     defaults = [
       widget: :checkbox,
+      value_type: :boolean,
       field: form_field(id: "insulation_ok", name: "insulation_ok", field: :insulation_ok),
       label: "Insulation test passed",
       dom: %RenderNode.FieldDOM{
@@ -185,34 +187,48 @@ defmodule Formentation.Phoenix.ThemeTest do
       end
     end
 
-    test "number widgets render as text with a numeric inputmode, not type=number" do
-      doc = render_field(widget: :number_input)
-      input = find_one(doc, "input")
-      assert Floki.attribute(input, "type") == ["text"]
-      assert Floki.attribute(input, "inputmode") == ["numeric"]
+    test "number widgets select input mode from both widget and value type" do
+      for {value_type, inputmode} <- [integer: "numeric", number: "decimal"] do
+        doc = render_field(widget: :number_input, value_type: value_type)
+        input = find_one(doc, "input")
+        assert Floki.attribute(input, "type") == ["text"]
+        assert Floki.attribute(input, "inputmode") == [inputmode]
+      end
     end
 
     test "a failed decode's raw text stays in a number input" do
-      doc = render_field(widget: :number_input, field: form_field(value: "51o2"))
-      assert Floki.attribute(find_one(doc, "input"), "value") == ["51o2"]
+      for {value_type, raw_value} <- [integer: "51o2", number: "-1.5e"] do
+        doc =
+          render_field(
+            widget: :number_input,
+            value_type: value_type,
+            field: form_field(value: raw_value)
+          )
+
+        assert Floki.attribute(find_one(doc, "input"), "value") == [raw_value]
+      end
     end
 
-    test "number widgets drop min/max/step but keep required" do
-      doc =
-        render_field(
-          widget: :number_input,
-          validations: [required: true, min: 0, max: 100, step: 1]
-        )
+    test "numeric fields drop min/max/step but keep required across controls" do
+      for widget <- [:number_input, :text_input, :textarea, :select] do
+        doc =
+          render_field(
+            widget: widget,
+            value_type: :integer,
+            options: ["1"],
+            validations: [required: true, min: 0, max: 100, step: 1]
+          )
 
-      input = find_one(doc, "input")
-      assert Floki.attribute(input, "required") == ["required"]
-      assert Floki.attribute(input, "min") == []
-      assert Floki.attribute(input, "max") == []
-      assert Floki.attribute(input, "step") == []
+        control = find_one(doc, "input, textarea, select")
+        assert Floki.attribute(control, "required") == ["required"]
+        assert Floki.attribute(control, "min") == []
+        assert Floki.attribute(control, "max") == []
+        assert Floki.attribute(control, "step") == []
+      end
     end
 
-    test "a plain text widget renders without an inputmode attribute" do
-      doc = render_field(widget: :text_input)
+    test "a numeric text widget renders without an inputmode attribute" do
+      doc = render_field(widget: :text_input, value_type: :number)
       assert Floki.attribute(find_one(doc, "input"), "inputmode") == []
     end
 
