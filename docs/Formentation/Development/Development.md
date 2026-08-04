@@ -98,6 +98,8 @@ Also as of 2026-08-03, collision-proof DOM identity adoption ([GitHub issue #30]
 Also as of 2026-08-03, group help is preserved through Phoenix preparation and
 rendered with prepared group identities ([GitHub issue #7](https://github.com/kioopi/formentation/issues/7)). Nested-object and native presentation-group help render as escaped, fieldset-associated text; whole-form `fields/1` deliberately keeps root help structural, while `field path={[]}` renders the root subtree. See [[18-decisions#D-036 — Group help uses prepared Phoenix identities|D-036]] and [[rendering|Rendering]].
 
+Also as of 2026-08-04, numeric rendering preserves normalized semantic value type in each prepared Phoenix field ([GitHub issue #8](https://github.com/kioopi/formentation/issues/8)). Integer and general-number fields remain in the shared `:number_input` interaction family, but the reference theme now renders `numeric` and `decimal` input modes respectively while retaining the raw-value-safe `type="text"` fallback. The cross-widget `min`/`max`/`step` leak for numeric fields is fixed, and [[rendering|Techdocs/Rendering]], [[rendering-with-phoenix|the Phoenix rendering guide]], and [[18-decisions#D-038 — Semantic value type and abstract widget are orthogonal prepared facts|D-038]] record the resulting contract.
+
 As of 2026-07-26, the project direction is additionally frozen in
 [[19-north-star-architecture|North-star architecture]],
 [[phase-1-north-star-alignment|the alignment plan]], and

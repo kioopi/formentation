@@ -118,6 +118,14 @@ The widget set is `text_input`, `textarea`, `number_input`, `checkbox`,
 `select`, `radio_group`, `date_input`, `email_input`, `url_input`, and
 `hidden_input`.
 
+A prepared field carries both its resolved `widget` and normalized semantic
+`value_type`; the two are independent. `:integer` and `:number` both resolve
+to `:number_input`, so the widget alone does not distinguish them, while an
+explicit widget hint changes presentation without changing semantic type. A
+custom theme can therefore distinguish them from the prepared field alone,
+without consulting `Definition` or source-adapter metadata
+([[18-decisions#D-038 — Semantic value type and abstract widget are orthogonal prepared facts|D-038]]).
+
 A widget that cannot render the field it names — one outside that set, or
 `checkbox` on a non-boolean — **falls back** to the inferred widget and
 records a `:widget_fallback` diagnostic on the render plan rather than
@@ -245,10 +253,13 @@ Errors are rendered with a deterministic id and linked from the control
 via `aria-describedby`, composing with the help text's id when both are
 present.
 
-Integer and number fields deliberately render as `type="text"` with
-`inputmode="numeric"`: browsers can otherwise refuse or sanitize a raw
-non-numeric value after a failed decode. The renderer therefore preserves that
-raw text instead of emitting non-conforming `min`, `max`, or `step` attributes.
+Integer and number fields deliberately render as `type="text"`: browsers can
+otherwise refuse or sanitize a raw non-numeric value after a failed decode.
+Integer fields use `inputmode="numeric"`; general-number fields use
+`inputmode="decimal"`. These are keyboard hints only — the codec remains the
+authority for signs, fractions, exponents, trimming, and invalid input. The
+renderer preserves raw text and omits non-conforming `min`, `max`, and `step`
+attributes for numeric fields.
 
 ## Accessibility
 

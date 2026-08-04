@@ -91,7 +91,19 @@ defmodule FormentationDemo.PumpInspectionBrowserTest do
     # the decode fails and its error appears (also anchors the assertion to the live patch)
     |> assert_has("##{field_id(["operating_hours"], :errors)}")
     # ...and the raw text survives the round-trip instead of being sanitized away
-    |> assert_has("##{field_id(["operating_hours"], :control)}", value: "51o2")
+    |> assert_has(~s(##{field_id(["operating_hours"], :control)}[inputmode="numeric"]),
+      value: "51o2"
+    )
+  end
+
+  test "the decimal field keeps a failed exponent attempt after the live round-trip", %{
+    conn: conn
+  } do
+    conn
+    |> visit_connected("/")
+    |> fill_in("Voltage (V)", with: "-1.5e")
+    |> assert_has("##{field_id(["voltage"], :errors)}")
+    |> assert_has(~s(##{field_id(["voltage"], :control)}[inputmode="decimal"]), value: "-1.5e")
   end
 
   test "clicking an error-summary link focuses the offending control", %{conn: conn} do

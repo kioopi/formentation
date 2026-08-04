@@ -61,6 +61,121 @@ defmodule Formentation.Phoenix.ComponentsTest do
   end
 
   describe "fields/1" do
+    test "numeric fields hinted to non-numeric widgets omit numeric constraint attributes" do
+      fields = [
+        {"count", %{kind: :integer, min: 0, max: 100, widget: :text}, "input"},
+        {"hours", %{kind: :integer, min: 0, max: 100, widget: :textarea}, "textarea"},
+        {"rating", %{kind: :integer, min: 0, max: 100, one_of: [1, 2]}, "select"}
+      ]
+
+      definition =
+        compile!(%{
+          kind: :object,
+          required: Enum.map(fields, &elem(&1, 0)),
+          properties: Enum.map(fields, fn {name, field, _selector} -> {name, field} end)
+        })
+
+      doc =
+        parse!(render_fields(definition, FormData.to_form(Form.new(definition), as: "payload")))
+
+      for {name, _field, selector} <- fields do
+        control = find_one(doc, ~s(#{selector}[id="#{field_id("payload", [name], :control)}"]))
+
+        assert Floki.attribute(control, "required") == ["required"]
+        assert Floki.attribute(control, "min") == []
+        assert Floki.attribute(control, "max") == []
+        assert Floki.attribute(control, "step") == []
+      end
+    end
+
+    test "renders numeric select and radio options as selected after projection" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"count", %{kind: :integer, one_of: [1, 2]}},
+            {"rating", %{kind: :integer, one_of: [1, 2], widget: :radio}}
+          ]
+        })
+
+      form = FormData.to_form(Form.new(definition, %{"count" => 2, "rating" => 2}), as: "payload")
+      doc = parse!(render_fields(definition, form))
+
+      [selected] =
+        Floki.find(
+          doc,
+          ~s(select[id="#{field_id("payload", ["count"], :control)}"] option[selected])
+        )
+
+      assert Floki.attribute(selected, "value") == ["2"]
+
+      [checked] =
+        Floki.find(
+          doc,
+          ~s(fieldset[id="#{field_id("payload", ["rating"], :container)}"] input[checked])
+        )
+
+      assert Floki.attribute(checked, "value") == ["2"]
+    end
+
+    test "retains numeric option selections after a failed sibling decode" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"count", %{kind: :integer, one_of: [1, 2]}},
+            {"rating", %{kind: :integer, one_of: [1, 2], widget: :radio}},
+            {"fault", %{kind: :integer}}
+          ]
+        })
+
+      form_state =
+        Form.transition(Form.new(definition), %Params{
+          values: %{"count" => "2", "rating" => "2", "fault" => "broken"},
+          event: :change
+        })
+
+      doc = parse!(render_fields(definition, FormData.to_form(form_state, as: "payload")))
+
+      [selected] =
+        Floki.find(
+          doc,
+          ~s(select[id="#{field_id("payload", ["count"], :control)}"] option[selected])
+        )
+
+      [checked] =
+        Floki.find(
+          doc,
+          ~s(fieldset[id="#{field_id("payload", ["rating"], :container)}"] input[checked])
+        )
+
+      assert Floki.attribute(selected, "value") == ["2"]
+      assert Floki.attribute(checked, "value") == ["2"]
+    end
+
+    test "renders integer and number fields with their distinct keyboard hints" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"count", %{kind: :integer}},
+            {"ratio", %{kind: :number}}
+          ]
+        })
+
+      doc =
+        parse!(render_fields(definition, FormData.to_form(Form.new(definition), as: "payload")))
+
+      for {name, inputmode} <- [{"count", "numeric"}, {"ratio", "decimal"}] do
+        control = find_one(doc, ~s(input[id="#{field_id("payload", [name], :control)}"]))
+        assert Floki.attribute(control, "name") == ["payload[#{name}]"]
+        assert Floki.attribute(control, "type") == ["text"]
+        assert Floki.attribute(control, "inputmode") == [inputmode]
+      end
+
+      assert Floki.find(doc, "input[type=number]") == []
+    end
+
     test "an invalid radio summary links to the rendered radio container" do
       definition =
         compile!(%{

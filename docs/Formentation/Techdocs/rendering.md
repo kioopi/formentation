@@ -12,7 +12,7 @@ status: current
 
 # Rendering
 
-*As of 2026-08-03 (native presentation traversal and semantic-index-backed
+*As of 2026-08-04 (native presentation traversal and semantic-index-backed
 projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]; DOM identity, [[18-decisions#D-034 — Phoenix renderer DOM identities are typed and injective|D-034]]; group help, [[18-decisions#D-036 — Group help uses prepared Phoenix identities|D-036]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
 
 ## Projector data flow (`Formentation.Phoenix.Projector`)
@@ -73,13 +73,14 @@ One struct per render node shape:
   while `field path={[]}` renders the root group itself.
 - `Formentation.Phoenix.RenderNode.Field` — `widget`, `field` (the
   `%Phoenix.HTML.FormField{}`, carrying Phoenix id/name/value), `label`, `dom`,
-  `help`,
+  normalized semantic `value_type`, `help`,
   `options`, `validations` (`Phoenix.HTML.Form.input_validations/2`,
   precomputed so the theme never calls back), `errors`, `show_errors?`,
   `read_only?`. `dom` is a `FieldDOM{control, container, help, errors,
   options}`. `control` names scalar controls (and hidden inputs); `container`
   names a composite widget's container, currently a radio group's fieldset.
-  Option ids are positionally parallel to field options.
+  Options retain source scalar values (`String.t() | number() | boolean()`),
+  and option ids are positionally parallel to them.
 
 `show_errors?` is computed once, in the projector, so themes never
 inspect `_unused_` markers or `form.action` (D-014, D-027). The source's
@@ -314,15 +315,21 @@ Conformance obligations pinned on top of the contract:
 - The editable checkbox emits the [[18-decisions#D-011 — Booleans use the hidden-input transport contract|D-011]] hidden input (`value="false"` preceding the `value="true"` checkbox).
 - [[18-decisions#D-016 — Participation is definition-driven, not transport-driven|D-016]] read-only rendering: `readonly` on text-like controls (text/textarea/number/date/email/url), `disabled` on selects, checkboxes, and radio groups; no hidden mirrors anywhere. A read-only boolean is a disabled checkbox *without* the hidden input — outside D-011's contract, which binds editable checkboxes only.
 - Selects always lead with a blank option (`<option value=""></option>`).
+- Options retain their declared scalar value. Themes emit each control value
+  and compare it to the current form value through the same canonical string
+  representation (`to_string/1`) for `selected`/`checked`; otherwise numeric
+  or boolean options submit correctly but fail to re-mark after a round trip.
+  [GitHub issue #38](https://github.com/kioopi/formentation/issues/38) owns
+  source-level rejection of unsupported non-scalar declarations.
 - A required boolean never renders the HTML `required` attribute on its checkbox — HTML `required` means must-be-*checked*, a different constraint than "always submits true or false", which the D-011 hidden input already satisfies.
-- `:number_input` renders `type="text" inputmode="numeric"`, never `type="number"`: a real browser blocks a `<input type="number">` from *displaying* non-numeric raw text (and sanitizes an injected invalid value on the next round trip), which breaks raw-input preservation after a failed decode. `inputmode="numeric"` keeps the numeric-only mobile keyboard without that constraint — confirmed by a browser check and recorded as [[18-decisions#D-021 — LiveView integration is wrappers plus a demo, not framework machinery|D-021]].
+- `:number_input` always renders `type="text"`, never `type="number"`: a real browser blocks a `<input type="number">` from *displaying* non-numeric raw text (and sanitizes an injected invalid value on the next round trip), which breaks raw-input preservation after a failed decode ([[18-decisions#D-021 — LiveView integration is wrappers plus a demo, not framework machinery|D-021]]). Its keyboard hint uses both prepared facts: integer fields use `inputmode="numeric"`; general-number fields use `inputmode="decimal"`. Browser coverage asserts those live-DOM attributes and raw-value preservation, not platform-dependent soft-keyboard layouts. `inputmode` is an ergonomic hint, not the transport grammar — the codec remains authoritative for signs, fractions, exponents, trimming, and invalid input ([[18-decisions#D-038 — Semantic value type and abstract widget are orthogonal prepared facts|D-038]]).
 - Progressive-hint attributes (`required`, `min`/`max`/`step`,
-  `minlength`/`maxlength`) come from step 5's `input_validations`, applied
-  as-is; they are hints, never server validation. Number widgets are the
-  exception: since they render as `type="text" inputmode="numeric"` (not
-  `type="number"`, see above), `min`/`max`/`step` are non-conforming on that
-  fallback and are dropped — only `required` (when present) survives on a
-  number input.
+  `minlength`/`maxlength`) come from step 5's `input_validations`; they are
+  hints, never server validation. `min`/`max`/`step` are dropped for numeric
+  semantic value types on `:number_input`, `:text_input`, `:textarea`, and
+  `:select`: the first two render text controls, and textareas/selects do not
+  accept those attributes. `:radio_group` follows its separate required-only
+  policy. `required`, when present, survives.
 
 ## Boundaries — what does not exist yet
 

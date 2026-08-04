@@ -260,6 +260,7 @@ defmodule Formentation.Phoenix.Projector do
        field: field,
        label: presentation.label || humanize(node.name),
        dom: dom,
+       value_type: node.value_type,
        help: presentation.help,
        options: node.options,
        validations: Phoenix.HTML.Form.input_validations(form, field.field),
