@@ -61,6 +61,36 @@ defmodule Formentation.Phoenix.ComponentsTest do
   end
 
   describe "fields/1" do
+    test "renders numeric select and radio options as selected after projection" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"count", %{kind: :integer, one_of: [1, 2]}},
+            {"rating", %{kind: :integer, one_of: [1, 2], widget: :radio}}
+          ]
+        })
+
+      form = FormData.to_form(Form.new(definition, %{"count" => 2, "rating" => 2}), as: "payload")
+      doc = parse!(render_fields(definition, form))
+
+      [selected] =
+        Floki.find(
+          doc,
+          ~s(select[id="#{field_id("payload", ["count"], :control)}"] option[selected])
+        )
+
+      assert Floki.attribute(selected, "value") == ["2"]
+
+      [checked] =
+        Floki.find(
+          doc,
+          ~s(fieldset[id="#{field_id("payload", ["rating"], :container)}"] input[checked])
+        )
+
+      assert Floki.attribute(checked, "value") == ["2"]
+    end
+
     test "renders integer and number fields with their distinct keyboard hints" do
       definition =
         compile!(%{

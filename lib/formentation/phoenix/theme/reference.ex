@@ -154,7 +154,11 @@ defmodule Formentation.Phoenix.Theme.Reference do
       {validation_attrs(@node)}
     >
       <option value=""></option>
-      <option :for={option <- @node.options} value={option} selected={option == @current}>
+      <option
+        :for={option <- @node.options}
+        value={option_value(option)}
+        selected={option_value(option) == @current}
+      >
         {option}
       </option>
     </select>
@@ -179,8 +183,8 @@ defmodule Formentation.Phoenix.Theme.Reference do
           type="radio"
           id={id}
           name={@node.field.name}
-          value={option}
-          checked={option == @current}
+          value={option_value(option)}
+          checked={option_value(option) == @current}
           disabled={@node.read_only?}
           {required_attr(@node)}
         />
@@ -252,5 +256,7 @@ defmodule Formentation.Phoenix.Theme.Reference do
   end
 
   defp current_option(nil), do: nil
-  defp current_option(value), do: to_string(value)
+  defp current_option(value), do: option_value(value)
+
+  defp option_value(value), do: to_string(value)
 end

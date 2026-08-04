@@ -357,6 +357,28 @@ defmodule Formentation.Phoenix.ThemeTest do
       assert Floki.attribute(select, "disabled") == ["disabled"]
       assert Floki.find(doc, "option[selected]") == []
     end
+
+    test "canonicalizes numeric option values for selection" do
+      doc =
+        parse!(
+          render_component(&Reference.field/1,
+            node:
+              select_node(
+                options: [1, 2],
+                field: form_field(id: "condition", name: "condition", value: "2")
+              )
+          )
+        )
+
+      assert Enum.flat_map(Floki.find(doc, "option"), &Floki.attribute(&1, "value")) == [
+               "",
+               "1",
+               "2"
+             ]
+
+      [selected] = Floki.find(doc, "option[selected]")
+      assert Floki.attribute(selected, "value") == ["2"]
+    end
   end
 
   describe "radio group" do
@@ -406,6 +428,22 @@ defmodule Formentation.Phoenix.ThemeTest do
       for radio <- radios do
         assert Floki.attribute(radio, "disabled") == ["disabled"]
       end
+    end
+
+    test "canonicalizes numeric option values for checked state" do
+      doc =
+        parse!(
+          render_component(&Reference.field/1,
+            node:
+              radio_node(
+                options: [1, 2],
+                field: form_field(id: "condition", name: "condition", value: "2")
+              )
+          )
+        )
+
+      [checked] = Floki.find(doc, "input[type=radio][checked]")
+      assert Floki.attribute(checked, "value") == ["2"]
     end
 
     test "radio group is a radiogroup and carries required on its inputs" do
