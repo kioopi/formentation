@@ -13,7 +13,7 @@ status: current
 
 # Browser testing
 
-> [!note] As of 2026-08-04 · browser-test suite and prepared DOM identities
+> [!note] As of 2026-08-04 · browser-test suite, prepared DOM identities, ephemeral test port
 > Describes the opt-in Playwright suite as built: the harness, the config
 > posture, and what each seed test pins. This is additive to
 > [[test-and-verification-architecture|the test architecture]]'s mechanism
@@ -92,14 +92,21 @@ When `browser?` is false — every plain `mix test` — the demo endpoint gets
 otherwise byte-for-byte the same file. When `browser?` is true, `test_helper.exs`:
 
 - configures `FormentationDemo.Endpoint` with `server: true`,
-  `adapter: Bandit.PhoenixAdapter`, listening on `127.0.0.1:4002`;
+  `adapter: Bandit.PhoenixAdapter`, listening on `127.0.0.1` at a port
+  `Formentation.FreePort.pick/0` obtains from the kernel;
 - sets the `phoenix_test` application env — `otp_app: :formentation`,
   `playwright: [assets_dir: ..., headless: true, timeout: to_timeout(second: 5)]`,
   and `base_url` from the endpoint's own `url()`;
 - starts `PhoenixTest.Playwright.Supervisor`.
 
-Port 4002 (not 4000, which `mix demo` uses for interactive browsing) keeps
-the two servers from colliding if both happen to run at once.
+The port is not fixed. `Formentation.FreePort.pick/0` binds port 0, reads
+back the port the kernel assigned, and releases it, so the endpoint takes
+a port nothing else holds — two concurrent browser runs, or an
+interactive `mix demo`, can never collide, and no command needs a `PORT`
+prefix. It is chosen before boot because `Phoenix.Endpoint` caches
+`url/0` from the `:url` config at init; `base_url` and
+`test/browser/demo_http_smoke_test.exs` both read that same `url/0`, so
+they follow automatically.
 
 The suite runs `async: true` and shares one demo server across its tests, so
 under load a `fill_in` → `phx-change` → websocket → DOM patch

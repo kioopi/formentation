@@ -8,11 +8,17 @@ endpoint_base = [
 
 endpoint_server =
   if browser? do
+    # The kernel picks the port (Formentation.FreePort): concurrent browser
+    # runs then never collide, and no one has to prefix a command with an
+    # environment variable. Chosen before boot because Phoenix caches url/0
+    # from the :url config at init.
+    port = Formentation.FreePort.pick()
+
     [
       adapter: Bandit.PhoenixAdapter,
       server: true,
-      http: [ip: {127, 0, 0, 1}, port: 4002],
-      url: [host: "localhost", port: 4002]
+      http: [ip: {127, 0, 0, 1}, port: port],
+      url: [host: "localhost", port: port]
     ]
   else
     [server: false]

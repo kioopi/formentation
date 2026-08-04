@@ -2,9 +2,10 @@ defmodule FormentationDemo.DemoHttpSmokeTest do
   @moduledoc """
   A real over-the-wire smoke test of the running demo server. Unlike the
   Playwright cases it runs no browser JS: it does a plain HTTP GET against the
-  endpoint `test/test_helper.exs` boots with `server: true` on port 4002 in the
-  E2E lane, and asserts the server-rendered ("dead render") HTML. Proves the
-  demo actually serves both of its pages over a socket.
+  endpoint `test/test_helper.exs` boots with `server: true` on a
+  kernel-chosen ephemeral port in the E2E lane, and asserts the
+  server-rendered ("dead render") HTML. Proves the demo actually serves both
+  of its pages over a socket.
   """
   use ExUnit.Case, async: true
 
