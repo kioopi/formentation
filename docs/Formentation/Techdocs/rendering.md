@@ -315,13 +315,14 @@ Conformance obligations pinned on top of the contract:
 - [[18-decisions#D-016 — Participation is definition-driven, not transport-driven|D-016]] read-only rendering: `readonly` on text-like controls (text/textarea/number/date/email/url), `disabled` on selects, checkboxes, and radio groups; no hidden mirrors anywhere. A read-only boolean is a disabled checkbox *without* the hidden input — outside D-011's contract, which binds editable checkboxes only.
 - Selects always lead with a blank option (`<option value=""></option>`).
 - A required boolean never renders the HTML `required` attribute on its checkbox — HTML `required` means must-be-*checked*, a different constraint than "always submits true or false", which the D-011 hidden input already satisfies.
-- `:number_input` always renders `type="text"`, never `type="number"`: a real browser blocks a `<input type="number">` from *displaying* non-numeric raw text (and sanitizes an injected invalid value on the next round trip), which breaks raw-input preservation after a failed decode. Its keyboard hint uses both prepared facts: integer fields use `inputmode="numeric"`; general-number fields use `inputmode="decimal"`. `inputmode` is an ergonomic hint, not the transport grammar — the codec remains authoritative for signs, fractions, exponents, trimming, and invalid input. This behavior is confirmed by browser coverage and recorded in [[18-decisions#D-038 — Semantic value type and abstract widget are orthogonal prepared facts|D-038]].
+- `:number_input` always renders `type="text"`, never `type="number"`: a real browser blocks a `<input type="number">` from *displaying* non-numeric raw text (and sanitizes an injected invalid value on the next round trip), which breaks raw-input preservation after a failed decode ([[18-decisions#D-021 — LiveView integration is wrappers plus a demo, not framework machinery|D-021]]). Its keyboard hint uses both prepared facts: integer fields use `inputmode="numeric"`; general-number fields use `inputmode="decimal"`. Browser coverage asserts those live-DOM attributes and raw-value preservation, not platform-dependent soft-keyboard layouts. `inputmode` is an ergonomic hint, not the transport grammar — the codec remains authoritative for signs, fractions, exponents, trimming, and invalid input ([[18-decisions#D-038 — Semantic value type and abstract widget are orthogonal prepared facts|D-038]]).
 - Progressive-hint attributes (`required`, `min`/`max`/`step`,
   `minlength`/`maxlength`) come from step 5's `input_validations`; they are
   hints, never server validation. `min`/`max`/`step` are dropped for numeric
-  semantic value types on every control that accepts progressive attributes:
-  their text fallback is not a native numeric input, and those attributes are
-  non-conforming or ineffective there. `required`, when present, survives.
+  semantic value types on controls routed through `validation_attrs/2`:
+  `:number_input` uses a text fallback, and textareas and selects do not accept
+  those attributes. Radio groups follow their separate required-only policy.
+  `required`, when present, survives.
 
 ## Boundaries — what does not exist yet
 

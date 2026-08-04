@@ -25,7 +25,7 @@ defmodule Formentation.Semantic.Field do
   ]
 
   @doc false
-  @spec new(String.t(), TemplatePath.t(), atom(), keyword()) :: t()
+  @spec new(String.t(), TemplatePath.t(), value_type(), keyword()) :: t()
   def new(name, %TemplatePath{} = template_path, value_type, opts \\ [])
       when is_binary(name) and value_type in [:string, :integer, :number, :boolean] do
     %__MODULE__{
@@ -44,7 +44,16 @@ defmodule Formentation.Semantic.Field do
     }
   end
 
+  @typedoc """
+  The source-neutral normalized scalar type of a field.
+
+  It is orthogonal to the resolved abstract widget: `:integer` and `:number`
+  share `:number_input` (D-038).
+  """
   @type value_type :: :string | :integer | :number | :boolean
+
+  @typedoc "A scalar option value retained from a source declaration."
+  @type option :: String.t() | number() | boolean()
 
   @type t :: %__MODULE__{
           id: String.t(),
@@ -52,7 +61,7 @@ defmodule Formentation.Semantic.Field do
           role: atom() | nil,
           value_type: value_type(),
           template_path: TemplatePath.t(),
-          options: [String.t()] | nil,
+          options: [option()] | nil,
           default: term() | nil,
           examples: [term()] | nil,
           required?: boolean(),

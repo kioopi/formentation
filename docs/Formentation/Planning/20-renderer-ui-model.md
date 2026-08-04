@@ -243,7 +243,7 @@ A likely field view needs facts in these categories:
 | --- | --- |
 | Identity | semantic/template path, absolute instance path, layout identity, DOM ID |
 | Binding | Environment field binding, primary and auxiliary names, raw control value, formatted read-only value |
-| Meaning | role, normalized type, required/read-only state |
+| Meaning | normalized type and read-only state today; role and schema requiredness are owned by [GitHub issue #37](https://github.com/kioopi/formentation/issues/37) |
 | Presentation | label, help, resolved abstract widget |
 | Interaction | Used/unused state, submitted state, disabled/hidden intent, omission and blank semantics |
 | Feedback | visible field issues, described-by IDs, summary target |

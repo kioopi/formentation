@@ -13,9 +13,9 @@ status: current
 
 # Browser testing
 
-> [!note] As of 2026-08-03 · browser-test suite and prepared DOM identities
+> [!note] As of 2026-08-04 · browser-test suite and prepared DOM identities
 > Describes the opt-in Playwright suite as built: the harness, the config
-> posture, and what each of the four seed tests pins. This is additive to
+> posture, and what each seed test pins. This is additive to
 > [[test-and-verification-architecture|the test architecture]]'s mechanism
 > table, not a replacement for it — the suite covers one specific gap that
 > mechanism describes: `Phoenix.LiveViewTest` never runs a browser.
@@ -101,7 +101,7 @@ otherwise byte-for-byte the same file. When `browser?` is true, `test_helper.exs
 Port 4002 (not 4000, which `mix demo` uses for interactive browsing) keeps
 the two servers from colliding if both happen to run at once.
 
-The suite runs `async: true` and shares one demo server across its four
+The suite runs `async: true` and shares one demo server across its tests
 tests, so under load a `fill_in` → `phx-change` → websocket → DOM patch
 round-trip can exceed PhoenixTest's default 2s assertion timeout; the
 `timeout: to_timeout(second: 5)` above absorbs that.
@@ -114,7 +114,7 @@ genuine round-trip latency, but it is not what makes the suite reliable.
 
 ## Tag and runner — `browser: :chromium`, not bare `:browser`
 
-The four tests carry `@moduletag browser: :chromium` rather than the more
+The tests carry `@moduletag browser: :chromium` rather than the more
 obvious bare `@moduletag :browser`. `PhoenixTest.Playwright.Case`'s
 `setup_all` reads the same `:browser` key out of ExUnit tags to pick the
 driver's browser engine (`:chromium` / `:firefox` / …, defaulting to
@@ -155,9 +155,9 @@ To iterate on a single test file: `PLAYWRIGHT_E2E=1 mix test <file> --only
 browser` (bypassing the alias, since `mix test.browser` doesn't forward a
 file argument ahead of `--only browser` today — pass it after, as `args`).
 
-## What the five seed tests pin
+## What the seed tests pin
 
-All five live in `test/browser/pump_inspection_browser_test.exs`, driving
+All live in `test/browser/pump_inspection_browser_test.exs`, driving
 `FormentationDemo.PumpInspectionLive` at `/`:
 
 1. **Valid-submit smoke** — fills in the three blank required fields
@@ -173,17 +173,23 @@ All five live in `test/browser/pump_inspection_browser_test.exs`, driving
    express at all — under `LiveViewTest`, the whole form re-serializes on
    every event and the field would already show `:used` from the first
    `render_change/1`.
-3. **Number-widget raw-text preservation** ([[18-decisions#D-021 — LiveView integration is wrappers plus a demo, not framework machinery|D-021]]) —
+3. **Integer raw-text preservation** ([[18-decisions#D-021 — LiveView integration is wrappers plus a demo, not framework machinery|D-021]]) —
    types `"51o2"` into `Operating hours` (rendered as `type="text"
    inputmode="numeric"`, so the browser accepts the non-numeric text
-   unlike the `type="number"` control it replaced) and asserts both the
-   decode error and the raw text survive the live round-trip.
-4. **Error-summary anchor focus** — unchecks native validation, submits a
+   unlike the `type="number"` control it replaced), asserts the live DOM
+   attribute, and proves both the decode error and raw text survive the
+   live round-trip.
+4. **General-number raw-text preservation** ([[18-decisions#D-038 — Semantic value type and abstract widget are orthogonal prepared facts|D-038]]) —
+   types the failed exponent attempt `"-1.5e"` into `Voltage (V)`, asserts
+   its live `inputmode="decimal"` attribute, and proves the decode error and
+   exact raw attempt survive the live round-trip. This tests DOM attributes and
+   raw preservation, not a platform-dependent soft-keyboard layout.
+5. **Error-summary anchor focus** — unchecks native validation, submits a
    blank form, clicks the `Serial number:` link inside the error summary
    (`.ftn-error-summary[role='alert']`), and asserts keyboard focus lands
    on `#ftn--asset_payload--field--control--serial_number`. This is an end-to-end interaction
    (`click` → focus movement) with no server-side equivalent to assert.
-5. **Radio-summary anchor focus** — unchecks native validation, submits a
+6. **Radio-summary anchor focus** — unchecks native validation, submits a
    blank form, clicks `Mounting:` in the error summary, and verifies focus lands on
    the radio fieldset's prepared container id; the fieldset is programmatically
    focusable with `tabindex="-1"` without entering ordinary tab order.

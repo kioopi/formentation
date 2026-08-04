@@ -53,6 +53,7 @@ defmodule FormentationDemo.PumpInspectionBrowserTest do
     # valid initial values (operating_hours 5102, voltage 230.0, insulation_ok true).
     conn
     |> visit_connected("/")
+    |> assert_has(~s(##{field_id(["operating_hours"], :control)}[inputmode="numeric"]))
     |> fill_in("Serial number", with: "PX-2044")
     |> select("Condition", option: "worn")
     |> choose("wall")
@@ -63,6 +64,7 @@ defmodule FormentationDemo.PumpInspectionBrowserTest do
   test "a pristine required field's error stays hidden until used or submitted", %{conn: conn} do
     conn
     |> visit_connected("/")
+    |> assert_has(~s(##{field_id(["voltage"], :control)}[inputmode="decimal"]))
     |> assert_has("form#asset-form")
     # pristine mount: the blank required serial_number shows no error
     |> refute_has("##{field_id(["serial_number"], :errors)}")
