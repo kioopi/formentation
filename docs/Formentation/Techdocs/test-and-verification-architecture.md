@@ -281,7 +281,8 @@ own.
 ## Boundaries — what is not verified
 
 A small, opt-in browser-real suite now exists ([[browser-testing|Browser testing]]),
-covering exactly the gap called out above — four seed tests, run via
+covering exactly the gap called out above — five seed tests (plus two
+plain-HTTP smoke tests of the demo server itself), run via
 `mix test.browser` and excluded from `mix ci`. It is deliberately narrow:
 no axe-style automated accessibility audit (the contract is still asserted
 structurally, not by a browser tool), no performance or load testing, and

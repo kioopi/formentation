@@ -20,9 +20,12 @@ defmodule Formentation.FreePortTest do
     assert :ok = :gen_tcp.close(socket)
   end
 
-  test "successive picks do not hand out the same port twice in a row" do
+  test "successive picks are not all identical" do
     # The kernel cycles through its ephemeral range rather than reissuing
     # the port it just released, which is what makes concurrent runs safe.
+    # Weak on purpose: this pins the environmental premise (the kernel does
+    # vary the port), not any specific cycling order — a sequence like
+    # A,B,A,B,A would still satisfy it.
     ports = Enum.map(1..5, fn _ -> FreePort.pick() end)
 
     assert match?([_, _ | _], Enum.uniq(ports))

@@ -102,16 +102,22 @@ otherwise byte-for-byte the same file. When `browser?` is true, `test_helper.exs
 The port is not fixed. `Formentation.FreePort.pick/0` binds port 0, reads
 back the port the kernel assigned, and releases it, so the endpoint takes
 a port nothing else holds — two concurrent browser runs, or an
-interactive `mix demo`, can never collide, and no command needs a `PORT`
-prefix. It is chosen before boot because `Phoenix.Endpoint` caches
-`url/0` from the `:url` config at init; `base_url` and
+interactive `mix demo`, practically never collide, and no command needs a
+`PORT` prefix. A small window remains between releasing the probe socket
+and the endpoint binding it, in which another process could take the same
+port (`test/support/free_port.ex`); losing that race fails loudly at boot
+rather than silently. It is chosen before boot because `Phoenix.Endpoint`
+caches `url/0` from the `:url` config at init; `base_url` and
 `test/browser/demo_http_smoke_test.exs` both read that same `url/0`, so
 they follow automatically.
 
-The suite runs `async: true` and shares one demo server across its tests, so
-under load a `fill_in` → `phx-change` → websocket → DOM patch
-round-trip can exceed PhoenixTest's default 2s assertion timeout; the
-`timeout: to_timeout(second: 5)` above absorbs that.
+The suite runs `async: true` and shares one demo server across its
+interaction tests, so under load a `fill_in` → `phx-change` → websocket →
+DOM patch round-trip can exceed PhoenixTest's default 2s assertion
+timeout; the `timeout: to_timeout(second: 5)` above absorbs that. The
+plain-HTTP smoke tests in `demo_http_smoke_test.exs` share the same
+server but drive it with `:httpc`, not `PhoenixTest`, so this timeout
+does not apply to them.
 
 This timeout was originally raised in the belief that the suite's
 intermittent failures were load-timing contention rather than a
@@ -121,14 +127,19 @@ genuine round-trip latency, but it is not what makes the suite reliable.
 
 ## Tag and runner — `browser: :chromium`, not bare `:browser`
 
-The tests carry `@moduletag browser: :chromium` rather than the more
-obvious bare `@moduletag :browser`. `PhoenixTest.Playwright.Case`'s
-`setup_all` reads the same `:browser` key out of ExUnit tags to pick the
-driver's browser engine (`:chromium` / `:firefox` / …, defaulting to
-`:chromium`); a bare atom tag sets `browser: true`, and `true` is not a
-valid engine name, so NimbleOptions rejects it and the setup crashes.
-Pinning the value to `:chromium` — already the default — keeps the tag
-under the literal key `:browser`, so `ExUnit.configure(exclude: [:browser])`
+The tests in both `test/browser/` files carry `@moduletag browser:
+:chromium` rather than the more obvious bare `@moduletag :browser`. That
+value is forced for the Playwright-driven tests:
+`PhoenixTest.Playwright.Case`'s `setup_all` reads the same `:browser` key
+out of ExUnit tags to pick the driver's browser engine (`:chromium` /
+`:firefox` / …, defaulting to `:chromium`); a bare atom tag sets `browser:
+true`, and `true` is not a valid engine name, so NimbleOptions rejects it
+and the setup crashes. `demo_http_smoke_test.exs`'s tests use plain
+`ExUnit.Case` and never go through that `setup_all`, so nothing forces
+their tag's value — they carry the same `:chromium` value purely for
+consistency with the tag the lane selects on. Pinning the value to
+`:chromium` — already the default — keeps the tag under the literal key
+`:browser`, so `ExUnit.configure(exclude: [:browser])`
 (set unconditionally at the bottom of `test_helper.exs`) still excludes it
 by presence of that key, and `--only browser` still selects it.
 
@@ -221,8 +232,8 @@ the pump-inspection demo (`demo/formentation_demo/pump_inspection_live.ex`)
 gained a checkbox, `#toggle-native-validation`, labeled "Native browser
 validation". Checking it (the default) renders the `<.form>` without
 `novalidate`; unchecking it flips `novalidate={not @native_validation}` to
-`true`. HEEx renders the boolean attribute as `novalidate=""`, so the two
-submit-driven tests (2 and 4 above) assert its presence with the CSS
+`true`. HEEx renders the boolean attribute as `novalidate=""`, so the
+submit-driven tests (2, 5, and 6 above) assert its presence with the CSS
 `[novalidate]` selector rather than a value comparison, and both uncheck
 the box before clicking Save — otherwise the click never leaves the
 browser. The toggle is also an exploration aid on its own: checking it back

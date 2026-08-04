@@ -38,6 +38,11 @@ defmodule Mix.Tasks.Test.DevTest do
       assert Dev.test_args(["--stale"]) == ["--stale"]
       assert Dev.test_args(["--stale", "--trace"]) == ["--stale", "--trace"]
     end
+
+    test "omits --stale for --failed, since mix test refuses to combine them" do
+      assert Dev.test_args(["--failed"]) == ["--failed"]
+      assert Dev.test_args(["--failed", "--trace"]) == ["--failed", "--trace"]
+    end
   end
 
   describe "target?/1" do

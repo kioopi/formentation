@@ -794,15 +794,21 @@ the suite binds no socket at all.
 `mix test`, adding `--stale` only when the caller named no test target. Naming a
 target suppresses `--stale`, because combining them selects the intersection —
 empty whenever the named file is not itself stale, which exits 0 having run
-nothing. The task lives in `test/support/`, so it never ships in the package,
-and `cli/0` runs it in `MIX_ENV=test`.
+nothing. `--failed` is treated the same as a named target: `mix test` itself
+refuses to combine `--failed` with `--stale`, so suppressing `--stale` there
+too is not optional. The task lives in `test/support/`, so it never ships in
+the package, and `cli/0` runs it in `MIX_ENV=test`.
 
 **Consequences.** The workflow rule in `CLAUDE.md` names one command instead of
 a pattern to improvise on. Filename-based test selection was rejected: a naive
 `lib/x.ex` → `test/x_test.exs` map misses 29 of 49 lib modules, so it would
-report green having run nothing, and the whole suite takes 4.6 seconds anyway.
-That `--stale` selects nearly the whole suite for a change to a central module
-is a coupling signal worth investigating separately.
+report green having run nothing, and the whole suite ran in 4.6 seconds anyway
+(`mix test` alone, 672 tests, measured at `1e4482e`). Both the count and the
+timing move as the suite grows — by this commit it is 704 tests, running
+standalone in ~4-5s and folding into a `mix ci` run measured at 28.5s total —
+so treat either figure as a snapshot, not a bound. That `--stale` selects
+nearly the whole suite for a change to a central module is a coupling signal
+worth investigating separately.
 
 ## D-040 — Browser tests bind an ephemeral port
 

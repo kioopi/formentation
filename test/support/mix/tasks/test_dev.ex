@@ -22,6 +22,7 @@ defmodule Mix.Tasks.Test.Dev do
       mix test.dev test/formentation/form_test.exs
       mix test.dev test/formentation/form_test.exs:42
       mix test.dev --max-failures 3
+      mix test.dev --failed
 
   The browser-real suite is opt-in and separate; see `mix test.browser`.
   Run `mix ci` when the work is done.
@@ -44,7 +45,9 @@ defmodule Mix.Tasks.Test.Dev do
   Adds `--stale` when the caller named no test target, so a bare
   `mix test.dev` runs only what the change affects. When a target *is*
   named, `--stale` is left off, and an explicit `--stale` is never
-  duplicated.
+  duplicated. `--failed` narrows the run on its own, exactly like a named
+  target, so it is treated the same way — `mix test` refuses to combine
+  `--failed` with `--stale` and raises if both are passed.
 
   ## Examples
 
@@ -60,10 +63,13 @@ defmodule Mix.Tasks.Test.Dev do
       iex> Mix.Tasks.Test.Dev.test_args(["--stale"])
       ["--stale"]
 
+      iex> Mix.Tasks.Test.Dev.test_args(["--failed"])
+      ["--failed"]
+
   """
   @spec test_args([String.t()]) :: [String.t()]
   def test_args(argv) do
-    if "--stale" in argv or Enum.any?(argv, &target?/1) do
+    if Enum.any?(argv, &(&1 in ["--stale", "--failed"])) or Enum.any?(argv, &target?/1) do
       argv
     else
       ["--stale" | argv]
