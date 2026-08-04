@@ -61,6 +61,29 @@ defmodule Formentation.Phoenix.ComponentsTest do
   end
 
   describe "fields/1" do
+    test "renders integer and number fields with their distinct keyboard hints" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"count", %{kind: :integer}},
+            {"ratio", %{kind: :number}}
+          ]
+        })
+
+      doc =
+        parse!(render_fields(definition, FormData.to_form(Form.new(definition), as: "payload")))
+
+      for {name, inputmode} <- [{"count", "numeric"}, {"ratio", "decimal"}] do
+        control = find_one(doc, ~s(input[id="#{field_id("payload", [name], :control)}"]))
+        assert Floki.attribute(control, "name") == ["payload[#{name}]"]
+        assert Floki.attribute(control, "type") == ["text"]
+        assert Floki.attribute(control, "inputmode") == [inputmode]
+      end
+
+      assert Floki.find(doc, "input[type=number]") == []
+    end
+
     test "an invalid radio summary links to the rendered radio container" do
       definition =
         compile!(%{

@@ -12,7 +12,7 @@ status: current
 
 # Rendering
 
-*As of 2026-08-03 (native presentation traversal and semantic-index-backed
+*As of 2026-08-04 (native presentation traversal and semantic-index-backed
 projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]; DOM identity, [[18-decisions#D-034 — Phoenix renderer DOM identities are typed and injective|D-034]]; group help, [[18-decisions#D-036 — Group help uses prepared Phoenix identities|D-036]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
 
 ## Projector data flow (`Formentation.Phoenix.Projector`)
@@ -73,7 +73,7 @@ One struct per render node shape:
   while `field path={[]}` renders the root group itself.
 - `Formentation.Phoenix.RenderNode.Field` — `widget`, `field` (the
   `%Phoenix.HTML.FormField{}`, carrying Phoenix id/name/value), `label`, `dom`,
-  `help`,
+  normalized semantic `value_type`, `help`,
   `options`, `validations` (`Phoenix.HTML.Form.input_validations/2`,
   precomputed so the theme never calls back), `errors`, `show_errors?`,
   `read_only?`. `dom` is a `FieldDOM{control, container, help, errors,
@@ -315,14 +315,13 @@ Conformance obligations pinned on top of the contract:
 - [[18-decisions#D-016 — Participation is definition-driven, not transport-driven|D-016]] read-only rendering: `readonly` on text-like controls (text/textarea/number/date/email/url), `disabled` on selects, checkboxes, and radio groups; no hidden mirrors anywhere. A read-only boolean is a disabled checkbox *without* the hidden input — outside D-011's contract, which binds editable checkboxes only.
 - Selects always lead with a blank option (`<option value=""></option>`).
 - A required boolean never renders the HTML `required` attribute on its checkbox — HTML `required` means must-be-*checked*, a different constraint than "always submits true or false", which the D-011 hidden input already satisfies.
-- `:number_input` renders `type="text" inputmode="numeric"`, never `type="number"`: a real browser blocks a `<input type="number">` from *displaying* non-numeric raw text (and sanitizes an injected invalid value on the next round trip), which breaks raw-input preservation after a failed decode. `inputmode="numeric"` keeps the numeric-only mobile keyboard without that constraint — confirmed by a browser check and recorded as [[18-decisions#D-021 — LiveView integration is wrappers plus a demo, not framework machinery|D-021]].
+- `:number_input` always renders `type="text"`, never `type="number"`: a real browser blocks a `<input type="number">` from *displaying* non-numeric raw text (and sanitizes an injected invalid value on the next round trip), which breaks raw-input preservation after a failed decode. Its keyboard hint uses both prepared facts: integer fields use `inputmode="numeric"`; general-number fields use `inputmode="decimal"`. `inputmode` is an ergonomic hint, not the transport grammar — the codec remains authoritative for signs, fractions, exponents, trimming, and invalid input. This behavior is confirmed by browser coverage and recorded in [[18-decisions#D-038 — Semantic value type and abstract widget are orthogonal prepared facts|D-038]].
 - Progressive-hint attributes (`required`, `min`/`max`/`step`,
-  `minlength`/`maxlength`) come from step 5's `input_validations`, applied
-  as-is; they are hints, never server validation. Number widgets are the
-  exception: since they render as `type="text" inputmode="numeric"` (not
-  `type="number"`, see above), `min`/`max`/`step` are non-conforming on that
-  fallback and are dropped — only `required` (when present) survives on a
-  number input.
+  `minlength`/`maxlength`) come from step 5's `input_validations`; they are
+  hints, never server validation. `min`/`max`/`step` are dropped for numeric
+  semantic value types on every control that accepts progressive attributes:
+  their text fallback is not a native numeric input, and those attributes are
+  non-conforming or ineffective there. `required`, when present, survives.
 
 ## Boundaries — what does not exist yet
 

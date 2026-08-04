@@ -94,6 +94,16 @@ defmodule FormentationDemo.PumpInspectionBrowserTest do
     |> assert_has("##{field_id(["operating_hours"], :control)}", value: "51o2")
   end
 
+  test "the decimal field keeps a failed exponent attempt after the live round-trip", %{
+    conn: conn
+  } do
+    conn
+    |> visit_connected("/")
+    |> fill_in("Voltage (V)", with: "-1.5e")
+    |> assert_has("##{field_id(["voltage"], :errors)}")
+    |> assert_has("##{field_id(["voltage"], :control)}", value: "-1.5e")
+  end
+
   test "clicking an error-summary link focuses the offending control", %{conn: conn} do
     conn
     |> visit_connected("/")

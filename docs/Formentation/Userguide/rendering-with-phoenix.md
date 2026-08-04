@@ -245,10 +245,13 @@ Errors are rendered with a deterministic id and linked from the control
 via `aria-describedby`, composing with the help text's id when both are
 present.
 
-Integer and number fields deliberately render as `type="text"` with
-`inputmode="numeric"`: browsers can otherwise refuse or sanitize a raw
-non-numeric value after a failed decode. The renderer therefore preserves that
-raw text instead of emitting non-conforming `min`, `max`, or `step` attributes.
+Integer and number fields deliberately render as `type="text"`: browsers can
+otherwise refuse or sanitize a raw non-numeric value after a failed decode.
+Integer fields use `inputmode="numeric"`; general-number fields use
+`inputmode="decimal"`. These are keyboard hints only — the codec remains the
+authority for signs, fractions, exponents, trimming, and invalid input. The
+renderer preserves raw text and omits non-conforming `min`, `max`, and `step`
+attributes for numeric fields.
 
 ## Accessibility
 

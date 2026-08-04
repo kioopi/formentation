@@ -746,6 +746,33 @@ gitignored). Filtering by compile source means a new non-shipping module under
 `demo/` or `test/support/` is excluded automatically, with no filter list to
 maintain; a module that should be documented must live in `lib/`.
 
+## D-038 — Semantic value type and abstract widget are orthogonal prepared facts
+
+*2026-08-04*
+
+**Context.** Integer and general-number fields share the `:number_input`
+interaction family, but their useful soft-keyboard hints differ. Preserving
+only the resolved widget at the Phoenix prepared-node boundary made both render
+as `inputmode="numeric"`, even though the number codec accepts signs,
+fractions, and exponents. `role` cannot carry this distinction: option sets and
+explicit declarations may overwrite it. Resolves [GitHub issue #8](https://github.com/kioopi/formentation/issues/8).
+
+**Decision.** Every `RenderNode.Field` carries the normalized semantic
+`value_type` alongside its resolved `widget`. Integer and number still share
+`:number_input`; the reference theme selects `inputmode="numeric"` only for
+that widget with `value_type: :integer`, and `inputmode="decimal"` only for
+that widget with `value_type: :number`. Both remain `type="text"`; the codec
+is the sole authority for accepted grammar. Numeric semantic value types also
+drop `min`/`max`/`step` from every control that accepts progressive attributes,
+because those hints are non-conforming or ineffective on the text fallback.
+
+**Consequences.** Custom themes can distinguish integer from number without
+consulting a definition or source adapter, while widget intent still wins: a
+numeric field rendered as text, select, or hidden input receives no numeric
+input mode. This does not preserve `role` or `required?` at the prepared-node
+boundary; those remain explicit follow-up candidates rather than expanding this
+change. No definition format change is required.
+
 ## Related notes
 
 - [[19-north-star-architecture|North-star architecture]]
