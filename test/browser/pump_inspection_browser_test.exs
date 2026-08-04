@@ -53,7 +53,6 @@ defmodule FormentationDemo.PumpInspectionBrowserTest do
     # valid initial values (operating_hours 5102, voltage 230.0, insulation_ok true).
     conn
     |> visit_connected("/")
-    |> assert_has(~s(##{field_id(["operating_hours"], :control)}[inputmode="numeric"]))
     |> fill_in("Serial number", with: "PX-2044")
     |> select("Condition", option: "worn")
     |> choose("wall")
@@ -64,7 +63,6 @@ defmodule FormentationDemo.PumpInspectionBrowserTest do
   test "a pristine required field's error stays hidden until used or submitted", %{conn: conn} do
     conn
     |> visit_connected("/")
-    |> assert_has(~s(##{field_id(["voltage"], :control)}[inputmode="decimal"]))
     |> assert_has("form#asset-form")
     # pristine mount: the blank required serial_number shows no error
     |> refute_has("##{field_id(["serial_number"], :errors)}")
@@ -93,7 +91,9 @@ defmodule FormentationDemo.PumpInspectionBrowserTest do
     # the decode fails and its error appears (also anchors the assertion to the live patch)
     |> assert_has("##{field_id(["operating_hours"], :errors)}")
     # ...and the raw text survives the round-trip instead of being sanitized away
-    |> assert_has("##{field_id(["operating_hours"], :control)}", value: "51o2")
+    |> assert_has(~s(##{field_id(["operating_hours"], :control)}[inputmode="numeric"]),
+      value: "51o2"
+    )
   end
 
   test "the decimal field keeps a failed exponent attempt after the live round-trip", %{
@@ -103,7 +103,7 @@ defmodule FormentationDemo.PumpInspectionBrowserTest do
     |> visit_connected("/")
     |> fill_in("Voltage (V)", with: "-1.5e")
     |> assert_has("##{field_id(["voltage"], :errors)}")
-    |> assert_has("##{field_id(["voltage"], :control)}", value: "-1.5e")
+    |> assert_has(~s(##{field_id(["voltage"], :control)}[inputmode="decimal"]), value: "-1.5e")
   end
 
   test "clicking an error-summary link focuses the offending control", %{conn: conn} do

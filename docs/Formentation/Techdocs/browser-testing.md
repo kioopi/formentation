@@ -101,8 +101,8 @@ otherwise byte-for-byte the same file. When `browser?` is true, `test_helper.exs
 Port 4002 (not 4000, which `mix demo` uses for interactive browsing) keeps
 the two servers from colliding if both happen to run at once.
 
-The suite runs `async: true` and shares one demo server across its tests
-tests, so under load a `fill_in` → `phx-change` → websocket → DOM patch
+The suite runs `async: true` and shares one demo server across its tests, so
+under load a `fill_in` → `phx-change` → websocket → DOM patch
 round-trip can exceed PhoenixTest's default 2s assertion timeout; the
 `timeout: to_timeout(second: 5)` above absorbs that.
 
