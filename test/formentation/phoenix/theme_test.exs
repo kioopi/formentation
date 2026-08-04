@@ -227,9 +227,24 @@ defmodule Formentation.Phoenix.ThemeTest do
       end
     end
 
-    test "a numeric text widget renders without an inputmode attribute" do
-      doc = render_field(widget: :text_input, value_type: :number)
-      assert Floki.attribute(find_one(doc, "input"), "inputmode") == []
+    test "controls outside a numeric number input render without an inputmode attribute" do
+      for {widget, value_type, selector} <- [
+            {:text_input, :string, "input"},
+            {:text_input, :number, "input"},
+            {:textarea, :integer, "textarea"},
+            {:select, :integer, "select"},
+            # Production projection cannot create this mismatch: numeric widget
+            # inference requires a numeric value type and no hint names it.
+            {:number_input, :string, "input"}
+          ] do
+        doc = render_field(widget: widget, value_type: value_type, options: ["1"])
+        assert Floki.attribute(find_one(doc, selector), "inputmode") == []
+      end
+    end
+
+    test "a hidden numeric field renders without an inputmode attribute" do
+      doc = render_field(widget: :hidden_input, value_type: :number)
+      assert Floki.attribute(find_one(doc, "input[type=hidden]"), "inputmode") == []
     end
 
     test "textarea renders the value escaped as content, readonly when read-only" do
