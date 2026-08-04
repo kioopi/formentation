@@ -12,6 +12,15 @@ defmodule Formentation.Fixtures.Annotations do
 
   @fixture_dir Path.join(__DIR__, "annotations")
 
+  @external_resource Path.join(@fixture_dir, "schema.json")
+  @external_resource Path.join(@fixture_dir, "ui.json")
+
+  # Decoded at compile time, not per call: @external_resource forces the
+  # recompile when the JSON changes, but only a change in the module's
+  # compiled content propagates staleness to the tests that use it.
+  @json_schema @fixture_dir |> Path.join("schema.json") |> File.read!() |> JSON.decode!()
+  @ui_hints @fixture_dir |> Path.join("ui.json") |> File.read!() |> JSON.decode!()
+
   @impl true
   def map_source do
     %{
@@ -33,15 +42,11 @@ defmodule Formentation.Fixtures.Annotations do
   end
 
   @impl true
-  def json_schema, do: decode!("schema.json")
+  def json_schema, do: @json_schema
 
   @impl true
-  def ui_hints, do: decode!("ui.json")
+  def ui_hints, do: @ui_hints
 
   @impl true
   def field_names, do: ["checklist_version", "reviewed_by", "summary"]
-
-  defp decode!(name) do
-    @fixture_dir |> Path.join(name) |> File.read!() |> JSON.decode!()
-  end
 end

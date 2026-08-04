@@ -11,11 +11,18 @@ defmodule FormentationDemo.PumpInspection do
 
   @schema_dir Path.join(__DIR__, "pump_inspection")
 
+  @external_resource Path.join(@schema_dir, "schema.json")
+  @external_resource Path.join(@schema_dir, "ui.json")
+
+  # Decoded at compile time so an edit to the JSON reaches `mix test --stale`.
+  @json_schema @schema_dir |> Path.join("schema.json") |> File.read!() |> JSON.decode!()
+  @ui_hints @schema_dir |> Path.join("ui.json") |> File.read!() |> JSON.decode!()
+
   @doc "The decoded JSON Schema declaration (schema.json)."
-  def json_schema, do: decode!("schema.json")
+  def json_schema, do: @json_schema
 
   @doc "The decoded UI-hints document (ui.json)."
-  def ui_hints, do: decode!("ui.json")
+  def ui_hints, do: @ui_hints
 
   @doc """
   The demo's initial data: a new-inspection posture — readings present,
@@ -24,9 +31,5 @@ defmodule FormentationDemo.PumpInspection do
   """
   def initial_data do
     %{"operating_hours" => 5102, "voltage" => 230.0, "insulation_ok" => true}
-  end
-
-  defp decode!(name) do
-    @schema_dir |> Path.join(name) |> File.read!() |> JSON.decode!()
   end
 end
