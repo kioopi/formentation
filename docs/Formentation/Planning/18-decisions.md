@@ -721,7 +721,7 @@ now includes group help without changing the stored definition format, field
 names, or DOM identity grammar. A future root/page-help API and group-summary
 linking work can build on the preserved content and prepared container ids.
 
-## D-035 — Documentation generation is a `mix ci` gate
+## D-037 — Documentation generation is a `mix ci` gate
 
 *2026-08-03*
 
