@@ -12,7 +12,7 @@ status: current
 
 # Rendering
 
-*As of 2026-08-05 (projected native Phoenix forms, nested subtree summaries,
+*As of 2026-08-05 (validated projection roots, projected native Phoenix forms, nested subtree summaries,
 and explicit generic FormData route, [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]; native presentation traversal and semantic-index-backed
 projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]; DOM identity, [[18-decisions#D-034 — Phoenix renderer DOM identities are typed and injective|D-034]]; group help, [[18-decisions#D-036 — Group help uses prepared Phoenix identities|D-036]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
 
@@ -27,8 +27,8 @@ the form. Any other `Phoenix.HTML.FormData` source is the explicit advanced
 route and supplies `definition:`. `prepare_at/3` projects the single subtree
 at a path relative to that form's projection root (a field or a data-nesting
 group), returning `nil` when the node deliberately renders nothing, and
-raising for an unknown or unsupported path. Both preparation functions accept
-an explicit `dom_namespace`; otherwise they use `form.id || form.name` and
+raising for an unknown or unsupported path. `prepare/1,2` and `prepare_at/2,3`
+accept an explicit `dom_namespace`; otherwise they use `form.id || form.name` and
 raise with an actionable error when neither exists.
 
 The walk consumes `Formentation.Info.presentation_root/1` and
@@ -252,6 +252,21 @@ enclosing occurrence path distinguishes repeated collection items. `part` is
 fieldset), and `option_<index>` names one radio input. These are separate token
 positions, so a field called `notes_help` and the help for `notes` cannot share
 an id.
+
+The namespace moves when you render a subtree from its own form.
+`dom_namespace!/2` resolves `form.id || form.name`, and a nested form's id is
+the joined one, so the same field's renderer-owned id differs by which form
+rendered it:
+
+```
+root   fields/1 → ftn--asset_payload--field--control--address--street
+nested fields/1 → ftn--asset_payload_address--field--control--address--street
+```
+
+The Phoenix `name` is identical in both. Each plan is internally consistent —
+labels, `aria-describedby`, and summary `href`s always agree within one plan —
+so this is only a problem when the same subtree is rendered twice on one page.
+That is the concrete reason to pass `dom_namespace:`.
 
 Identity and namespace bytes are escaped byte by byte: ASCII letters, digits,
 and `_` remain literal except that a leading digit is encoded; every other byte

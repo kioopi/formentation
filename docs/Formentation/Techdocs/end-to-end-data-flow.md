@@ -12,7 +12,7 @@ status: current
 
 # End-to-end data flow
 
-> [!note] As of 2026-08-05 · projected Phoenix forms (D-041), submit decision result (D-032), prepared DOM identities (D-035)
+> [!note] As of 2026-08-05 · projected Phoenix forms and three-source rendering join (D-041), submit decision result (D-032), prepared DOM identities (D-035)
 > Follows one form through every layer that exists today, and stops
 > where the built system stops. Each layer has its own deep-dive note;
 > this one is about the **joins between them** — what crosses each
@@ -42,6 +42,7 @@ flowchart TD
     Def -->|"Form.new/3"| State
     State -->|"to_form/2"| PForm
     PForm -->|"native context or definition:"| Plan
+    Def -.->|"generic FormData"| Plan
     Plan -->|"reference theme"| HTML
     HTML -.->|"POST"| Params
     Params -->|"validate/2 or transition/2"| State
@@ -112,9 +113,10 @@ ordinary Phoenix form struct.
 state and answers Phoenix's questions with it: `input_value` from
 `display_value`, `errors` from action-gated issues, `input_validations`
 from schema constraints. The private projection metadata it puts in `options`
-carries the definition and current instance-path root, so one flat Phoenix form
-struct stays anchored in a tree and ordinary rendering needs no duplicate
-definition.
+carries the current instance-path root; the form's **source** carries the state
+and, with it, the compiled definition. `Formentation.Phoenix.ProjectedForm`
+recombines the two, so one flat Phoenix form struct stays anchored in a tree
+and ordinary rendering needs no duplicate definition.
 
 The example passes `as: "asset[payload]"`, and that single option is what
 makes submitted names compose under a parent namespace — every name below
@@ -124,10 +126,12 @@ control id is `ftn--asset_payload--field--control--serial_number`.
 
 ## 4 · `%Phoenix.HTML.Form{}` → `RenderPlan`
 
-**Crosses:** a Phoenix form (for values, errors, per-field usage, and, for a
-native Formentation form, definition plus projection root) and `form.source`
-(for the three semantic facts Phoenix cannot carry). A generic FormData source
-supplies the definition explicitly. **Comes back:** a
+**Crosses:** Three things come here, from three different places: values,
+errors, and per-field usage come through Phoenix's own conventions on the form
+struct; the projection root comes from the private `options` key; and, for a
+native Formentation form, the definition comes from `form.source`. Only the
+middle one is new in D-041. A generic FormData source supplies the definition
+explicitly. **Comes back:** a
 `%RenderPlan{}`.
 
 [[rendering|Render preparation]] walks the definition in declaration order and
