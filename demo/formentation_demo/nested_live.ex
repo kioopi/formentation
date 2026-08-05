@@ -67,7 +67,7 @@ defmodule FormentationDemo.NestedLive do
     <main>
       <h1>Nested address</h1>
       <.form for={@payload_form} id="nested-form" phx-change="validate" phx-submit="save">
-        <Formentation.Phoenix.fields definition={@definition} form={@payload_form} />
+        <Formentation.Phoenix.fields form={@payload_form} />
         <button type="submit">Save</button>
       </.form>
       <pre :if={@submitted} id="decoded-candidate">{JSON.encode!(@submitted)}</pre>
