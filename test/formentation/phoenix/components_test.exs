@@ -581,6 +581,38 @@ defmodule Formentation.Phoenix.ComponentsTest do
   end
 
   describe "field/1" do
+    test "renders a nested object's own fieldset at the relative root path" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"serial_number", %{kind: :string}},
+            {"address",
+             %{
+               kind: :object,
+               title: "Address",
+               help: "Where it lives.",
+               properties: [{"street", %{kind: :string}}]
+             }}
+          ]
+        })
+
+      form_state = Form.new(definition, %{"address" => %{"street" => "Elm"}})
+      root = FormData.to_form(form_state, as: "asset[payload]", id: "asset_payload")
+      [address] = FormData.to_form(form_state, root, :address, [])
+
+      doc = render_component(&Formentation.Phoenix.field/1, form: address, path: []) |> parse!()
+
+      assert [_] = Floki.find(doc, "fieldset")
+      assert Floki.text(find_one(doc, "legend")) |> String.trim() == "Address"
+      assert Floki.text(find_one(doc, ".ftn-group-help")) |> String.trim() == "Where it lives."
+
+      assert [_] = Floki.find(doc, ~s(input[name="asset[payload][address][street]"]))
+      assert Floki.find(doc, ~s(input[name="asset[payload][serial_number]"])) == []
+
+      assert_all_references_resolve(doc)
+    end
+
     test "renders root help when explicitly projecting the root subtree" do
       definition = compile!(%{kind: :object, help: "Root help.", properties: []})
       form = FormData.to_form(Form.new(definition), as: "payload")

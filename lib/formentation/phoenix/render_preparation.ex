@@ -62,8 +62,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
   @spec prepare(Phoenix.HTML.Form.t(), keyword()) :: RenderPlan.t()
   def prepare(%Phoenix.HTML.Form{} = form, opts) when is_list(opts) do
     ctx = resolve_context(form, opts)
-    descriptor = presentation_root_at(ctx.definition, ctx.root_path)
-    {root, diagnostics} = project_descriptor(descriptor, form, ctx)
+    {root, diagnostics} = project_descriptor(ctx.root_descriptor, form, ctx)
     %RenderPlan{root: root, summary: summary(root, ctx), diagnostics: diagnostics}
   end
 
@@ -112,10 +111,10 @@ defmodule Formentation.Phoenix.RenderPreparation do
 
       {:ok, descriptor} ->
         parent = descriptor_parent_path(descriptor)
-        relative_parent = Enum.drop(parent, length(ctx.root_path))
+        {starting_form, cursor} = subtree_cursor(parent, form, ctx)
 
         {render, _diagnostics} =
-          project_descriptor(descriptor, descend(form, relative_parent), %{ctx | path: parent})
+          project_descriptor(descriptor, starting_form, %{ctx | path: cursor})
 
         render
     end
@@ -132,6 +131,8 @@ defmodule Formentation.Phoenix.RenderPreparation do
       source: form.source,
       path: path,
       root_path: root_path,
+      root_instance_path: InstancePath.new!(root_path),
+      root_descriptor: presentation_root_at(definition, root_path),
       semantic_nodes: semantic_nodes,
       dom_namespace: dom_namespace
     }
@@ -221,6 +222,18 @@ defmodule Formentation.Phoenix.RenderPreparation do
       [nested] = Phoenix.HTML.FormData.to_form(form.source, form, segment, [])
       nested
     end)
+  end
+
+  # A descriptor reachable from this context sits either at the projection
+  # root (its own parent is above the root) or strictly below it. The root
+  # descriptor has already been validated by resolve_context/2, so there is
+  # no malformed-root case left for traversal to handle.
+  defp subtree_cursor(parent, form, ctx) do
+    if InstancePath.ancestor_or_self?(ctx.root_instance_path, InstancePath.new!(parent)) do
+      {descend(form, Enum.drop(parent, length(ctx.root_path))), parent}
+    else
+      {form, ctx.root_path}
+    end
   end
 
   defp project_descriptor(%Presentation.Object{semantic_path: path} = object, form, ctx) do

@@ -56,6 +56,30 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
     })
   end
 
+  defp nested_projection_definition do
+    compile!(%{
+      kind: :object,
+      properties: [
+        {"title", %{kind: :string}},
+        {"address",
+         %{
+           kind: :object,
+           title: "Address",
+           help: "Where it lives.",
+           properties: [{"street", %{kind: :string}}]
+         }}
+      ]
+    })
+  end
+
+  defp nested_projection_forms do
+    definition = nested_projection_definition()
+    state = Form.new(definition, %{"title" => "root", "address" => %{"street" => "Elm"}})
+    root = FormData.to_form(state, as: "asset[payload]", id: "asset_payload")
+    [address] = FormData.to_form(state, root, :address, [])
+    {root, address}
+  end
+
   defp decode_error_form(event, extra_values \\ %{}) do
     definition = flat_definition()
 
@@ -235,6 +259,44 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
       assert_raise ArgumentError, ~r/not a valid Formentation projection.*rebuild/, fn ->
         RenderPreparation.prepare(broken, definition: flat_definition())
+      end
+    end
+
+    test "prepares a nested form's own object at the relative root path" do
+      {_root, address} = nested_projection_forms()
+
+      node = RenderPreparation.prepare_at(address, [])
+
+      assert %RenderNode.Group{legend: "Address", help: "Where it lives."} = node
+
+      assert node.dom.container ==
+               DOMIdentity.object(
+                 "asset_payload_address",
+                 InstancePath.new!(["address"]),
+                 :container
+               )
+
+      # The child name is what proves no second nesting happened: a double
+      # descent would produce asset[payload][address][address][street].
+      assert [%RenderNode.Field{field: %{name: "asset[payload][address][street]"}}] =
+               node.children
+    end
+
+    test "rejects a projection root that is not an object from both entry points" do
+      {root, _address} = nested_projection_forms()
+
+      tampered = %{
+        root
+        | options: Keyword.put(root.options, :__formentation__, ["address", "street"])
+      }
+
+      message = ~r/projected form root \["address", "street"\] is not an object/
+
+      assert_raise ArgumentError, message, fn -> RenderPreparation.prepare(tampered) end
+      assert_raise ArgumentError, message, fn -> RenderPreparation.prepare_at(tampered, []) end
+
+      assert_raise ArgumentError, message, fn ->
+        RenderPreparation.prepare_at(tampered, ["street"])
       end
     end
 
