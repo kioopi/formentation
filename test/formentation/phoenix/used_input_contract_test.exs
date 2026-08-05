@@ -198,7 +198,7 @@ defmodule Formentation.Phoenix.UsedInputContractTest do
     # And the user-visible consequence, through the projector, is that
     # the (now-:required, since "title" is absent from the candidate)
     # error is shown.
-    plan = RenderPreparation.prepare(definition, phoenix_form_t2)
+    plan = RenderPreparation.prepare(phoenix_form_t2, definition: definition)
 
     title_node =
       Enum.find(plan.root.children, &match?(%RenderNode.Field{field: %{field: :title}}, &1))

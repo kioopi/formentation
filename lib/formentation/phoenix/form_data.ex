@@ -58,12 +58,13 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
     opts = drop_collection_options!(opts)
     {name, opts} = Keyword.pop(opts, :as)
     {id, opts} = Keyword.pop(opts, :id)
+    form_fields = Map.from_struct(form)
 
     %Phoenix.HTML.Form{
       source: form_state,
       impl: __MODULE__,
-      id: (id && to_string(id)) || join_id(form.id, key),
-      name: (name && to_string(name)) || join_name(form.name, key),
+      id: (id && to_string(id)) || join_id(Map.get(form_fields, :id), key),
+      name: (name && to_string(name)) || join_name(Map.get(form_fields, :name), key),
       params: sub_map(form.params, key),
       data: sub_map(form.data, key),
       errors: errors_for(form_state, path),

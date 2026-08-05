@@ -491,8 +491,9 @@ defmodule Formentation.Phoenix.RenderPreparation do
 
       {:ok, issues} ->
         issues
-        |> Enum.filter(&inside_projection?(&1.path, ctx.root_path))
-        |> Enum.filter(&non_field_visible?(ctx, &1))
+        |> Enum.filter(
+          &(inside_projection?(&1.path, ctx.root_path) and non_field_visible?(ctx, &1))
+        )
         |> Enum.map(&summary_entry(nil, summary_label(ctx, &1.path), &1.message))
     end
   end
