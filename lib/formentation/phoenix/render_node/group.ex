@@ -1,5 +1,8 @@
 defmodule Formentation.Phoenix.RenderNode.Group do
-  @moduledoc false
+  @moduledoc """
+  A rendered grouping. Data-nesting and presentational groups project to this
+  one shape; their field names retain the distinction through FormData.
+  """
 
   alias Formentation.Phoenix.RenderNode
 

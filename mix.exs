@@ -111,6 +111,15 @@ defmodule Formentation.MixProject do
     end
   end
 
+  defp internal_documentation_module?(module) do
+    module in [
+      Formentation.Phoenix.RenderPreparation,
+      Formentation.Phoenix.ReferenceComponents,
+      Formentation.Phoenix.RenderPlan,
+      Formentation.Phoenix.RenderNode
+    ] or String.starts_with?(Atom.to_string(module), "Elixir.Formentation.Phoenix.RenderNode.")
+  end
+
   defp package do
     [
       licenses: ["MIT"],
@@ -127,7 +136,9 @@ defmodule Formentation.MixProject do
       # compiles `demo/` (:dev, :test) and `test/support/` (:test), and
       # `mix ci` runs `mix docs` in MIX_ENV=test — filtering on the compile
       # source keeps the gated doc surface equal to the published one.
-      filter_modules: fn module, _metadata -> library_module?(module) end,
+      filter_modules: fn module, _metadata ->
+        library_module?(module) and not internal_documentation_module?(module)
+      end,
       groups_for_modules: [
         "Compile & query": [
           Formentation,

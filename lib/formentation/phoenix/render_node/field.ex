@@ -1,5 +1,9 @@
 defmodule Formentation.Phoenix.RenderNode.Field do
-  @moduledoc false
+  @moduledoc """
+  A single renderable control with all component-ready facts a reference
+  component needs, including resolved widget, semantic `value_type`, Phoenix
+  form field, and prepared DOM identities.
+  """
 
   alias Formentation.Phoenix.RenderNode
 

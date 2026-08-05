@@ -1,5 +1,9 @@
 defmodule Formentation.Phoenix.RenderPlan do
-  @moduledoc false
+  @moduledoc """
+  The render-preparation output: a render-node tree plus the submit-gated error
+  summary and preparation diagnostics. The planning-note fields with no Phase 1
+  behavior (fingerprint, branches, item identities) are omitted, not stubbed.
+  """
 
   alias Formentation.Diagnostic
   alias Formentation.Phoenix.RenderNode
