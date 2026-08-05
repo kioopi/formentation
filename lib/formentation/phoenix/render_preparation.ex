@@ -510,9 +510,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
 
       {:ok, issues} ->
         issues
-        |> Enum.filter(
-          &(inside_projection?(&1.path, ctx.root_path) and non_field_visible?(ctx, &1))
-        )
+        |> Enum.filter(&(inside_projection?(ctx, &1) and non_field_visible?(ctx, &1)))
         |> Enum.map(&summary_entry(nil, summary_label(ctx, &1.path), &1.message))
     end
   end
@@ -531,8 +529,11 @@ defmodule Formentation.Phoenix.RenderPreparation do
     Info.semantic_kind(ctx.definition, segments) == :field
   end
 
-  defp inside_projection?(%InstancePath{segments: issue_path}, root_path) do
-    Enum.take(issue_path, length(root_path)) == root_path
+  # D-028's shared predicate, not a second implementation of it: "is this
+  # path under that path" is decided segment-wise in one place, so
+  # ["tag"] never counts as an ancestor of ["tags"].
+  defp inside_projection?(ctx, %StateView.Issue{path: path}) do
+    InstancePath.ancestor_or_self?(ctx.root_instance_path, path)
   end
 
   # An unsupported node carries a name a reader can recognize, so its

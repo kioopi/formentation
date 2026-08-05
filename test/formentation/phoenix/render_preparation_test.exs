@@ -990,6 +990,42 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       Phoenix.HTML.FormData.to_form(source, as: "payload")
     end
 
+    test "a nested plan's summary carries only non-field issues inside its subtree" do
+      definition =
+        compile_json!(%{
+          "type" => "object",
+          "required" => ["address", "contact"],
+          "properties" => %{
+            "title" => %{"type" => "string"},
+            "address" => %{
+              "type" => "object",
+              "title" => "Address",
+              "required" => ["street"],
+              "properties" => %{"street" => %{"type" => "string", "minLength" => 1}}
+            },
+            "contact" => %{
+              "type" => "object",
+              "title" => "Contact",
+              "required" => ["email"],
+              "properties" => %{"email" => %{"type" => "string", "minLength" => 1}}
+            }
+          }
+        })
+
+      form_state = submitted_form(Form.new(definition), %{"title" => "t"})
+      root = FormData.to_form(form_state, as: "asset[payload]", id: "asset_payload")
+      [address] = FormData.to_form(form_state, root, :address, [])
+
+      assert RenderPreparation.prepare(root).summary
+             |> Enum.map(& &1.message) == [
+               "property 'address' is required",
+               "property 'contact' is required"
+             ]
+
+      assert [%{id: nil, label: nil, message: "property 'address' is required"}] =
+               RenderPreparation.prepare(address).summary
+    end
+
     test "a root issue appears once, unlinked, and never enters a field's errors" do
       plan =
         Projector.project(
