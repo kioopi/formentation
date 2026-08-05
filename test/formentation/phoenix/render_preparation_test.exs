@@ -4,10 +4,15 @@ defmodule Formentation.Phoenix.RenderPreparationTest.ProjectorAdapter do
   shapes working so ~1200 lines of behavioural assertions did not have to be
   rewritten under the rename.
 
-  Every test routed through this shim passes `definition:` explicitly, so it
-  takes the **generic** branch of `resolve_context/2`. The bulk of
-  preparation coverage therefore proves nothing about native derivation; if
-  the two branches ever diverge, this shim is where the divergence will hide.
+  Passing `definition:` does **not** select the generic branch.
+  `resolve_context/2` dispatches on `ProjectedForm.native_context/1` first, so
+  a form whose source is a `%Formentation.Form{}` takes the **native** branch
+  regardless, and the shim's explicit definition is then checked by
+  `validate_native_definition!/2` as a matching redundant definition. Most of
+  this file's forms are native, so the bulk of preparation coverage exercises
+  native derivation plus that redundancy check. Only the map-source and
+  `SourceFixture` forms reach the generic branch — which is where the
+  `definition:` requirement itself is proved.
   """
 
   alias Formentation.Phoenix.RenderPreparation
