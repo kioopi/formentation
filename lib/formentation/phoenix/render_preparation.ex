@@ -552,6 +552,14 @@ defmodule Formentation.Phoenix.RenderPreparation do
   # D-028's shared predicate, not a second implementation of it: "is this
   # path under that path" is decided segment-wise in one place, so
   # ["tag"] never counts as an ancestor of ["tags"].
+  #
+  # Nuance worth knowing before someone reports it as a bug: an object-level
+  # issue at the projection root *itself* passes this filter and then gets
+  # summary_label/2 == nil, because Info.semantic_kind/2 says :object. It
+  # therefore renders as an unlabelled plain-text entry — visually identical
+  # to a root-of-form issue. At root_path == [] that reading was exactly
+  # right; at root_path == ["address"] it is slightly misleading, but not
+  # enough to warrant a second label rule.
   defp inside_projection?(ctx, %StateView.Issue{path: path}) do
     InstancePath.ancestor_or_self?(ctx.root_instance_path, path)
   end

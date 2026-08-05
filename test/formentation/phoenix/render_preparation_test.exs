@@ -1114,18 +1114,38 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       Phoenix.HTML.FormData.to_form(source, as: "payload")
     end
 
-    test "a nested plan's summary carries only non-field issues inside its subtree" do
+    test "a nested plan's summary carries exactly the non-field issues at or under its root" do
+      # One fixture, four boundaries relative to the projected root ["address"]:
+      #
+      #   []                 ancestor of the root  → excluded
+      #   ["address"]        the root itself       → included
+      #   ["address","geo"]  descendant            → included
+      #   ["contact"]        sibling               → excluded
+      #
+      # The [] and descendant cases are what distinguish ancestor/self
+      # semantics from an equality-only filter; both minProperties issues are
+      # filed at the *object's own* path, which is what makes them non-field
+      # entries rather than per-field errors.
       definition =
         compile_json!(%{
           "type" => "object",
+          "minProperties" => 4,
           "required" => ["address", "contact"],
           "properties" => %{
             "title" => %{"type" => "string"},
             "address" => %{
               "type" => "object",
               "title" => "Address",
-              "required" => ["street"],
-              "properties" => %{"street" => %{"type" => "string", "minLength" => 1}}
+              "minProperties" => 3,
+              "required" => ["geo"],
+              "properties" => %{
+                "street" => %{"type" => "string", "minLength" => 1},
+                "geo" => %{
+                  "type" => "object",
+                  "required" => ["lat"],
+                  "properties" => %{"lat" => %{"type" => "string", "minLength" => 1}}
+                }
+              }
             },
             "contact" => %{
               "type" => "object",
@@ -1136,18 +1156,30 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
           }
         })
 
-      form_state = submitted_form(Form.new(definition), %{"title" => "t"})
+      form_state =
+        submitted_form(Form.new(definition), %{"title" => "t", "address" => %{"street" => "Elm"}})
+
       root = FormData.to_form(form_state, as: "asset[payload]", id: "asset_payload")
       [address] = FormData.to_form(form_state, root, :address, [])
 
-      assert RenderPreparation.prepare(root).summary
-             |> Enum.map(& &1.message) == [
-               "property 'address' is required",
+      assert Enum.map(RenderPreparation.prepare(root).summary, & &1.message) == [
+               "value must have at least 4 properties, got 2",
+               "value must have at least 3 properties, got 1",
+               "property 'geo' is required",
                "property 'contact' is required"
              ]
 
-      assert [%{id: nil, label: nil, message: "property 'address' is required"}] =
-               RenderPreparation.prepare(address).summary
+      # Root-of-form and sibling entries are gone; self and descendant remain,
+      # in adapter order — the filter never reorders.
+      assert Enum.map(RenderPreparation.prepare(address).summary, & &1.message) == [
+               "value must have at least 3 properties, got 1",
+               "property 'geo' is required"
+             ]
+
+      # Both nested entries are unlinked and unlabelled: they name objects, so
+      # summary_label/2 returns nil and there is no focusable control to target.
+      assert Enum.all?(RenderPreparation.prepare(address).summary, &(&1.id == nil))
+      assert Enum.all?(RenderPreparation.prepare(address).summary, &(&1.label == nil))
     end
 
     test "a root issue appears once, unlinked, and never enters a field's errors" do
