@@ -1561,9 +1561,14 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
     test "the projection decoder never reaches for runtime state" do
       source = File.read!("lib/formentation/phoenix/projected_form.ex")
 
-      refute source =~ "StateView"
-      refute source =~ "submitted?"
-      refute source =~ "issue"
+      # Call shapes, not vocabulary: the point is that ProjectedForm decodes
+      # projection metadata and never asks the source a state-dependent
+      # question. A comment mentioning issues or submission must not fail
+      # this — only a call to StateView can.
+      refute source =~ ~r/\bStateView\b/
+      refute source =~ ~r/\bsubmitted\?\(/
+      refute source =~ ~r/\bissue_visibility\(/
+      refute source =~ ~r/\bissues\(/
     end
 
     test "the projector names no concrete runtime-state struct" do
