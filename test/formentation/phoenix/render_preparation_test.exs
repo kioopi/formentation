@@ -1171,15 +1171,16 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
       # Root-of-form and sibling entries are gone; self and descendant remain,
       # in adapter order — the filter never reorders.
-      assert Enum.map(RenderPreparation.prepare(address).summary, & &1.message) == [
+      address_summary = RenderPreparation.prepare(address).summary
+
+      assert Enum.map(address_summary, & &1.message) == [
                "value must have at least 3 properties, got 1",
                "property 'geo' is required"
              ]
 
       # Both nested entries are unlinked and unlabelled: they name objects, so
       # summary_label/2 returns nil and there is no focusable control to target.
-      assert Enum.all?(RenderPreparation.prepare(address).summary, &(&1.id == nil))
-      assert Enum.all?(RenderPreparation.prepare(address).summary, &(&1.label == nil))
+      assert Enum.all?(address_summary, &(&1.label == nil))
     end
 
     test "a root issue appears once, unlinked, and never enters a field's errors" do
@@ -1564,11 +1565,15 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       # Call shapes, not vocabulary: the point is that ProjectedForm decodes
       # projection metadata and never asks the source a state-dependent
       # question. A comment mentioning issues or submission must not fail
-      # this — only a call to StateView can.
+      # this — only a call to StateView can. The capitalised, word-bounded
+      # pattern below additionally guards against ProjectedForm reaching for
+      # a concrete %Formentation.Issue{} struct, without tripping on the
+      # lowercase prose "issue"/"issues" that Task 5 deliberately allows.
       refute source =~ ~r/\bStateView\b/
       refute source =~ ~r/\bsubmitted\?\(/
       refute source =~ ~r/\bissue_visibility\(/
       refute source =~ ~r/\bissues\(/
+      refute source =~ ~r/\bIssue\b/
     end
 
     test "the projector names no concrete runtime-state struct" do
@@ -1595,11 +1600,41 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       # field/1 render — materialize the whole presentation tree to answer a
       # question about one node. A wall-clock assertion would be flaky, so pin
       # the seam instead, in the idiom this block already uses.
+      assert @projector_source =~ "defp context(", "expected defp context/5 in the source"
       [_head, after_head] = String.split(@projector_source, "defp context(", parts: 2)
       [context_body, _rest] = String.split(after_head, "\n  end\n", parts: 2)
 
       assert context_body =~ "validate_projection_root!"
       refute context_body =~ "presentation_root_at"
+
+      # The claim above is narrower than it looks: it only pins that
+      # context/5's own body doesn't call presentation_root_at/2. Someone
+      # could move the eager build one level down, into
+      # validate_projection_root!/2 (still called from context/5), and
+      # reinstate the exact performance regression with the assertions
+      # above still green. Pin the real claim instead: presentation_root_at
+      # is called only from prepare/2. It appears three times in the source
+      # by construction — its two `defp` clause heads plus exactly one call
+      # site — and that one call site must be inside prepare/2's body.
+      prepare_marker =
+        "def prepare(%Phoenix.HTML.Form{} = form, opts) when is_list(opts) do"
+
+      assert @projector_source =~ prepare_marker, "expected prepare/2 in the source"
+
+      [_before_prepare, after_prepare_head] =
+        String.split(@projector_source, prepare_marker, parts: 2)
+
+      [prepare_body, _rest] = String.split(after_prepare_head, "\n  end\n", parts: 2)
+
+      assert prepare_body =~ "presentation_root_at"
+
+      occurrences =
+        @projector_source
+        |> String.split("presentation_root_at(")
+        |> length()
+        |> Kernel.-(1)
+
+      assert occurrences == 3
     end
   end
 

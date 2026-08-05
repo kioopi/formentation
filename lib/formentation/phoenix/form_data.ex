@@ -64,7 +64,6 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
     # the nil clauses of join_id/2 and join_name/2 unreachable; direct
     # `form.id` access reports two pattern_match errors here. Map.get/2 takes
     # the struct as-is, so this costs nothing beyond the lookup.
-
     %Phoenix.HTML.Form{
       source: form_state,
       impl: __MODULE__,

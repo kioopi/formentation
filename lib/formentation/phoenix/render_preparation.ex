@@ -252,7 +252,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
 
   # A descriptor reachable from this context sits either at the projection
   # root (its own parent is above the root) or strictly below it. The root
-  # descriptor has already been validated by resolve_context/2, so there is
+  # path has already been validated by resolve_context/2, so there is
   # no malformed-root case left for traversal to handle.
   defp subtree_cursor(parent, form, ctx) do
     if InstancePath.ancestor_or_self?(ctx.root_instance_path, InstancePath.new!(parent)) do
