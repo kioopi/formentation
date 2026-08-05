@@ -16,6 +16,10 @@ defmodule Formentation.Phoenix do
 
   alias Formentation.Phoenix.{ReferenceComponents, RenderPlan, RenderPreparation}
 
+  @definition_doc "required only when `form`'s source is not a `%Formentation.Form{}`; a form " <>
+                    "projected from `Formentation.Form` carries its own definition, and passing " <>
+                    "a different one raises"
+
   @doc """
   Renders the whole payload form body — error summary first, then every
   render node — inside your own `<form>`:
@@ -57,14 +61,7 @@ defmodule Formentation.Phoenix do
   `Formentation.Phoenix.StateView`; without an implementation it falls back to
   the Phoenix action/`used_input?` rule.
   """
-  attr(:definition, Formentation.Definition,
-    default: nil,
-    doc:
-      "required only when `form`'s source is not a `%Formentation.Form{}`; a form " <>
-        "projected from `Formentation.Form` carries its own definition, and passing " <>
-        "a different one raises"
-  )
-
+  attr(:definition, Formentation.Definition, default: nil, doc: @definition_doc)
   attr(:form, Phoenix.HTML.Form, required: true)
   attr(:dom_namespace, :string, default: nil, doc: "override for renderer-owned DOM ids")
 
@@ -106,15 +103,8 @@ defmodule Formentation.Phoenix do
   />
   ```
   """
-  attr(:definition, Formentation.Definition,
-    default: nil,
-    doc:
-      "required only when `form`'s source is not a `%Formentation.Form{}`; a form " <>
-        "projected from `Formentation.Form` carries its own definition, and passing " <>
-        "a different one raises"
-  )
-
-  attr(:form, Phoenix.HTML.Form, required: true)
+  attr(:definition, Formentation.Definition, default: nil, doc: @definition_doc)
+  attr(:form, Phoenix.HTML.Form, required: true, doc: "the projected form to render")
   attr(:dom_namespace, :string, default: nil, doc: "override for renderer-owned DOM ids")
 
   attr(:path, :list,
