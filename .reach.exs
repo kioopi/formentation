@@ -93,19 +93,19 @@
       {"Formentation.*", ["Phoenix.*"], except: ["Formentation.Phoenix.*"]},
       # JSV never leaks past its swap point (D-008).
       {"Formentation.*", ["JSV.*"], except: ["Formentation.JSONSchema.Validator"]},
-      # The projector dispatches state-dependent decisions only through
+      # Render preparation dispatches state-dependent decisions only through
       # Formentation.Phoenix.StateView (D-027); it must never call into
       # Formentation.Form directly. The {:phoenix, :core} layer dependency
       # is sanctioned (the projector reads Definition/Info/Node freely), so
       # no layer rule can express this narrower obligation — only a
       # per-module call rule can. This closes the alias-evasion gap the
-      # projector_test.exs "architectural boundary" grep pin cannot see:
+      # render_preparation_test.exs "architectural boundary" grep pin cannot see:
       # `alias Formentation.{Form, ...}` (brace syntax) never produces the
       # literal substring "Formentation.Form" the grep looks for, but Reach
       # resolves calls against the call graph after alias resolution, so it
       # catches a `Form.some_function/arity` call regardless of how the
       # alias was spelled.
-      {"Formentation.Phoenix.Projector", ["Formentation.Form", "Formentation.Form.*"]}
+      {"Formentation.Phoenix.RenderPreparation", ["Formentation.Form", "Formentation.Form.*"]}
     ]
   ],
   effects: [

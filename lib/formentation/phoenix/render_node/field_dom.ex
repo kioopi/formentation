@@ -1,12 +1,5 @@
 defmodule Formentation.Phoenix.RenderNode.FieldDOM do
-  @moduledoc """
-  Exact renderer-owned DOM identities prepared for one field occurrence.
-
-  Components consume these values verbatim; they never derive identifiers from
-  Phoenix's transport-oriented field id. `control` names scalar controls (and
-  hidden inputs), while `container` is reserved for composite widgets. Only a
-  `:radio_group` currently consumes `container`, for its fieldset.
-  """
+  @moduledoc false
 
   @enforce_keys [:control, :container, :help, :errors, :options]
   defstruct [:control, :container, :help, :errors, :options]

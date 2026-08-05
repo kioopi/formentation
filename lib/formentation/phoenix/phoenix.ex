@@ -14,7 +14,7 @@ defmodule Formentation.Phoenix do
 
   use Phoenix.Component
 
-  alias Formentation.Phoenix.{Projector, Theme.Reference}
+  alias Formentation.Phoenix.{ReferenceComponents, RenderPreparation}
 
   @doc """
   Renders the whole payload form body — error summary first, then every
@@ -52,13 +52,13 @@ defmodule Formentation.Phoenix do
       assign(
         assigns,
         :plan,
-        Projector.project(assigns.definition, assigns.form, projector_opts(assigns))
+        RenderPreparation.prepare(assigns.definition, assigns.form, projector_opts(assigns))
       )
 
     ~H"""
     <div class="ftn-form">
-      <Reference.error_summary summary={@plan.summary} />
-      <Reference.node :for={child <- @plan.root.children} node={child} />
+      <ReferenceComponents.error_summary summary={@plan.summary} />
+      <ReferenceComponents.node :for={child <- @plan.root.children} node={child} />
     </div>
     """
   end
@@ -92,7 +92,7 @@ defmodule Formentation.Phoenix do
       assign(
         assigns,
         :node,
-        Projector.project_at(
+        RenderPreparation.prepare_at(
           assigns.definition,
           assigns.form,
           assigns.path,
@@ -101,7 +101,7 @@ defmodule Formentation.Phoenix do
       )
 
     ~H"""
-    <Reference.node :if={@node} node={@node} />
+    <ReferenceComponents.node :if={@node} node={@node} />
     """
   end
 

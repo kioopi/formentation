@@ -1,17 +1,5 @@
-defmodule Formentation.Phoenix.Projector do
-  @moduledoc """
-  Combines a compiled definition with a `%Phoenix.HTML.Form{}` into a
-  `Formentation.Phoenix.RenderPlan` (the rendering boundary in
-  Planning/06-runtime-projection). Two-part boundary: Phoenix form
-  conventions carry field-level mechanics, so any `Phoenix.HTML.FormData`
-  implementation still projects; the source's
-  `Formentation.Phoenix.StateView` (D-027) carries submission, issue
-  visibility, and non-field issues Phoenix cannot express. Pure — same
-  inputs, same plan.
-
-  Spec: docs/superpowers/specs/2026-07-23-phase1-step6-projector-components-theme-design.md
-  Spec: docs/superpowers/specs/2026-07-25-runtime-state-view-contract-design.md
-  """
+defmodule Formentation.Phoenix.RenderPreparation do
+  @moduledoc false
 
   alias Formentation.{Definition, Diagnostic, Info, InstancePath, Semantic}
   alias Formentation.Info.Presentation
@@ -48,14 +36,14 @@ defmodule Formentation.Phoenix.Projector do
       ...>     adapter: Formentation.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
-      iex> plan = Formentation.Phoenix.Projector.project(definition, form)
+      iex> plan = Formentation.Phoenix.RenderPreparation.prepare(definition, form)
       iex> [field] = plan.root.children
       iex> {field.widget, field.label, field.field.name}
       {:email_input, "Email", "payload[email]"}
   """
-  @spec project(Definition.t(), Phoenix.HTML.Form.t()) :: RenderPlan.t()
-  def project(%Definition{} = definition, %Phoenix.HTML.Form{} = form),
-    do: project(definition, form, [])
+  @spec prepare(Definition.t(), Phoenix.HTML.Form.t()) :: RenderPlan.t()
+  def prepare(%Definition{} = definition, %Phoenix.HTML.Form{} = form),
+    do: prepare(definition, form, [])
 
   @doc """
   Projects the whole definition with an explicit renderer-owned DOM namespace.
@@ -68,12 +56,12 @@ defmodule Formentation.Phoenix.Projector do
       ...>     adapter: Formentation.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
-      iex> [field] = Formentation.Phoenix.Projector.project(definition, form, dom_namespace: "asset_payload").root.children
+      iex> [field] = Formentation.Phoenix.RenderPreparation.prepare(definition, form, dom_namespace: "asset_payload").root.children
       iex> {field.dom.control, field.field.name}
       {"ftn--asset_payload--field--control--email", "payload[email]"}
   """
-  @spec project(Definition.t(), Phoenix.HTML.Form.t(), keyword()) :: RenderPlan.t()
-  def project(%Definition{} = definition, %Phoenix.HTML.Form{} = form, opts) when is_list(opts) do
+  @spec prepare(Definition.t(), Phoenix.HTML.Form.t(), keyword()) :: RenderPlan.t()
+  def prepare(%Definition{} = definition, %Phoenix.HTML.Form{} = form, opts) when is_list(opts) do
     ctx =
       context(
         definition,
@@ -102,22 +90,22 @@ defmodule Formentation.Phoenix.Projector do
       ...>     adapter: Formentation.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
-      iex> node = Formentation.Phoenix.Projector.project_at(definition, form, ["email"])
+      iex> node = Formentation.Phoenix.RenderPreparation.prepare_at(definition, form, ["email"])
       iex> {node.widget, node.field.name}
       {:email_input, "payload[email]"}
   """
-  @spec project_at(Definition.t(), Phoenix.HTML.Form.t(), [String.t()]) ::
+  @spec prepare_at(Definition.t(), Phoenix.HTML.Form.t(), [String.t()]) ::
           RenderNode.t() | nil
-  def project_at(%Definition{} = definition, %Phoenix.HTML.Form{} = form, segments)
+  def prepare_at(%Definition{} = definition, %Phoenix.HTML.Form{} = form, segments)
       when is_list(segments),
-      do: project_at(definition, form, segments, [])
+      do: prepare_at(definition, form, segments, [])
 
   @doc """
   Projects one subtree with an explicit renderer-owned DOM namespace.
   """
-  @spec project_at(Definition.t(), Phoenix.HTML.Form.t(), [String.t()], keyword()) ::
+  @spec prepare_at(Definition.t(), Phoenix.HTML.Form.t(), [String.t()], keyword()) ::
           RenderNode.t() | nil
-  def project_at(%Definition{} = definition, %Phoenix.HTML.Form{} = form, segments, opts)
+  def prepare_at(%Definition{} = definition, %Phoenix.HTML.Form{} = form, segments, opts)
       when is_list(segments) do
     %InstancePath{segments: segments} = InstancePath.new!(segments)
 

@@ -1,12 +1,5 @@
-defmodule Formentation.Phoenix.Theme.Reference do
-  @moduledoc """
-  The Phase 1 reference theme: plain, accessible, deliberately
-  unpolished markup for every projector widget. This is a markup set,
-  not a theme contract — the contract is extracted in Phase 3 from a
-  second implementation. The D-011 (checkbox hidden input) and D-016
-  (readonly/disabled, no hidden mirrors) conformance tests bind these
-  components directly.
-  """
+defmodule Formentation.Phoenix.ReferenceComponents do
+  @moduledoc false
 
   use Phoenix.Component
   import Kernel, except: [node: 1]
@@ -19,7 +12,7 @@ defmodule Formentation.Phoenix.Theme.Reference do
   `RenderNode.Field` delegates to `field/1`.
 
   ```heex
-  <Reference.node :for={child <- @plan.root.children} node={child} />
+  <ReferenceComponents.node :for={child <- @plan.root.children} node={child} />
   ```
   """
   attr(:node, :any, required: true, doc: "a RenderNode.Field or RenderNode.Group")
@@ -52,7 +45,7 @@ defmodule Formentation.Phoenix.Theme.Reference do
 
       iex> import Phoenix.LiveViewTest
       iex> html =
-      ...>   render_component(&Formentation.Phoenix.Theme.Reference.error_summary/1,
+      ...>   render_component(&Formentation.Phoenix.ReferenceComponents.error_summary/1,
       ...>     summary: [%{id: "email", label: "Email", message: "is required"}]
       ...>   )
       iex> html =~ ~s(role="alert") and html =~ ~s(href="#email")

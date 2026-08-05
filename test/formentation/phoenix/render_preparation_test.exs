@@ -1,13 +1,29 @@
-defmodule Formentation.Phoenix.ProjectorTest do
+defmodule Formentation.Phoenix.RenderPreparationTest.ProjectorAdapter do
+  @moduledoc false
+
+  alias Formentation.Phoenix.RenderPreparation
+
+  def project(definition, form), do: RenderPreparation.prepare(definition, form)
+
+  def project(definition, form, opts), do: RenderPreparation.prepare(definition, form, opts)
+
+  def project_at(definition, form, path), do: RenderPreparation.prepare_at(definition, form, path)
+
+  def project_at(definition, form, path, opts),
+    do: RenderPreparation.prepare_at(definition, form, path, opts)
+end
+
+defmodule Formentation.Phoenix.RenderPreparationTest do
   use ExUnit.Case, async: true
 
   import Formentation.Test.FormHelpers
 
-  doctest Formentation.Phoenix.Projector
+  doctest Formentation.Phoenix.RenderPreparation
 
   alias Formentation.Definition.Finalizer
   alias Formentation.{Form, InstancePath, NodeId, TemplatePath}
-  alias Formentation.Phoenix.{DOMIdentity, Projector, RenderNode, RenderPlan}
+  alias Formentation.Phoenix.{DOMIdentity, RenderNode, RenderPlan}
+  alias Formentation.Phoenix.RenderPreparationTest.ProjectorAdapter, as: Projector
   alias Formentation.Presentation, as: NativePresentation
   alias Formentation.Semantic
   alias Phoenix.HTML.FormData
@@ -1197,13 +1213,13 @@ defmodule Formentation.Phoenix.ProjectorTest do
     # A source-text assertion states that obligation directly, and is the
     # regression PR #13 must keep green when it rebases its blocker work
     # into the Formentation.Form state view.
-    @projector_source File.read!("lib/formentation/phoenix/projector.ex")
+    @projector_source File.read!("lib/formentation/phoenix/render_preparation.ex")
     # File.read!/1 above is not a Mix compile dependency by itself; it
     # currently recompiles correctly only incidentally, via the
-    # `doctest Formentation.Phoenix.Projector` at the top of this file.
+    # `doctest Formentation.Phoenix.RenderPreparation` at the top of this file.
     # This makes the recompilation guarantee explicit rather than
     # incidental, so the pin can never validate a stale snapshot.
-    @external_resource "lib/formentation/phoenix/projector.ex"
+    @external_resource "lib/formentation/phoenix/render_preparation.ex"
 
     test "the projector names no concrete runtime-state struct" do
       refute @projector_source =~ "Formentation.Form"

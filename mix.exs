@@ -158,12 +158,8 @@ defmodule Formentation.MixProject do
         "Phoenix rendering": [
           Formentation.Phoenix,
           Formentation.Phoenix.DOMIdentity,
-          Formentation.Phoenix.Projector,
-          Formentation.Phoenix.RenderPlan,
-          Formentation.Phoenix.RenderNode,
-          Formentation.Phoenix.RenderNode.Field,
-          Formentation.Phoenix.RenderNode.Group,
-          Formentation.Phoenix.Theme.Reference
+          Formentation.Phoenix.StateView,
+          Formentation.Phoenix.StateView.Issue
         ],
         Sources: [
           Formentation.Source,

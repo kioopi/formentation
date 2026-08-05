@@ -1,10 +1,5 @@
 defmodule Formentation.Phoenix.RenderPlan do
-  @moduledoc """
-  The projector's output: a render-node tree plus the submit-gated error
-  summary and projection diagnostics. The planning-note fields with no
-  Phase 1 behavior (fingerprint, branches, item identities) are omitted,
-  not stubbed.
-  """
+  @moduledoc false
 
   alias Formentation.Diagnostic
   alias Formentation.Phoenix.RenderNode
