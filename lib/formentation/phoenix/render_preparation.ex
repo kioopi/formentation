@@ -62,7 +62,8 @@ defmodule Formentation.Phoenix.RenderPreparation do
   @spec prepare(Phoenix.HTML.Form.t(), keyword()) :: RenderPlan.t()
   def prepare(%Phoenix.HTML.Form{} = form, opts) when is_list(opts) do
     ctx = resolve_context(form, opts)
-    {root, diagnostics} = project_descriptor(ctx.root_descriptor, form, ctx)
+    descriptor = presentation_root_at(ctx.definition, ctx.root_path)
+    {root, diagnostics} = project_descriptor(descriptor, form, ctx)
 
     %RenderPlan{
       root: root,
@@ -128,20 +129,44 @@ defmodule Formentation.Phoenix.RenderPreparation do
 
   # The projection cursor. `path` holds raw segments — an %InstancePath{}
   # is built only where a path crosses into StateView — and `root_form`
-  # and `source` stay pinned to the form handed to project/2 or
-  # project_at/3, never a nested form built during traversal.
-  defp context(definition, form, path, semantic_nodes, dom_namespace, root_path) do
+  # and `source` stay pinned to the form handed to prepare/2 or
+  # prepare_at/3, never a nested form built during traversal. Preparation
+  # always starts with the cursor on the projection root, so `path` and
+  # `root_path` are the same segments here; only traversal moves `path`.
+  defp context(definition, form, root_path, semantic_nodes, dom_namespace) do
+    validate_projection_root!(definition, root_path)
+
     %{
       definition: definition,
       root_form: form,
       source: form.source,
-      path: path,
+      path: root_path,
       root_path: root_path,
       root_instance_path: InstancePath.new!(root_path),
-      root_descriptor: presentation_root_at(definition, root_path),
       semantic_nodes: semantic_nodes,
       dom_namespace: dom_namespace
     }
+  end
+
+  # Validating the root is not the same as building it. semantic_kind/2 is a
+  # single index lookup; presentation_root_at/2 materializes the descriptor
+  # tree recursively, and only prepare/2 consumes that. Building it here made
+  # every prepare_at/3 call — that is, every field/1 render — pay for
+  # whole-body presentation traversal to answer a question about one node.
+  defp validate_projection_root!(definition, root_path) do
+    case Info.semantic_kind(definition, root_path) do
+      :object ->
+        :ok
+
+      nil ->
+        raise ArgumentError, "projected form root #{inspect(root_path)} does not exist"
+
+      :unsupported ->
+        raise ArgumentError, "projected form root #{inspect(root_path)} is unsupported"
+
+      _field ->
+        raise ArgumentError, "projected form root #{inspect(root_path)} is not an object"
+    end
   end
 
   defp resolve_context(form, opts) do
@@ -154,8 +179,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
           form,
           root_path,
           Info.semantic_node_index(definition),
-          dom_namespace!(form, opts),
-          root_path
+          dom_namespace!(form, opts)
         )
 
       :not_native ->
@@ -166,8 +190,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
           form,
           [],
           Info.semantic_node_index(definition),
-          dom_namespace!(form, opts),
-          []
+          dom_namespace!(form, opts)
         )
 
       {:error, reason} ->
@@ -203,14 +226,11 @@ defmodule Formentation.Phoenix.RenderPreparation do
       {:ok, %Presentation.Object{} = descriptor} ->
         descriptor
 
-      {:ok, _other} ->
-        raise ArgumentError, "projected form root #{inspect(root_path)} is not an object"
-
-      :not_found ->
-        raise ArgumentError, "projected form root #{inspect(root_path)} does not exist"
-
-      :unsupported ->
-        raise ArgumentError, "projected form root #{inspect(root_path)} is unsupported"
+      other ->
+        invariant!(
+          "projection root #{inspect(root_path)} resolved to #{inspect(other)} " <>
+            "after validate_projection_root!/2 accepted it"
+        )
     end
   end
 

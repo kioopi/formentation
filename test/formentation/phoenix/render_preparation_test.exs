@@ -309,6 +309,39 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       end
     end
 
+    test "rejects a projection root that names nothing or an unsupported node" do
+      definition =
+        compile_json!(%{
+          "type" => "object",
+          "properties" => %{
+            "title" => %{"type" => "string"},
+            "weird" => %{"not" => %{"type" => "string"}}
+          }
+        })
+
+      root = FormData.to_form(Form.new(definition), as: "payload", id: "payload")
+
+      missing = %{root | options: Keyword.put(root.options, :__formentation__, ["nope"])}
+      unsupported = %{root | options: Keyword.put(root.options, :__formentation__, ["weird"])}
+
+      assert_raise ArgumentError, ~r/projected form root \["nope"\] does not exist/, fn ->
+        RenderPreparation.prepare(missing)
+      end
+
+      assert_raise ArgumentError, ~r/projected form root \["weird"\] is unsupported/, fn ->
+        RenderPreparation.prepare(unsupported)
+      end
+
+      # Both entry points, since validation now lives in the shared context.
+      assert_raise ArgumentError, ~r/projected form root \["nope"\] does not exist/, fn ->
+        RenderPreparation.prepare_at(missing, [])
+      end
+
+      assert_raise ArgumentError, ~r/projected form root \["weird"\] is unsupported/, fn ->
+        RenderPreparation.prepare_at(unsupported, ["anything"])
+      end
+    end
+
     test "prepares only a nested form's subtree and resolves relative field paths" do
       definition =
         compile!(%{
@@ -1512,6 +1545,19 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       refute @projector_source =~ ~r/\bdefinition\.root\b|%Definition\{root:/
       refute @projector_source =~ "nests_data?"
       refute @projector_source =~ "%Node.Group"
+    end
+
+    test "the preparation context validates the projection root without building it" do
+      # Building the root descriptor is recursive and only prepare/2 consumes it.
+      # Putting it in the context made every prepare_at/3 call — that is, every
+      # field/1 render — materialize the whole presentation tree to answer a
+      # question about one node. A wall-clock assertion would be flaky, so pin
+      # the seam instead, in the idiom this block already uses.
+      [_head, after_head] = String.split(@projector_source, "defp context(", parts: 2)
+      [context_body, _rest] = String.split(after_head, "\n  end\n", parts: 2)
+
+      assert context_body =~ "validate_projection_root!"
+      refute context_body =~ "presentation_root_at"
     end
   end
 
