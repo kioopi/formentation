@@ -3,14 +3,16 @@ defmodule Formentation.Phoenix.RenderPreparationTest.ProjectorAdapter do
 
   alias Formentation.Phoenix.RenderPreparation
 
-  def project(definition, form), do: RenderPreparation.prepare(definition, form)
+  def project(definition, form), do: RenderPreparation.prepare(form, definition: definition)
 
-  def project(definition, form, opts), do: RenderPreparation.prepare(definition, form, opts)
+  def project(definition, form, opts),
+    do: RenderPreparation.prepare(form, Keyword.put(opts, :definition, definition))
 
-  def project_at(definition, form, path), do: RenderPreparation.prepare_at(definition, form, path)
+  def project_at(definition, form, path),
+    do: RenderPreparation.prepare_at(form, path, definition: definition)
 
   def project_at(definition, form, path, opts),
-    do: RenderPreparation.prepare_at(definition, form, path, opts)
+    do: RenderPreparation.prepare_at(form, path, Keyword.put(opts, :definition, definition))
 end
 
 defmodule Formentation.Phoenix.RenderPreparationTest do

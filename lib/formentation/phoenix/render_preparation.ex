@@ -36,7 +36,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
       ...>     adapter: Formentation.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
-      iex> plan = Formentation.Phoenix.RenderPreparation.prepare(definition, form)
+      iex> plan = Formentation.Phoenix.RenderPreparation.prepare(form, definition: definition)
       iex> [field] = plan.root.children
       iex> {field.widget, field.label, field.field.name}
       {:email_input, "Email", "payload[email]"}
@@ -55,7 +55,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
       ...>     adapter: Formentation.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
-      iex> [field] = Formentation.Phoenix.RenderPreparation.prepare(definition, form, dom_namespace: "asset_payload").root.children
+      iex> [field] = Formentation.Phoenix.RenderPreparation.prepare(form, definition: definition, dom_namespace: "asset_payload").root.children
       iex> {field.dom.control, field.field.name}
       {"ftn--asset_payload--field--control--email", "payload[email]"}
   """
@@ -66,16 +66,6 @@ defmodule Formentation.Phoenix.RenderPreparation do
     {root, diagnostics} = project_descriptor(descriptor, form, ctx)
     %RenderPlan{root: root, summary: summary(root, ctx), diagnostics: diagnostics}
   end
-
-  @doc false
-  @spec prepare(Definition.t(), Phoenix.HTML.Form.t()) :: RenderPlan.t()
-  def prepare(%Definition{} = definition, %Phoenix.HTML.Form{} = form),
-    do: prepare(form, definition: definition)
-
-  @doc false
-  @spec prepare(Definition.t(), Phoenix.HTML.Form.t(), keyword()) :: RenderPlan.t()
-  def prepare(%Definition{} = definition, %Phoenix.HTML.Form{} = form, opts) when is_list(opts),
-    do: prepare(form, Keyword.put(opts, :definition, definition))
 
   @doc """
   Projects the single subtree at `segments` (an instance path — fields
@@ -92,7 +82,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
       ...>     adapter: Formentation.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
-      iex> node = Formentation.Phoenix.RenderPreparation.prepare_at(definition, form, ["email"])
+      iex> node = Formentation.Phoenix.RenderPreparation.prepare_at(form, ["email"], definition: definition)
       iex> {node.widget, node.field.name}
       {:email_input, "payload[email]"}
   """
@@ -130,17 +120,6 @@ defmodule Formentation.Phoenix.RenderPreparation do
         render
     end
   end
-
-  @doc false
-  @spec prepare_at(Definition.t(), Phoenix.HTML.Form.t(), [String.t()]) :: RenderNode.t() | nil
-  def prepare_at(%Definition{} = definition, %Phoenix.HTML.Form{} = form, segments),
-    do: prepare_at(form, segments, definition: definition)
-
-  @doc false
-  @spec prepare_at(Definition.t(), Phoenix.HTML.Form.t(), [String.t()], keyword()) ::
-          RenderNode.t() | nil
-  def prepare_at(%Definition{} = definition, %Phoenix.HTML.Form{} = form, segments, opts),
-    do: prepare_at(form, segments, Keyword.put(opts, :definition, definition))
 
   # The projection cursor. `path` holds raw segments — an %InstancePath{}
   # is built only where a path crosses into StateView — and `root_form`
