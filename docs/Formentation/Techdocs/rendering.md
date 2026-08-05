@@ -12,12 +12,13 @@ status: current
 
 # Rendering
 
-*As of 2026-08-04 (native presentation traversal and semantic-index-backed
+*As of 2026-08-05 (projected native Phoenix forms and explicit generic FormData
+route, [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]; native presentation traversal and semantic-index-backed
 projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]; DOM identity, [[18-decisions#D-034 — Phoenix renderer DOM identities are typed and injective|D-034]]; group help, [[18-decisions#D-036 — Group help uses prepared Phoenix identities|D-036]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
 
-## Projector data flow (`Formentation.Phoenix.Projector`)
+## Render preparation data flow
 
-`Projector.project(definition, %Phoenix.HTML.Form{})` returns a
+Internal `RenderPreparation.prepare(%Phoenix.HTML.Form{})` returns a
 `%Formentation.Phoenix.RenderPlan{}`. It is pure — the same definition and
 form state always produce the same plan, with no side effects and no
 mutation of form state. Both have options variants (`project/3`,
@@ -190,9 +191,9 @@ There is no slot to reposition it; that is a
   element. Their optional `dom_namespace` overrides only renderer-owned DOM
   identities; it never changes Phoenix names or form ids:
 
-- `<Formentation.Phoenix.fields definition={@definition} form={@form} />`
+- `<Formentation.Phoenix.fields form={@form} />`
   — the whole payload body: the error summary, then the projected tree.
-- `<Formentation.Phoenix.field definition={@definition} form={@form}
+- `<Formentation.Phoenix.field form={@form}
   path={["email"]} />` — a subtree render at an instance path (fields and
   data-nesting groups; presentational groups have no instance path and
   are not independently addressable).
