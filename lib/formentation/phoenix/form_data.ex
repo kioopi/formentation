@@ -5,8 +5,7 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
   # Spec: docs/superpowers/specs/2026-07-23-phase1-step5-formdata-design.md
 
   alias Formentation.{Form, Info, Semantic}
-
-  @path_key :__formentation__
+  alias Formentation.Phoenix.ProjectedForm
 
   def to_form(form_state, opts) do
     reject_owned_option!(opts, :action)
@@ -31,13 +30,13 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
       errors: errors_for(form_state, []),
       action: form_state.action,
       hidden: [],
-      options: Keyword.put(opts, @path_key, [])
+      options: ProjectedForm.put_root_path(opts, [])
     }
   end
 
   def to_form(form_state, form, field, opts) when is_atom(field) or is_binary(field) do
     key = field_to_string(field)
-    path = path_of(form) ++ [key]
+    path = ProjectedForm.root_segments!(form) ++ [key]
 
     case Info.semantic_kind(form_state.definition, path) do
       :object -> [nested_form(form_state, form, key, path, opts)]
@@ -70,7 +69,7 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
       errors: errors_for(form_state, path),
       action: form.action,
       hidden: [],
-      options: Keyword.put(opts, @path_key, path)
+      options: ProjectedForm.put_root_path(opts, path)
     }
   end
 
@@ -105,7 +104,7 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
 
   def input_value(form_state, form, field) do
     key = field_to_string(field)
-    path = path_of(form) ++ [key]
+    path = ProjectedForm.root_segments!(form) ++ [key]
 
     case Info.node_at(form_state.definition, path) do
       %Semantic.Field{} -> Form.field(form_state, path).display_value
@@ -120,10 +119,8 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
     end
   end
 
-  defp path_of(%{options: options}), do: Keyword.fetch!(options, @path_key)
-
   def input_validations(form_state, form, field) do
-    path = path_of(form) ++ [field_to_string(field)]
+    path = ProjectedForm.root_segments!(form) ++ [field_to_string(field)]
 
     case Info.node_at(form_state.definition, path) do
       %Semantic.Field{} = node -> validations(node)
