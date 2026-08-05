@@ -16,14 +16,14 @@ output from the version described; whitespace may be lightly reformatted for
 readability.*
 
 Formentation ships two function components and one built-in reference component set.
-Rendering is a pure function of the definition and the form state — the
+Rendering is a pure function of the form state and the definition it carries or is given — the
 components choose nothing at render time that was not already decided
 when the form was compiled or transitioned.
 
 > [!note] What this page covers
 > These components render identically in LiveView and in plain
-> controller-rendered templates — rendering is a pure function of the
-> definition and the form state either way. This page is about *what*
+> controller-rendered templates — rendering is a pure function of the form
+> state and the definition it carries or is given either way. This page is about *what*
 > gets rendered: widgets, groups, accessibility. Wiring
 > `phx-change`/`phx-submit` and the handlers that drive a re-render are
 > [[using-with-liveview|a separate page]].
@@ -286,6 +286,30 @@ against the rendered DOM, not merely intended:
 
 That last point matters if your schemas are authored by anyone other
 than you: a `title` containing markup is escaped, not rendered.
+
+## Rendering a non-Formentation form source
+
+The components accept any `Phoenix.HTML.FormData` source. A form projected
+from `Formentation.Form` carries its own definition, so you pass only the
+form. Any other source cannot, so pass the definition alongside it:
+
+```heex
+<Formentation.Phoenix.fields definition={@definition} form={@ash_form} />
+<Formentation.Phoenix.field definition={@definition} form={@ash_form} path={["street"]} />
+```
+
+Omitting `definition` on such a form raises:
+
+```
+** (ArgumentError) render preparation requires a native projected form or a
+   generic form plus definition:
+```
+
+Passing a `definition` that differs from a native form's own definition also
+raises — the source's definition is authoritative. This route is permanent,
+not transitional; it is how a source with its own state semantics
+([[../Techdocs/rendering|a `StateView` implementation]]) participates in
+rendering.
 
 ## Styling and replacing the theme
 

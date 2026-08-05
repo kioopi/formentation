@@ -42,6 +42,20 @@ defmodule Formentation.Phoenix do
       iex> html = render_component(&Formentation.Phoenix.fields/1, form: form)
       iex> html =~ ~s(name="payload[email]") and not (html =~ "<form")
       true
+
+  ## Generic form sources
+
+  Any other `Phoenix.HTML.FormData` source — an `AshPhoenix.Form`, an Ecto
+  changeset form, your own struct — is a permanent supported route rather than
+  a compatibility shim. It cannot carry a definition, so pass one:
+
+  ```heex
+  <Formentation.Phoenix.fields definition={@definition} form={@ash_form} />
+  ```
+
+  Such a source decides submission and issue visibility through
+  `Formentation.Phoenix.StateView`; without an implementation it falls back to
+  the Phoenix action/`used_input?` rule.
   """
   attr(:definition, Formentation.Definition,
     default: nil,
