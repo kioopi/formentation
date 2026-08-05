@@ -559,7 +559,66 @@ defmodule Formentation.Phoenix.ComponentsTest do
       assert [_] = Floki.find(field_doc, ~s(input[name="asset[payload][address][street]"]))
     end
 
-    test "requires an explicit definition for a generic component form" do
+    test "a generic source drives submission, visibility, and non-field issues" do
+      definition = nested_definition()
+
+      source = %Formentation.SourceFixture{
+        params: %{"serial_number" => "PX", "address" => %{}},
+        errors: [serial_number: {"is too short", []}],
+        submitted?: true,
+        visibility: %{["serial_number"] => :show},
+        issues:
+          {:ok,
+           [
+             %Formentation.Phoenix.StateView.Issue{
+               path: InstancePath.new!([]),
+               message: "fix the form"
+             }
+           ]}
+      }
+
+      form = FormData.to_form(source, as: "payload")
+
+      doc =
+        render_component(&Formentation.Phoenix.fields/1, definition: definition, form: form)
+        |> parse!()
+
+      assert [_] = Floki.find(doc, ~s(div.ftn-error-summary[role="alert"]))
+
+      serial_control = field_id("payload", ["serial_number"], :control)
+      assert [_] = Floki.find(doc, ~s(a[href="##{serial_control}"]))
+
+      assert Floki.find(doc, ".ftn-error-summary span")
+             |> Floki.text() =~ "fix the form"
+
+      assert Floki.attribute(find_one(doc, ~s([id="#{serial_control}"])), "aria-invalid") ==
+               ["true"]
+    end
+
+    test "a generic source's :hide answer suppresses an error that would otherwise show" do
+      definition = nested_definition()
+
+      source = %Formentation.SourceFixture{
+        params: %{"serial_number" => "PX", "address" => %{}},
+        errors: [serial_number: {"is too short", []}],
+        submitted?: true,
+        visibility: %{["serial_number"] => :hide}
+      }
+
+      form = FormData.to_form(source, as: "payload")
+
+      doc =
+        render_component(&Formentation.Phoenix.fields/1, definition: definition, form: form)
+        |> parse!()
+
+      serial_control = field_id("payload", ["serial_number"], :control)
+
+      assert Floki.find(doc, ".ftn-errors") == []
+      assert Floki.find(doc, ~s(a[href="##{serial_control}"])) == []
+      assert Floki.attribute(find_one(doc, ~s([id="#{serial_control}"])), "aria-invalid") == []
+    end
+
+    test "both components require an explicit definition for a generic form" do
       definition = nested_definition()
 
       form =
@@ -572,11 +631,24 @@ defmodule Formentation.Phoenix.ComponentsTest do
         render_component(&Formentation.Phoenix.fields/1, form: form)
       end
 
-      doc =
+      assert_raise ArgumentError, ~r/native projected form.*generic form plus definition:/, fn ->
+        render_component(&Formentation.Phoenix.field/1, form: form, path: ["serial_number"])
+      end
+
+      fields_doc =
         render_component(&Formentation.Phoenix.fields/1, definition: definition, form: form)
         |> parse!()
 
-      assert [_] = Floki.find(doc, ~s(input[name="payload[serial_number]"]))
+      field_doc =
+        render_component(&Formentation.Phoenix.field/1,
+          definition: definition,
+          form: form,
+          path: ["serial_number"]
+        )
+        |> parse!()
+
+      assert [_] = Floki.find(fields_doc, ~s(input[name="payload[serial_number]"]))
+      assert [_] = Floki.find(field_doc, ~s(input[name="payload[serial_number]"]))
     end
   end
 
