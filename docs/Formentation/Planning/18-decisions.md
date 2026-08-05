@@ -831,6 +831,26 @@ change, both reading the endpoint's own `url/0`. A small window remains between
 releasing the probe socket and the endpoint binding; losing that race fails
 loudly at boot rather than silently.
 
+## D-041 — Projected Phoenix forms are the ordinary rendering input
+
+*2026-08-05*
+
+**Decision.** `Formentation.Phoenix.fields/1` and `field/1` accept a typed
+`Phoenix.HTML.Form`. When that form is projected from `Formentation.Form`, its
+definition and projection-root path are recovered from the native projection;
+the caller supplies neither a duplicate definition nor renderer-owned name or
+ID. A nested projected form renders only its own object subtree and resolves
+`field/1` paths relative to that root. Any other FormData source remains a
+permanent advanced route and must provide `definition:` explicitly. Render
+preparation, render plans/nodes, and reference components are internal
+implementation seams: documented for IEx users but excluded from public ExDoc.
+
+**Consequences.** A native form with missing or malformed projection metadata
+fails rather than falling through to the generic route, and a mismatched native
+`definition:` cannot override the source definition. `StateView` remains the
+source-neutral contract for the generic route. No UI registry, component
+selection behaviour, or stable prepared-view API is introduced.
+
 ## Related notes
 
 - [[19-north-star-architecture|North-star architecture]]

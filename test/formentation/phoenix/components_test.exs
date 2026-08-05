@@ -558,6 +558,26 @@ defmodule Formentation.Phoenix.ComponentsTest do
 
       assert [_] = Floki.find(field_doc, ~s(input[name="asset[payload][address][street]"]))
     end
+
+    test "requires an explicit definition for a generic component form" do
+      definition = nested_definition()
+
+      form =
+        FormData.to_form(
+          %Formentation.SourceFixture{params: %{"serial_number" => "PX-1", "address" => %{}}},
+          as: "payload"
+        )
+
+      assert_raise ArgumentError, ~r/native projected form.*generic form plus definition:/, fn ->
+        render_component(&Formentation.Phoenix.fields/1, form: form)
+      end
+
+      doc =
+        render_component(&Formentation.Phoenix.fields/1, definition: definition, form: form)
+        |> parse!()
+
+      assert [_] = Floki.find(doc, ~s(input[name="payload[serial_number]"]))
+    end
   end
 
   describe "field/1" do
