@@ -22,7 +22,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
   alias Formentation.Definition.Finalizer
   alias Formentation.{Form, InstancePath, NodeId, TemplatePath}
-  alias Formentation.Phoenix.{DOMIdentity, RenderNode, RenderPlan}
+  alias Formentation.Phoenix.{DOMIdentity, RenderNode, RenderPlan, RenderPreparation}
   alias Formentation.Phoenix.RenderPreparationTest.ProjectorAdapter, as: Projector
   alias Formentation.Presentation, as: NativePresentation
   alias Formentation.Semantic
@@ -197,6 +197,62 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
     plan = single_field_plan(spec)
     [%RenderNode.Field{widget: widget}] = plan.root.children
     {widget, plan.diagnostics}
+  end
+
+  describe "native and generic preparation contexts" do
+    test "derives the definition from a native root form" do
+      definition = flat_definition()
+      form = FormData.to_form(Form.new(definition), as: "payload")
+
+      assert %RenderPlan{} = RenderPreparation.prepare(form)
+    end
+
+    test "requires an explicit definition for a generic form" do
+      form = FormData.to_form(%{}, as: "payload")
+
+      assert_raise ArgumentError, ~r/native projected form.*generic form plus definition:/, fn ->
+        RenderPreparation.prepare(form)
+      end
+
+      assert %RenderPlan{} = RenderPreparation.prepare(form, definition: flat_definition())
+    end
+
+    test "rejects an explicit definition that differs from a native form source" do
+      native_definition = flat_definition()
+      other_definition = compile!(%{kind: :object, properties: [{"name", %{kind: :string}}]})
+      form = FormData.to_form(Form.new(native_definition), as: "payload")
+
+      assert_raise ArgumentError, ~r/source definition is authoritative.*remove/, fn ->
+        RenderPreparation.prepare(form, definition: other_definition)
+      end
+    end
+
+    test "prepares only a nested form's subtree and resolves relative field paths" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"title", %{kind: :string}},
+            {"address", %{kind: :object, properties: [{"street", %{kind: :string}}]}}
+          ]
+        })
+
+      form_state = Form.new(definition, %{"title" => "root", "address" => %{"street" => "Main"}})
+      root = FormData.to_form(form_state, as: "asset[payload]")
+      [address] = FormData.to_form(form_state, root, :address, [])
+
+      plan = RenderPreparation.prepare(address)
+
+      assert [%RenderNode.Field{field: %{name: "asset[payload][address][street]"}}] =
+               plan.root.children
+
+      assert %RenderNode.Field{field: %{name: "asset[payload][address][street]"}} =
+               RenderPreparation.prepare_at(address, ["street"])
+
+      assert_raise ArgumentError, ~r/relative path.*projected root/, fn ->
+        RenderPreparation.prepare_at(address, ["title"])
+      end
+    end
   end
 
   describe "widget resolution" do
@@ -396,7 +452,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
         )
         |> compile!()
 
-      form = FormData.to_form(Form.new(first), as: "payload")
+      form = FormData.to_form(%{}, as: "payload")
       assert Projector.project(first, form) == Projector.project(first, form)
 
       identities = fn definition ->

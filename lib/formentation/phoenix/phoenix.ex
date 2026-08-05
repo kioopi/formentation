@@ -43,7 +43,7 @@ defmodule Formentation.Phoenix do
       iex> html =~ ~s(name="payload[email]") and not (html =~ "<form")
       true
   """
-  attr(:definition, Formentation.Definition, required: true)
+  attr(:definition, Formentation.Definition, default: nil)
   attr(:form, Phoenix.HTML.Form, required: true)
   attr(:dom_namespace, :string, default: nil, doc: "override for renderer-owned DOM ids")
 
@@ -52,7 +52,7 @@ defmodule Formentation.Phoenix do
       assign(
         assigns,
         :plan,
-        RenderPreparation.prepare(assigns.definition, assigns.form, projector_opts(assigns))
+        RenderPreparation.prepare(assigns.form, preparation_opts(assigns))
       )
 
     ~H"""
@@ -78,7 +78,7 @@ defmodule Formentation.Phoenix do
   />
   ```
   """
-  attr(:definition, Formentation.Definition, required: true)
+  attr(:definition, Formentation.Definition, default: nil)
   attr(:form, Phoenix.HTML.Form, required: true)
   attr(:dom_namespace, :string, default: nil, doc: "override for renderer-owned DOM ids")
 
@@ -92,12 +92,7 @@ defmodule Formentation.Phoenix do
       assign(
         assigns,
         :node,
-        RenderPreparation.prepare_at(
-          assigns.definition,
-          assigns.form,
-          assigns.path,
-          projector_opts(assigns)
-        )
+        RenderPreparation.prepare_at(assigns.form, assigns.path, preparation_opts(assigns))
       )
 
     ~H"""
@@ -105,6 +100,8 @@ defmodule Formentation.Phoenix do
     """
   end
 
-  defp projector_opts(%{dom_namespace: nil}), do: []
-  defp projector_opts(%{dom_namespace: namespace}), do: [dom_namespace: namespace]
+  defp preparation_opts(assigns) do
+    [definition: assigns.definition, dom_namespace: assigns.dom_namespace]
+    |> Keyword.reject(fn {_key, value} -> is_nil(value) end)
+  end
 end

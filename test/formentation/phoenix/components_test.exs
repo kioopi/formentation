@@ -527,6 +527,39 @@ defmodule Formentation.Phoenix.ComponentsTest do
     end
   end
 
+  describe "native projected component inputs" do
+    test "renders a native root form without a definition assign" do
+      definition = nested_definition()
+      form = FormData.to_form(Form.new(definition), as: "payload")
+
+      doc =
+        render_component(&Formentation.Phoenix.fields/1, form: form)
+        |> parse!()
+
+      assert [_] = Floki.find(doc, ~s(input[name="payload[serial_number]"]))
+    end
+
+    test "renders only a nested native form and resolves a relative field path" do
+      definition = nested_definition()
+      form_state = Form.new(definition, %{"address" => %{"street" => "Elm"}})
+      root = FormData.to_form(form_state, as: "asset[payload]", id: "asset_payload")
+      [address] = FormData.to_form(form_state, root, :address, [])
+
+      nested_doc =
+        render_component(&Formentation.Phoenix.fields/1, form: address)
+        |> parse!()
+
+      assert [_] = Floki.find(nested_doc, ~s(input[name="asset[payload][address][street]"]))
+      assert Floki.find(nested_doc, ~s(input[name="asset[payload][serial_number]"])) == []
+
+      field_doc =
+        render_component(&Formentation.Phoenix.field/1, form: address, path: ["street"])
+        |> parse!()
+
+      assert [_] = Floki.find(field_doc, ~s(input[name="asset[payload][address][street]"]))
+    end
+  end
+
   describe "field/1" do
     test "renders root help when explicitly projecting the root subtree" do
       definition = compile!(%{kind: :object, help: "Root help.", properties: []})
