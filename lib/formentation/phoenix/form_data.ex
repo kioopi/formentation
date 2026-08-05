@@ -59,16 +59,17 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
     {name, opts} = Keyword.pop(opts, :as)
     {id, opts} = Keyword.pop(opts, :id)
     # Phoenix.HTML.Form.t()'s spec narrows id/name to binaries, but the
-    # anonymous-form boundary intentionally supports nil at runtime. Keep
-    # the struct-to-map read here so Dialyzer does not reject the nil clauses
-    # in join_id/2 and join_name/2 that Phoenix's runtime can reach.
-    form_fields = Map.from_struct(form)
+    # anonymous-form boundary (`to_form(state, [])`) intentionally supports
+    # nil at runtime. Reading through Map.get/2 keeps Dialyzer from judging
+    # the nil clauses of join_id/2 and join_name/2 unreachable; direct
+    # `form.id` access reports two pattern_match errors here. Map.get/2 takes
+    # the struct as-is, so this costs nothing beyond the lookup.
 
     %Phoenix.HTML.Form{
       source: form_state,
       impl: __MODULE__,
-      id: (id && to_string(id)) || join_id(Map.get(form_fields, :id), key),
-      name: (name && to_string(name)) || join_name(Map.get(form_fields, :name), key),
+      id: (id && to_string(id)) || join_id(Map.get(form, :id), key),
+      name: (name && to_string(name)) || join_name(Map.get(form, :name), key),
       params: sub_map(form.params, key),
       data: sub_map(form.data, key),
       errors: errors_for(form_state, path),
