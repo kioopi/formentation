@@ -1472,6 +1472,30 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
     # incidental, so the pin can never validate a stale snapshot.
     @external_resource "lib/formentation/phoenix/render_preparation.ex"
 
+    # #28 requires one authoritative decoder of the private projection key.
+    # Reach cannot express "no module but these two mentions this atom" — it
+    # is a literal, not a call — so a source-text pin states it directly.
+    @projection_key_readers ["lib/formentation/phoenix/projected_form.ex"]
+    @external_resource "lib/formentation/phoenix/projected_form.ex"
+
+    test "only ProjectedForm spells the private projection key" do
+      offenders =
+        "lib/**/*.ex"
+        |> Path.wildcard()
+        |> Enum.filter(&(File.read!(&1) =~ ":__formentation__"))
+        |> Enum.reject(&(&1 in @projection_key_readers))
+
+      assert offenders == []
+    end
+
+    test "the projection decoder never reaches for runtime state" do
+      source = File.read!("lib/formentation/phoenix/projected_form.ex")
+
+      refute source =~ "StateView"
+      refute source =~ "submitted?"
+      refute source =~ "issue"
+    end
+
     test "the projector names no concrete runtime-state struct" do
       refute @projector_source =~ "Formentation.Form"
       refute @projector_source =~ "%Form{"

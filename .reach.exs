@@ -105,6 +105,15 @@
       # resolves calls against the call graph after alias resolution, so it
       # catches a `Form.some_function/arity` call regardless of how the
       # alias was spelled.
+      # Formentation.Phoenix.ProjectedForm is the sanctioned exception: it is
+      # the companion of the FormData implementation and decodes the native
+      # projection (definition + root path) on preparation's behalf. That is
+      # metadata, not runtime state — submission, issue visibility, and
+      # non-field issues must still cross the StateView seam. Do not relieve
+      # pressure on this rule by moving further state-dependent decisions into
+      # ProjectedForm; the "architectural boundary" tests in
+      # render_preparation_test.exs pin both that ProjectedForm never names
+      # StateView and that nothing else spells the private projection key.
       {"Formentation.Phoenix.RenderPreparation", ["Formentation.Form", "Formentation.Form.*"]}
     ]
   ],
