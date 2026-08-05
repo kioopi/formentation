@@ -12,7 +12,7 @@ status: current
 
 # The `FormData` projection
 
-> [!note] As of 2026-07-23 · step 6 complete
+> [!note] As of 2026-08-05 · projected Phoenix forms (D-041)
 > Describes `defimpl Phoenix.HTML.FormData, for: Formentation.Form` as
 > built. The state being projected is
 > [[form-state-and-transitions|Form state and transitions]]; what the
@@ -46,15 +46,17 @@ this layer has to satisfy exactly; most of what follows is that contract.
 | `input_value/3` | `FieldState.display_value` |
 | `input_validations/3` | the node's schema constraints plus input policy |
 
-### Instance path travels in the options
+### Projection context travels in the options
 
 A Phoenix form has a `name` and an `id` but no notion of *where in the
-data* it sits. The implementation therefore carries the current
-[[paths-and-identity|`InstancePath`]] in a private options key, and every
-callback resolves `path_of(form) ++ [field]` before asking `Info` which
-node governs it. Nesting a form extends the path by one segment. This is
-the mechanism that lets one `Definition` describe a tree while Phoenix
-hands out flat, per-level form structs.
+data* it sits. The implementation therefore carries a private projection
+context in its options: the compiled definition and the current
+[[paths-and-identity|`InstancePath`]]. Every callback resolves
+`path_of(form) ++ [field]` before asking `Info` which node governs it.
+Nesting a form extends the path by one segment. This is the mechanism that
+lets one `Definition` describe a tree while Phoenix hands out flat, per-level
+form structs; it also lets the rendering components recover their ordinary
+input from the native form alone.
 
 ### Nesting materializes forms directly
 

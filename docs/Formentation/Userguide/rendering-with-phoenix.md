@@ -11,11 +11,11 @@ status: current
 
 # Rendering with Phoenix
 
-*Covers Formentation as of 2026-08-03. Every HTML fragment below represents
+*Covers Formentation as of 2026-08-05. Every HTML fragment below represents
 output from the version described; whitespace may be lightly reformatted for
 readability.*
 
-Formentation ships two function components and one built-in theme.
+Formentation ships two function components and one built-in reference component set.
 Rendering is a pure function of the definition and the form state — the
 components choose nothing at render time that was not already decided
 when the form was compiled or transitioned.

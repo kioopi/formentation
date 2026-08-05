@@ -113,7 +113,7 @@ attributes:
 ```heex
 <.form for={@asset_form} id="asset-form" phx-change="validate" phx-submit="save">
   ...
-  <Formentation.Phoenix.fields definition={@definition} form={@payload_form} />
+  <Formentation.Phoenix.fields form={@payload_form} />
   <button type="submit">Save</button>
 </.form>
 ```

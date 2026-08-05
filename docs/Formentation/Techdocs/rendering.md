@@ -18,16 +18,18 @@ projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurr
 
 ## Render preparation data flow
 
-Internal `RenderPreparation.prepare(%Phoenix.HTML.Form{})` returns a
-`%Formentation.Phoenix.RenderPlan{}`. It is pure — the same definition and
-form state always produce the same plan, with no side effects and no
-mutation of form state. Both have options variants (`project/3`,
-`project_at/4`) for an explicit `dom_namespace`. Otherwise the projector uses
-`form.id || form.name`; it raises with an actionable error when neither exists.
-`Projector.project_at(definition, form, path)`
-projects the single subtree at an instance path (a field or a
-data-nesting group), returning `nil` when the node deliberately renders
-nothing, and raising for an unknown or unsupported path.
+Internal `RenderPreparation.prepare/2` returns a
+`%Formentation.Phoenix.RenderPlan{}`. It is pure — the same form and
+definition context always produce the same plan, with no side effects and no
+mutation of form state. A form projected from `Formentation.Form` carries its
+definition and projection-root path, so ordinary component use supplies only
+the form. Any other `Phoenix.HTML.FormData` source is the explicit advanced
+route and supplies `definition:`. `prepare_at/3` projects the single subtree
+at a path relative to that form's projection root (a field or a data-nesting
+group), returning `nil` when the node deliberately renders nothing, and
+raising for an unknown or unsupported path. Both preparation functions accept
+an explicit `dom_namespace`; otherwise they use `form.id || form.name` and
+raise with an actionable error when neither exists.
 
 The walk consumes `Formentation.Info.presentation_root/1` and
 `presentation_at/2`. Those queries read the native `Definition.presentation`
@@ -47,7 +49,7 @@ keeps declaration order and layout order as separate contracts: for example,
 semantic fields can enumerate as `["a", "c"]` while a presentation group
 renders them as `["c", "a"]`. Unsupported nodes do not appear in renderable
 presentation traversal; their semantic paths still classify as unsupported so
-`project_at/3` and summary labelling preserve their existing behaviour.
+subtree preparation and summary labelling preserve their existing behaviour.
 
 Nested object descriptors cause exactly one
 `Phoenix.HTML.FormData.to_form/4` descent for their semantic segment —
@@ -83,7 +85,7 @@ One struct per render node shape:
   Options retain source scalar values (`String.t() | number() | boolean()`),
   and option ids are positionally parallel to them.
 
-`show_errors?` is computed once, in the projector, so themes never
+`show_errors?` is computed once during render preparation, so components never
 inspect `_unused_` markers or `form.action` (D-014, D-027). The source's
 `StateView.issue_visibility/3` decides first; only a `:default` answer
 falls back to the Phoenix-generic rule:
@@ -170,7 +172,7 @@ everything else follows in path order
 ([[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]],
 [[form-state-and-transitions#Submission status is derived, not stored|Form state and transitions]]).
 
-By the time the list reaches the projector it is ordinary normalized
+By the time the list reaches render preparation it is ordinary normalized
 issues, so the object-entry rule above renders them unchanged — including
 the humanized label, which the unsupported-node case already earns. A
 source with different semantics (Ash, Ecto) can produce equivalent entries
@@ -198,16 +200,16 @@ There is no slot to reposition it; that is a
   data-nesting groups; presentational groups have no instance path and
   are not independently addressable).
 
-The projector reads display values, names, IDs, input validations, and
+Render preparation reads display values, names, IDs, input validations, and
 per-field errors through Phoenix conventions, and the three semantic facts
 Phoenix cannot carry — submission, issue visibility, root/object issues —
 through `Formentation.Phoenix.StateView`, dispatched on `form.source` with
 `@fallback_to_any` — so any `Phoenix.HTML.FormData` implementation still
 projects, not only `Formentation.Form`; an `AshPhoenix.Form` is just
 another implementation to project, through the `Any` fallback until it
-gets a dedicated state view. Neither `Projector.project/2`/`project_at/3`
-nor either component takes an adapter argument — dispatch is entirely on
-`form.source`. All of this lives in `lib/formentation/phoenix/`, behind the
+gets a dedicated state view. Neither `RenderPreparation` nor either component
+takes an adapter argument — dispatch is entirely on `form.source`. All of this
+lives in `lib/formentation/phoenix/`, behind the
 [[18-decisions#D-017 — Phoenix integration ships in-tree behind a namespace boundary|D-017]]/[[18-decisions#D-018 — Reach is the architecture gate|D-018]] directory boundary —
 [[18-decisions#D-019 — Projection is Phoenix-generic|D-019]],
 [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]].
@@ -276,7 +278,7 @@ renderer ids are the control/label/help/error/fieldset/summary relationship
 surface. Groups render optional help with the already-prepared `GroupDOM.help`
 identity; components never derive help IDs themselves.
 
-## Reference theme (`Formentation.Phoenix.Theme.Reference`)
+## Reference components (`Formentation.Phoenix.ReferenceComponents`)
 
 Per-widget function components called directly by `fields/1` and
 `field/1` — nothing dispatches through a configurable theme parameter.

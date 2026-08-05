@@ -144,7 +144,7 @@ and fire identically for both sources.
 
 Step 6 introduced the first diagnostic produced *after* compilation:
 `:widget_fallback`, emitted by
-[[rendering|`Formentation.Phoenix.Projector`]] onto
+[[rendering|`Formentation.Phoenix.RenderPreparation`]] onto
 `RenderPlan.diagnostics` when a declared widget hint cannot render the
 field it names — a widget outside the theme's set, or a `:checkbox` hint
 on a non-boolean field. The projector falls back to the inferred widget
@@ -229,7 +229,7 @@ is [[phase-2-compiler-diagnostics|Phase 2]] territory.
 | Origin struct | `Formentation.Origin` | `lib/formentation/origin.ex` |
 | Guards · policy pass · `origin_entries/1` | `Formentation.Source.Shared` | `lib/formentation/source/shared.ex` |
 | Metaschema translation | `Formentation.JSONSchema.Validator` | `lib/formentation/json_schema/validator.ex` |
-| Projection-time diagnostic | `Formentation.Phoenix.Projector` | `lib/formentation/phoenix/projector.ex` |
+| Projection-time diagnostic | `Formentation.Phoenix.RenderPreparation` | `lib/formentation/phoenix/render_preparation.ex` |
 
 ## Related notes
 

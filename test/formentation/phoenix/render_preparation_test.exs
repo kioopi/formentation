@@ -229,6 +229,15 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       end
     end
 
+    test "rejects malformed metadata on a native form instead of treating it as generic" do
+      form = FormData.to_form(Form.new(flat_definition()), as: "payload")
+      broken = %{form | options: Keyword.delete(form.options, :__formentation__)}
+
+      assert_raise ArgumentError, ~r/not a valid Formentation projection.*rebuild/, fn ->
+        RenderPreparation.prepare(broken, definition: flat_definition())
+      end
+    end
+
     test "prepares only a nested form's subtree and resolves relative field paths" do
       definition =
         compile!(%{
