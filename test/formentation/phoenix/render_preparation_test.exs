@@ -1,5 +1,14 @@
 defmodule Formentation.Phoenix.RenderPreparationTest.ProjectorAdapter do
-  @moduledoc false
+  @moduledoc """
+  Keeps the pre-rename `Projector.project/2,3` and `project_at/3,4` call
+  shapes working so ~1200 lines of behavioural assertions did not have to be
+  rewritten under the rename.
+
+  Every test routed through this shim passes `definition:` explicitly, so it
+  takes the **generic** branch of `resolve_context/2`. The bulk of
+  preparation coverage therefore proves nothing about native derivation; if
+  the two branches ever diverge, this shim is where the divergence will hide.
+  """
 
   alias Formentation.Phoenix.RenderPreparation
 
@@ -326,6 +335,65 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
         RenderPreparation.prepare_at(address, ["title"])
       end
     end
+
+    test "a nested plan's DOM identities carry the nested form's joined id" do
+      {root, address} = nested_projection_forms()
+
+      [root_street] =
+        RenderPreparation.prepare(root).root.children
+        |> Enum.filter(&match?(%RenderNode.Group{}, &1))
+        |> Enum.flat_map(& &1.children)
+
+      [nested_street] = RenderPreparation.prepare(address).root.children
+
+      assert root_street.field.name == nested_street.field.name
+
+      assert root_street.dom.control ==
+               DOMIdentity.field(
+                 "asset_payload",
+                 InstancePath.new!(["address", "street"]),
+                 :control
+               )
+
+      assert nested_street.dom.control ==
+               DOMIdentity.field(
+                 "asset_payload_address",
+                 InstancePath.new!(["address", "street"]),
+                 :control
+               )
+    end
+
+    test "resolves a relative path deeper than the projected root by one level" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"address",
+             %{
+               kind: :object,
+               properties: [
+                 {"geo", %{kind: :object, properties: [{"lat", %{kind: :number}}]}}
+               ]
+             }}
+          ]
+        })
+
+      state = Form.new(definition, %{"address" => %{"geo" => %{"lat" => 51.5}}})
+      root = FormData.to_form(state, as: "asset[payload]", id: "asset_payload")
+      [address] = FormData.to_form(state, root, :address, [])
+
+      node = RenderPreparation.prepare_at(address, ["geo", "lat"])
+
+      assert node.field.name == "asset[payload][address][geo][lat]"
+      assert node.field.value == "51.5"
+
+      assert node.dom.control ==
+               DOMIdentity.field(
+                 "asset_payload_address",
+                 InstancePath.new!(["address", "geo", "lat"]),
+                 :control
+               )
+    end
   end
 
   describe "widget resolution" do
@@ -525,6 +593,12 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
         )
         |> compile!()
 
+      # A native source pins its own definition (D-041), so the two-definition
+      # comparison below is illegal by construction against one: passing
+      # `second` against a form built from `first` makes
+      # validate_native_definition!/2 raise. A map source proves the same
+      # claim — DOM identities are a pure function of definition structure —
+      # and is the only source that can hold both definitions.
       form = FormData.to_form(%{}, as: "payload")
       assert Projector.project(first, form) == Projector.project(first, form)
 
@@ -537,6 +611,18 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       end
 
       assert identities.(first) == identities.(second)
+
+      # The native route mints the same identities, so the D-034 claim is not
+      # proved only against a source ordinary rendering never uses.
+      native_identities =
+        Form.new(first)
+        |> FormData.to_form(as: "payload")
+        |> RenderPreparation.prepare()
+        |> Map.fetch!(:root)
+        |> flatten_fields()
+        |> Map.new(&{&1.field.name, &1.dom})
+
+      assert native_identities == identities.(first)
     end
 
     test "presentation order can differ from semantic declaration order" do
