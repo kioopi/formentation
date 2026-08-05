@@ -17,6 +17,13 @@ defmodule Formentation.Phoenix.FormDataTest do
 
   defp pump_form(data \\ %{}), do: Form.new(pump_definition(), data)
 
+  defp compile!(declaration) do
+    {:ok, definition, _diagnostics} =
+      Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
+    definition
+  end
+
   defp nested_definition do
     declaration = %{
       kind: :object,
@@ -73,6 +80,28 @@ defmodule Formentation.Phoenix.FormDataTest do
 
       namespaced = FormData.to_form(pump_form(), as: "asset[payload]")
       assert namespaced[:serial_number].name == "asset[payload][serial_number]"
+    end
+
+    test "nesting an anonymous form uses the bare key as id and name" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"address", %{kind: :object, properties: [{"street", %{kind: :string}}]}}
+          ]
+        })
+
+      state = Form.new(definition, %{"address" => %{"street" => "Elm"}})
+      root = Phoenix.HTML.FormData.to_form(state, [])
+
+      assert root.id == nil
+      assert root.name == nil
+
+      [address] = Phoenix.HTML.FormData.to_form(state, root, :address, [])
+
+      assert address.id == "address"
+      assert address.name == "address"
+      assert address[:street].name == "address[street]"
     end
 
     test "params expose the Phoenix-compatible view after a transition" do

@@ -58,6 +58,10 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
     opts = drop_collection_options!(opts)
     {name, opts} = Keyword.pop(opts, :as)
     {id, opts} = Keyword.pop(opts, :id)
+    # Phoenix.HTML.Form.t()'s spec narrows id/name to binaries, but the
+    # anonymous-form boundary intentionally supports nil at runtime. Keep
+    # the struct-to-map read here so Dialyzer does not reject the nil clauses
+    # in join_id/2 and join_name/2 that Phoenix's runtime can reach.
     form_fields = Map.from_struct(form)
 
     %Phoenix.HTML.Form{
