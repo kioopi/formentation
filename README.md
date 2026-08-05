@@ -131,7 +131,7 @@ wrote yourself, under its namespace:
 <.form for={@asset_form} action={~p"/assets"} method="post">
   <.input field={@asset_form[:name]} label="Asset name" />
 
-  <Formentation.Phoenix.fields definition={@definition} form={@payload_form} />
+  <Formentation.Phoenix.fields form={@payload_form} />
 
   <button type="submit">Save</button>
 </.form>

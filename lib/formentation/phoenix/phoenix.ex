@@ -23,7 +23,7 @@ defmodule Formentation.Phoenix do
   ```heex
   <.form for={@asset_form} phx-change="validate" phx-submit="save">
     <.input field={@asset_form[:name]} label="Asset name" />
-    <Formentation.Phoenix.fields definition={@definition} form={@payload_form} />
+    <Formentation.Phoenix.fields form={@payload_form} />
   </.form>
   ```
 
@@ -39,7 +39,7 @@ defmodule Formentation.Phoenix do
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(Formentation.Form.new(definition), as: "payload")
       iex> import Phoenix.LiveViewTest
-      iex> html = render_component(&Formentation.Phoenix.fields/1, definition: definition, form: form)
+      iex> html = render_component(&Formentation.Phoenix.fields/1, form: form)
       iex> html =~ ~s(name="payload[email]") and not (html =~ "<form")
       true
   """
@@ -72,7 +72,6 @@ defmodule Formentation.Phoenix do
 
   ```heex
   <Formentation.Phoenix.field
-    definition={@definition}
     form={@payload_form}
     path={["address", "street"]}
   />

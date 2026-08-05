@@ -63,7 +63,7 @@ pass them — drive them through `Formentation.Form.transition/2` instead.
 
 ```heex
 <.form for={@form} action={~p"/inspections"} method="post">
-  <Formentation.Phoenix.fields definition={@definition} form={@form} />
+  <Formentation.Phoenix.fields form={@form} />
   <button type="submit">Save</button>
 </.form>
 ```
@@ -78,7 +78,7 @@ composes inside a form you own, alongside your own inputs:
 <.form for={@asset_form} action={~p"/assets"} method="post">
   <.input field={@asset_form[:name]} label="Asset name" />
 
-  <Formentation.Phoenix.fields definition={@definition} form={@payload_form} />
+  <Formentation.Phoenix.fields form={@payload_form} />
 
   <button type="submit">Save</button>
 </.form>
@@ -87,7 +87,7 @@ composes inside a form you own, alongside your own inputs:
 ### `field/1` — one subtree
 
 ```heex
-<Formentation.Phoenix.field definition={@definition} form={@form} path={["address", "street"]} />
+<Formentation.Phoenix.field form={@form} path={["address", "street"]} />
 ```
 
 Renders a single field or nested object, addressed by its **instance
