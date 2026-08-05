@@ -510,8 +510,10 @@ representation, and interactive event API remain Phase 3 prototype decisions.
 [[14-naming|naming note]] use the new vocabulary. D-020 remains the historical
 record of why Phase 1 did not freeze a configurable contract, but its
 `Formentation.Phoenix.Theme.Reference` name is transitional. The current
-`Formentation.Phoenix.Projector` performs render preparation and should be
-renamed before `0.1.0` so “projection” remains available for
+`Formentation.Phoenix.Projector` performs render preparation and **was renamed**
+in [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]
+(2026-08-05) to `Formentation.Phoenix.RenderPreparation` and
+`Formentation.Phoenix.ReferenceComponents`, so “projection” is available for
 `Form` → `%Phoenix.HTML.Form{}`. Phase 3 must build the second UI and review
 consumer concurrently with the contract, publish the round-trip conformance
 suite, define capability-failure developer experience, and establish resource
@@ -848,8 +850,30 @@ implementation seams: documented for IEx users but excluded from public ExDoc.
 **Consequences.** A native form with missing or malformed projection metadata
 fails rather than falling through to the generic route, and a mismatched native
 `definition:` cannot override the source definition. `StateView` remains the
-source-neutral contract for the generic route. No UI registry, component
-selection behaviour, or stable prepared-view API is introduced.
+source-neutral contract for the generic route. This supersedes the naming
+obligation recorded in
+[[18-decisions#D-030 — Renderer, UI, theme, and transport responsibilities are separate|D-030]]:
+`Formentation.Phoenix.Projector` is now `RenderPreparation` and
+`Formentation.Phoenix.Theme.Reference` is now `ReferenceComponents`, so
+“projection” is available for `Form` → `%Phoenix.HTML.Form{}` as intended. It
+narrows [[18-decisions#D-019 — Projection is Phoenix-generic|D-019]]:
+preparation branches on whether a source is native, but only to recover
+*metadata* (definition and projection root) — submission, issue visibility,
+and non-field issues still cross the `StateView` seam unchanged. It renames
+the subject of [[18-decisions#D-020 — The reference theme is a markup set, not a contract|D-020]]
+without changing it. No UI registry, component selection behaviour, or stable
+prepared-view API is introduced.
+
+Two consequences are observable in markup. A nested plan's DOM namespace is
+the nested form's joined id (`asset_payload_address`) rather than the root's,
+so the same field's renderer-owned id depends on which form rendered it while
+its Phoenix name does not; each plan stays internally consistent. And because
+the plan root of a nested form *is* the projected object, `fields/1` renders
+that object's children without its fieldset, legend, or group help — those are
+rendered by `field path={[]}` on the same form. The submit-gated error summary
+is scoped to the projection subtree and rendered only at the projection root
+unless `summary={true}`/`summary={false}` says otherwise, so composing under
+`<.inputs_for>` yields one `role="alert"` region rather than two.
 
 ## Related notes
 

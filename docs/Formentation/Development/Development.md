@@ -20,7 +20,7 @@ The conceptual roadmap that frames these phases is [[13-roadmap|Planning/13 — 
 | Phase | Status | Outcome |
 | --- | --- | --- |
 | [[phase-1-walking-skeleton\|1 — Walking skeleton]] | 🚧 In progress | A form compiled from two sources renders, validates, and submits end to end through Phoenix. |
-| [[phase-1-north-star-alignment\|Phase 1 — North-star alignment]] | 📋 Planned | Milestone A adopts split semantic/presentation structure, layout-invariant semantics, a complete submission decision, and the intended Phoenix projection path before collections. |
+| [[phase-1-north-star-alignment\|Phase 1 — North-star alignment]] | 🚧 In progress | Milestone A adopts split semantic/presentation structure, layout-invariant semantics, a complete submission decision, and the intended Phoenix projection path before collections. |
 | [[phase-2-compiler-diagnostics\|2 — Compiler and diagnostics]] | 📋 Planned | Compilation becomes an ordered, explainable pipeline with verifiers, full provenance, and stable diagnostics. |
 | [[phase-3-extensibility\|3 — Extensibility and UI integrations]] | 📋 Planned | Applications and UI packages can add semantics, codecs, prepared-view consumers, stateless and interactive widgets, and compiler passes through proven contracts. |
 | [[phase-4-dynamic-schemas\|4 — Dynamic schemas]] | 📋 Planned | Conditional and compositional schemas project against changing data without losing state. |
@@ -99,6 +99,22 @@ Also as of 2026-08-03, group help is preserved through Phoenix preparation and
 rendered with prepared group identities ([GitHub issue #7](https://github.com/kioopi/formentation/issues/7)). Nested-object and native presentation-group help render as escaped, fieldset-associated text; whole-form `fields/1` deliberately keeps root help structural, while `field path={[]}` renders the root subtree. See [[18-decisions#D-036 — Group help uses prepared Phoenix identities|D-036]] and [[rendering|Rendering]].
 
 Also as of 2026-08-04, numeric rendering preserves normalized semantic value type in each prepared Phoenix field ([GitHub issue #8](https://github.com/kioopi/formentation/issues/8)). Integer and general-number fields remain in the shared `:number_input` interaction family, but the reference theme now renders `numeric` and `decimal` input modes respectively while retaining the raw-value-safe `type="text"` fallback. The cross-widget `min`/`max`/`step` leak for numeric fields is fixed, and [[rendering|Techdocs/Rendering]], [[rendering-with-phoenix|the Phoenix rendering guide]], and [[18-decisions#D-038 — Semantic value type and abstract widget are orthogonal prepared facts|D-038]] record the resulting contract.
+
+✅ Done (2026-08-05) — north-star P1+P2+P3: projected Phoenix forms are the
+ordinary rendering input ([GitHub issue #28](https://github.com/kioopi/formentation/issues/28)).
+`Formentation.Phoenix.fields/1` and `field/1` take a form alone when it is
+projected from `Formentation.Form`; the definition and projection root are
+recovered from the native projection by the single decoder
+`Formentation.Phoenix.ProjectedForm`, and a nested form renders only its own
+object subtree with `field/1` paths resolved relative to that root. Any other
+`FormData` source remains a permanent advanced route supplying `definition:`.
+`Projector` → `RenderPreparation` and `Theme.Reference` → `ReferenceComponents`
+fulfil the rename D-030 required before `0.1.0`; render preparation, plans,
+nodes, and reference components are now excluded from public ExDoc while
+keeping their moduledocs for IEx. See
+[[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]
+and the refreshed [[rendering|Rendering]], [[phoenix-form-data|Phoenix FormData]],
+and [[end-to-end-data-flow|End-to-end data flow]] notes.
 
 As of 2026-07-26, the project direction is additionally frozen in
 [[19-north-star-architecture|North-star architecture]],

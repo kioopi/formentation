@@ -1042,10 +1042,10 @@ target vocabulary is:
   context, UI descriptor, and overrides become a prepared view;
 - **rendering** — the selected UI turns that prepared view into output.
 
-`Formentation.Phoenix.Projector` currently performs render preparation, and
+`Formentation.Phoenix.RenderPreparation` performs render preparation, and
 [[06-runtime-projection|Runtime projection]] retains the historical term. The
-module should be renamed as part of the Phoenix presentation migration or an
-adjacent pre-`0.1.0` cleanup. Documentation and new public APIs should prefer
+module rename is recorded in
+[[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]. Documentation and new public APIs should prefer
 the three terms above rather than introducing a second meaning of projection.
 
 ## Worked example: a money field across UIs
@@ -1289,10 +1289,11 @@ The alignment work should not add:
 - interactive widget behaviours.
 
 Those would commit to the seam before the split definition and collections have
-provided representative requirements. The pre-`0.1.0` alignment may rename
+provided representative requirements. The pre-`0.1.0` alignment renamed
 `Formentation.Phoenix.Projector` to reflect preparation and
 `Formentation.Phoenix.Theme.Reference` to remove the obsolete architectural use
-of “theme”; those are vocabulary corrections, not a public UI contract.
+of “theme”; [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]
+records those vocabulary corrections, not a public UI contract.
 
 ## Phase 3 discovery and delivery
 
