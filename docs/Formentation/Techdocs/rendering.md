@@ -12,8 +12,8 @@ status: current
 
 # Rendering
 
-*As of 2026-08-05 (projected native Phoenix forms and explicit generic FormData
-route, [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]; native presentation traversal and semantic-index-backed
+*As of 2026-08-05 (projected native Phoenix forms, nested subtree summaries,
+and explicit generic FormData route, [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]; native presentation traversal and semantic-index-backed
 projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]; DOM identity, [[18-decisions#D-034 — Phoenix renderer DOM identities are typed and injective|D-034]]; group help, [[18-decisions#D-036 — Group help uses prepared Phoenix identities|D-036]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
 
 ## Render preparation data flow
@@ -73,7 +73,11 @@ One struct per render node shape:
   `dom` is a `GroupDOM{container, help}` prepared even for the structural root.
   Semantic objects and presentation groups both project to this one render shape.
   The root retains its help in the plan; `fields/1` renders only its children,
-  while `field path={[]}` renders the root group itself.
+  while `field path={[]}` renders the root group itself. For a **nested**
+  projected form the plan root is the projected object, so the same two rules
+  apply one level down: `fields/1` renders the object's children without its
+  fieldset, legend, or group help, and `field path={[]}` on that form is how
+  the object's own fieldset is rendered.
 - `Formentation.Phoenix.RenderNode.Field` — `widget`, `field` (the
   `%Phoenix.HTML.FormField{}`, carrying Phoenix id/name/value), `label`, `dom`,
   normalized semantic `value_type`, `help`,
@@ -153,6 +157,12 @@ It combines two sources:
   `:unavailable` and the summary degrades honestly to the field entries
   only — the degradation is keyed on what `issues/2` reports, not on the
   source's module.
+
+A nested projected form's plan carries a summary scoped to its own subtree,
+but `fields/1` does not render it by default: the summary is owned by the
+outermost render, and two `role="alert"` regions for one form is an
+accessibility regression. `summary={true}` / `summary={false}` overrides that
+placement explicitly.
 
 An entry whose path resolves to a `Semantic.Unsupported` is the one object
 entry the projector labels, humanizing the node's last path segment; root

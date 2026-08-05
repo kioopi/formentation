@@ -580,6 +580,64 @@ defmodule Formentation.Phoenix.ComponentsTest do
     end
   end
 
+  describe "error summary placement" do
+    defp summary_forms do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"hours", %{kind: :integer}},
+            {"address",
+             %{kind: :object, title: "Address", properties: [{"floor", %{kind: :integer}}]}}
+          ]
+        })
+
+      state =
+        Form.transition(Form.new(definition), %Params{
+          values: %{"hours" => "5o", "address" => %{"floor" => "3x"}},
+          event: :submit
+        })
+
+      root = FormData.to_form(state, as: "asset[payload]", id: "asset_payload")
+      [address] = FormData.to_form(state, root, :address, [])
+      {root, address}
+    end
+
+    test "a root form renders the submit-gated summary" do
+      {root, _address} = summary_forms()
+      doc = render_component(&Formentation.Phoenix.fields/1, form: root) |> parse!()
+
+      assert [_] = Floki.find(doc, ~s(div.ftn-error-summary[role="alert"]))
+    end
+
+    test "a nested form renders no summary of its own by default" do
+      {_root, address} = summary_forms()
+      doc = render_component(&Formentation.Phoenix.fields/1, form: address) |> parse!()
+
+      assert Floki.find(doc, ~s([role="alert"])) == []
+      assert [_] = Floki.find(doc, ".ftn-errors")
+    end
+
+    test "summary={true} places the summary on a nested form" do
+      {_root, address} = summary_forms()
+
+      doc =
+        render_component(&Formentation.Phoenix.fields/1, form: address, summary: true) |> parse!()
+
+      assert [_] = Floki.find(doc, ~s(div.ftn-error-summary[role="alert"]))
+      assert_all_references_resolve(doc)
+    end
+
+    test "summary={false} suppresses the summary on a root form" do
+      {root, _address} = summary_forms()
+
+      doc =
+        render_component(&Formentation.Phoenix.fields/1, form: root, summary: false) |> parse!()
+
+      assert Floki.find(doc, ~s([role="alert"])) == []
+    end
+  end
+
   describe "field/1" do
     test "renders a nested object's own fieldset at the relative root path" do
       definition =

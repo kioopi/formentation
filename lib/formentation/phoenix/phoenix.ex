@@ -14,7 +14,7 @@ defmodule Formentation.Phoenix do
 
   use Phoenix.Component
 
-  alias Formentation.Phoenix.{ReferenceComponents, RenderPreparation}
+  alias Formentation.Phoenix.{ReferenceComponents, RenderPlan, RenderPreparation}
 
   @doc """
   Renders the whole payload form body — error summary first, then every
@@ -43,21 +43,36 @@ defmodule Formentation.Phoenix do
       iex> html =~ ~s(name="payload[email]") and not (html =~ "<form")
       true
   """
-  attr(:definition, Formentation.Definition, default: nil)
+  attr(:definition, Formentation.Definition,
+    default: nil,
+    doc:
+      "required only when `form`'s source is not a `%Formentation.Form{}`; a form " <>
+        "projected from `Formentation.Form` carries its own definition, and passing " <>
+        "a different one raises"
+  )
+
   attr(:form, Phoenix.HTML.Form, required: true)
   attr(:dom_namespace, :string, default: nil, doc: "override for renderer-owned DOM ids")
 
+  attr(:summary, :boolean,
+    default: nil,
+    doc:
+      "whether to render the submit-gated error summary; defaults to rendering it " <>
+        "only at the form's projection root, so a nested form composed under " <>
+        "`<.inputs_for>` does not emit a second `role=\"alert\"` region"
+  )
+
   def fields(assigns) do
+    plan = RenderPreparation.prepare(assigns.form, preparation_opts(assigns))
+
     assigns =
-      assign(
-        assigns,
-        :plan,
-        RenderPreparation.prepare(assigns.form, preparation_opts(assigns))
-      )
+      assigns
+      |> assign(:plan, plan)
+      |> assign(:summary?, summary?(assigns.summary, plan))
 
     ~H"""
     <div class="ftn-form">
-      <ReferenceComponents.error_summary summary={@plan.summary} />
+      <ReferenceComponents.error_summary :if={@summary?} summary={@plan.summary} />
       <ReferenceComponents.node :for={child <- @plan.root.children} node={child} />
     </div>
     """
@@ -77,7 +92,14 @@ defmodule Formentation.Phoenix do
   />
   ```
   """
-  attr(:definition, Formentation.Definition, default: nil)
+  attr(:definition, Formentation.Definition,
+    default: nil,
+    doc:
+      "required only when `form`'s source is not a `%Formentation.Form{}`; a form " <>
+        "projected from `Formentation.Form` carries its own definition, and passing " <>
+        "a different one raises"
+  )
+
   attr(:form, Phoenix.HTML.Form, required: true)
   attr(:dom_namespace, :string, default: nil, doc: "override for renderer-owned DOM ids")
 
@@ -103,4 +125,14 @@ defmodule Formentation.Phoenix do
     [definition: assigns.definition, dom_namespace: assigns.dom_namespace]
     |> Keyword.reject(fn {_key, value} -> is_nil(value) end)
   end
+
+  # The error summary is a form-level affordance owned by the outermost
+  # render: two role="alert" regions for one form is an accessibility
+  # regression, and a nested plan's entries carry the nested form's DOM
+  # namespace, so the same error would appear twice under different ids.
+  # Unset therefore means "only at the projection root"; an explicit
+  # true/false always wins, so a caller composing subtrees by hand decides
+  # where the one summary goes.
+  defp summary?(nil, %RenderPlan{root_path: root_path}), do: root_path == []
+  defp summary?(summary?, _plan) when is_boolean(summary?), do: summary?
 end

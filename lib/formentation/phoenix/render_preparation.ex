@@ -63,7 +63,13 @@ defmodule Formentation.Phoenix.RenderPreparation do
   def prepare(%Phoenix.HTML.Form{} = form, opts) when is_list(opts) do
     ctx = resolve_context(form, opts)
     {root, diagnostics} = project_descriptor(ctx.root_descriptor, form, ctx)
-    %RenderPlan{root: root, summary: summary(root, ctx), diagnostics: diagnostics}
+
+    %RenderPlan{
+      root: root,
+      root_path: ctx.root_path,
+      summary: summary(root, ctx),
+      diagnostics: diagnostics
+    }
   end
 
   @doc """
