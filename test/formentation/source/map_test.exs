@@ -255,6 +255,25 @@ defmodule Formentation.Source.MapTest do
       assert Info.origins(definition, ["condition"])[:role] == {:inference, :string_default}
       assert Info.origins(definition, ["condition"])[:options] == nil
     end
+
+    test "a mixed valid list of string, integer, float, and boolean values compiles unchanged" do
+      options = ["string", 42, 3.14, true, false]
+
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"condition", %{kind: :string, one_of: options}}
+          ]
+        })
+
+      assert %Semantic.Field{options: ^options} = Info.node_at(definition, ["condition"])
+      assert Info.role(definition, ["condition"]) == :select
+      assert Info.origins(definition, ["condition"])[:role] == {:inference, :one_of_select}
+
+      assert Info.origins(definition, ["condition"])[:options] ==
+               {:map_source, [:properties, "condition", :one_of]}
+    end
   end
 
   describe "widget, help, and constraints" do
