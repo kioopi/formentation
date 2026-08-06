@@ -243,17 +243,162 @@ defmodule Formentation.Source.MapTest do
       assert Info.role(definition, ["condition"]) == :radio
     end
 
-    test "a nil one_of does not infer :select, set options, or stamp an options origin" do
-      definition =
-        compile!(%{
-          kind: :object,
-          properties: [{"condition", %{kind: :string, one_of: nil}}]
-        })
+    test "a nil one_of is ignored with a warning" do
+      declaration = %{
+        kind: :object,
+        properties: [{"condition", %{kind: :string, one_of: nil}}]
+      }
+
+      assert {:ok, definition, diagnostics} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
+      assert [
+               %Formentation.Diagnostic{
+                 severity: :warning,
+                 code: :unsupported_keyword,
+                 message: "nil one_of for property \"condition\" is ignored",
+                 origin: {:map_source, [:properties, "condition", :one_of]},
+                 template_path: %{segments: ["condition"]}
+               }
+             ] = diagnostics
 
       assert %Semantic.Field{options: nil} = Info.node_at(definition, ["condition"])
       assert Info.role(definition, ["condition"]) == :text
       assert Info.origins(definition, ["condition"])[:role] == {:inference, :string_default}
       assert Info.origins(definition, ["condition"])[:options] == nil
+    end
+
+    test "a mixed valid list of string, integer, float, and boolean values compiles unchanged" do
+      options = ["string", 42, 3.14, true, false]
+
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"condition", %{kind: :string, one_of: options}}
+          ]
+        })
+
+      assert %Semantic.Field{options: ^options} = Info.node_at(definition, ["condition"])
+      assert Info.role(definition, ["condition"]) == :select
+      assert Info.origins(definition, ["condition"])[:role] == {:inference, :one_of_select}
+
+      assert Info.origins(definition, ["condition"])[:options] ==
+               {:map_source, [:properties, "condition", :one_of]}
+    end
+
+    test "an invalid map option member fails compilation with structured diagnostic" do
+      declaration = %{
+        kind: :object,
+        properties: [
+          {"condition", %{kind: :string, one_of: ["valid", %{a: 1}]}}
+        ]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  severity: :error,
+                  code: :invalid_declaration,
+                  message:
+                    "one_of option 1 for property \"condition\" must be a string, number, or boolean, got: %{a: 1}",
+                  origin: {:map_source, [:properties, "condition", :one_of, 1]},
+                  template_path: %{segments: ["condition"]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-list non-nil one_of value fails compilation with structured diagnostic" do
+      declaration = %{
+        kind: :object,
+        properties: [
+          {"condition", %{kind: :string, one_of: "oops"}}
+        ]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  severity: :error,
+                  code: :invalid_declaration,
+                  message: "property \"condition\" one_of: expected a list, got: \"oops\"",
+                  origin: {:map_source, [:properties, "condition", :one_of]},
+                  template_path: %{segments: ["condition"]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "unsupported option values return invalid_declaration diagnostic" do
+      invalid_values = [
+        {[1], "[1]"},
+        {{1}, "{1}"},
+        {:foo, ":foo"},
+        {nil, "nil"}
+      ]
+
+      for {invalid_val, desc} <- invalid_values do
+        declaration = %{
+          kind: :object,
+          properties: [
+            {"field", %{kind: :string, one_of: [invalid_val]}}
+          ]
+        }
+
+        assert {:error,
+                [
+                  %Formentation.Diagnostic{
+                    severity: :error,
+                    code: :invalid_declaration,
+                    origin: {:map_source, [:properties, "field", :one_of, 0]},
+                    message: msg
+                  }
+                ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
+        assert msg =~ desc
+      end
+    end
+
+    test "reports the first invalid member in source order deterministically" do
+      declaration = %{
+        kind: :object,
+        properties: [
+          {"choice", %{kind: :string, one_of: ["valid1", %{first: 1}, "valid2", %{second: 2}]}}
+        ]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  severity: :error,
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "choice", :one_of, 1]},
+                  message: msg
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
+      assert msg =~ "one_of option 1"
+      assert msg =~ "%{first: 1}"
+    end
+
+    test "does not return a partial option set or definition on invalid option" do
+      declaration = %{
+        kind: :object,
+        properties: [
+          {"choice", %{kind: :string, one_of: ["valid_before", %{invalid: 1}, "valid_after"]}}
+        ]
+      }
+
+      result = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "choice", :one_of, 1]}
+                }
+              ]} = result
+
+      refute match?({:ok, _, _}, result)
     end
   end
 

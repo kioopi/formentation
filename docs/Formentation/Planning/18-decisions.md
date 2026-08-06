@@ -875,6 +875,19 @@ is scoped to the projection subtree and rendered only at the projection root
 unless `summary={true}`/`summary={false}` says otherwise, so composing under
 `<.inputs_for>` yields one `role="alert"` region rather than two.
 
+## D-042 — Map source validates scalar options at compile boundary; hard-errors on invalid option declarations
+
+*2026-08-06*
+
+**Context.** `Formentation.Source.Map` previously copied `:one_of` options lists without validating list element types or verifying that `:one_of` was a list. This allowed malformed declarations like `one_of: [%{a: 1}]` or `one_of: "oops"` to compile without error and fail only during downstream rendering. Meanwhile, `Formentation.Semantic.Field` declares `@type option :: String.t() | number() | boolean()`.
+
+**Decision.** The Map source validates `:one_of` option declarations at the compilation boundary:
+- Valid option values must be scalars (`String.t()`, `number()`, or `boolean()`). Accepted values are retained verbatim without stringification, sorting, or deduplication.
+- Invalid member types (e.g. maps, tuples, nested lists, atoms, or `nil`) or non-list `:one_of` declarations other than explicit `nil` produce an `:invalid_declaration` error diagnostic. An explicit `one_of: nil` is treated as absent and emits an `:unsupported_keyword` warning.
+- Hard-error compilation failure (`{:error, diagnostics}`) is used for malformed `:one_of` declarations in the Map source (matching `fetch_examples`), rather than field-level degradation (`Semantic.Unsupported` used by JSON Schema for `enum` violations). Map declarations are author code, so a malformed `:one_of` declaration represents an author bug that should fail compilation explicitly rather than silently degrading.
+
+**Consequences.** Malformed option sets fail compilation immediately at the source boundary with structured diagnostics pointing to the exact indexed origin path (`{:map_source, source_path ++ [:one_of, index]}`). Valid numbers and booleans remain first-class scalar options on Map source fields. The supported option set is currently source-dependent: Map accepts strings, numbers, and booleans, while JSON Schema accepts strings only; reconciling that difference is out of scope for this decision.
+
 ## Related notes
 
 - [[19-north-star-architecture|North-star architecture]]

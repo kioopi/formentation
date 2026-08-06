@@ -6,6 +6,10 @@ defmodule Formentation.Source.Map do
   A declaration is a map with a `:kind`. Object properties are an ordered
   list of `{name, spec}` tuples, so ordering is data, never map
   enumeration order.
+
+  Field specifications support `:one_of` options lists containing scalar values
+  (`String.t()`, `number()`, or `boolean()`). Unsupported non-scalar values in
+  `:one_of` produce an `:invalid_declaration` error.
   """
 
   @behaviour Formentation.Source
@@ -229,7 +233,10 @@ defmodule Formentation.Source.Map do
     source_path = ctx.source_path ++ [:properties, name]
 
     with {:ok, ctx} <- take_budget(ctx),
-         {:ok, examples, examples_origin} <- fetch_examples(spec, name, source_path, ctx) do
+         {:ok, examples, examples_origin} <-
+           fetch_examples(spec, name, source_path, template_path, ctx),
+         {:ok, options, options_origin, ctx} <-
+           fetch_one_of_options(spec, name, source_path, template_path, ctx) do
       {label, label_origin} = resolve_label(spec, name, source_path)
       {role, role_origin} = resolve_role(spec, source_path)
 
@@ -248,7 +255,7 @@ defmodule Formentation.Source.Map do
           role: role_origin,
           widget: key_origin(spec, :widget, source_path),
           help: key_origin(spec, :help, source_path),
-          options: options_origin(spec, source_path),
+          options: options_origin,
           examples: examples_origin,
           default: default_origin,
           hidden: hidden_origin,
@@ -260,7 +267,7 @@ defmodule Formentation.Source.Map do
           role: role,
           required?: required?,
           read_only?: read_only,
-          options: one_of_options(spec),
+          options: options,
           default: default,
           examples: examples,
           constraints: Map.take(spec, @constraint_keys),
@@ -280,7 +287,7 @@ defmodule Formentation.Source.Map do
     end
   end
 
-  defp fetch_examples(spec, name, source_path, ctx) do
+  defp fetch_examples(spec, name, source_path, template_path, ctx) do
     case Map.fetch(spec, :examples) do
       {:ok, examples} when is_list(examples) ->
         {:ok, examples, {:map_source, source_path ++ [:examples]}}
@@ -290,7 +297,8 @@ defmodule Formentation.Source.Map do
          invalid(
            "property #{inspect(name)} examples: expected a list, got: #{inspect(other)}",
            ctx,
-           source_path ++ [:examples]
+           source_path ++ [:examples],
+           template_path
          )}
 
       :error ->
@@ -342,13 +350,13 @@ defmodule Formentation.Source.Map do
     end
   end
 
-  defp invalid(message, ctx, origin_path \\ nil) do
+  defp invalid(message, ctx, origin_path \\ nil, template_path \\ nil) do
     %Diagnostic{
       severity: :error,
       code: :invalid_declaration,
       message: message,
       origin: {:map_source, origin_path || ctx.source_path},
-      template_path: ctx.template_path
+      template_path: template_path || ctx.template_path
     }
   end
 
@@ -379,14 +387,57 @@ defmodule Formentation.Source.Map do
     if Map.has_key?(spec, key), do: {:map_source, source_path ++ [key]}
   end
 
-  defp one_of_options(%{one_of: options}) when is_list(options), do: options
-  defp one_of_options(_spec), do: nil
-
-  defp options_origin(%{one_of: options}, source_path) when is_list(options) do
-    {:map_source, source_path ++ [:one_of]}
+  defp scalar_option?(value) do
+    is_binary(value) or is_number(value) or is_boolean(value)
   end
 
-  defp options_origin(_spec, _source_path), do: nil
+  defp fetch_one_of_options(spec, name, source_path, template_path, ctx) do
+    case Map.fetch(spec, :one_of) do
+      {:ok, options} when is_list(options) ->
+        case validate_scalar_options(options, name, source_path, template_path, ctx) do
+          {:ok, options, origin} -> {:ok, options, origin, ctx}
+          {:error, diagnostic} -> {:error, diagnostic}
+        end
+
+      {:ok, nil} ->
+        warning = %Diagnostic{
+          severity: :warning,
+          code: :unsupported_keyword,
+          message: "nil one_of for property #{inspect(name)} is ignored",
+          origin: {:map_source, source_path ++ [:one_of]},
+          template_path: template_path
+        }
+
+        {:ok, nil, nil, %{ctx | diagnostics: [warning | ctx.diagnostics]}}
+
+      {:ok, other} ->
+        {:error,
+         invalid(
+           "property #{inspect(name)} one_of: expected a list, got: #{inspect(other)}",
+           ctx,
+           source_path ++ [:one_of],
+           template_path
+         )}
+
+      :error ->
+        {:ok, nil, nil, ctx}
+    end
+  end
+
+  defp validate_scalar_options(options, name, source_path, template_path, ctx) do
+    case Enum.find(Enum.with_index(options), fn {value, _index} -> not scalar_option?(value) end) do
+      nil ->
+        {:ok, options, {:map_source, source_path ++ [:one_of]}}
+
+      {invalid_value, index} ->
+        origin_path = source_path ++ [:one_of, index]
+
+        message =
+          "one_of option #{index} for property #{inspect(name)} must be a string, number, or boolean, got: #{inspect(invalid_value)}"
+
+        {:error, invalid(message, ctx, origin_path, template_path)}
+    end
+  end
 
   @semantic_origin_keys [:role, :options, :examples, :default, :read_only]
   @presentation_origin_keys [:label, :widget, :help, :hidden]
