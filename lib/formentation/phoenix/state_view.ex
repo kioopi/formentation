@@ -12,7 +12,7 @@ defprotocol Formentation.Phoenix.StateView do
   per-field error convention.
 
   Dispatch is on `form.source`, so no adapter option appears on
-  `Formentation.Phoenix.Projector.project/2` or on any component. Sources
+  render preparation or on any component. Sources
   without an implementation fall back to `Any`, which reproduces the
   conservative Phoenix-generic behaviour.
 

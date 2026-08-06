@@ -91,7 +91,7 @@ defmodule FormentationDemo.PumpInspectionLive do
             value={@asset_form[:name].value}
           />
         </div>
-        <Formentation.Phoenix.fields definition={@definition} form={@payload_form} />
+        <Formentation.Phoenix.fields form={@payload_form} />
         <button type="submit">Save</button>
       </.form>
       <pre :if={@submitted} id="decoded-candidate">{JSON.encode!(@submitted)}</pre>

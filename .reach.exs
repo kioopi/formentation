@@ -93,19 +93,28 @@
       {"Formentation.*", ["Phoenix.*"], except: ["Formentation.Phoenix.*"]},
       # JSV never leaks past its swap point (D-008).
       {"Formentation.*", ["JSV.*"], except: ["Formentation.JSONSchema.Validator"]},
-      # The projector dispatches state-dependent decisions only through
+      # Render preparation dispatches state-dependent decisions only through
       # Formentation.Phoenix.StateView (D-027); it must never call into
       # Formentation.Form directly. The {:phoenix, :core} layer dependency
       # is sanctioned (the projector reads Definition/Info/Node freely), so
       # no layer rule can express this narrower obligation — only a
       # per-module call rule can. This closes the alias-evasion gap the
-      # projector_test.exs "architectural boundary" grep pin cannot see:
+      # render_preparation_test.exs "architectural boundary" grep pin cannot see:
       # `alias Formentation.{Form, ...}` (brace syntax) never produces the
       # literal substring "Formentation.Form" the grep looks for, but Reach
       # resolves calls against the call graph after alias resolution, so it
       # catches a `Form.some_function/arity` call regardless of how the
       # alias was spelled.
-      {"Formentation.Phoenix.Projector", ["Formentation.Form", "Formentation.Form.*"]}
+      # Formentation.Phoenix.ProjectedForm is the sanctioned exception: it is
+      # the companion of the FormData implementation and decodes the native
+      # projection (definition + root path) on preparation's behalf. That is
+      # metadata, not runtime state — submission, issue visibility, and
+      # non-field issues must still cross the StateView seam. Do not relieve
+      # pressure on this rule by moving further state-dependent decisions into
+      # ProjectedForm; the "architectural boundary" tests in
+      # render_preparation_test.exs pin both that ProjectedForm never names
+      # StateView and that nothing else spells the private projection key.
+      {"Formentation.Phoenix.RenderPreparation", ["Formentation.Form", "Formentation.Form.*"]}
     ]
   ],
   effects: [

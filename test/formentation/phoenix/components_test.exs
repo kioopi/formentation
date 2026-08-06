@@ -527,7 +527,222 @@ defmodule Formentation.Phoenix.ComponentsTest do
     end
   end
 
+  describe "native projected component inputs" do
+    test "renders a native root form without a definition assign" do
+      definition = nested_definition()
+      form = FormData.to_form(Form.new(definition), as: "payload")
+
+      doc =
+        render_component(&Formentation.Phoenix.fields/1, form: form)
+        |> parse!()
+
+      assert [_] = Floki.find(doc, ~s(input[name="payload[serial_number]"]))
+    end
+
+    test "renders only a nested native form and resolves a relative field path" do
+      definition = nested_definition()
+      form_state = Form.new(definition, %{"address" => %{"street" => "Elm"}})
+      root = FormData.to_form(form_state, as: "asset[payload]", id: "asset_payload")
+      [address] = FormData.to_form(form_state, root, :address, [])
+
+      nested_doc =
+        render_component(&Formentation.Phoenix.fields/1, form: address)
+        |> parse!()
+
+      assert [_] = Floki.find(nested_doc, ~s(input[name="asset[payload][address][street]"]))
+      assert Floki.find(nested_doc, ~s(input[name="asset[payload][serial_number]"])) == []
+
+      field_doc =
+        render_component(&Formentation.Phoenix.field/1, form: address, path: ["street"])
+        |> parse!()
+
+      assert [_] = Floki.find(field_doc, ~s(input[name="asset[payload][address][street]"]))
+    end
+
+    test "a generic source drives submission, visibility, and non-field issues" do
+      definition = nested_definition()
+
+      source = %Formentation.SourceFixture{
+        params: %{"serial_number" => "PX", "address" => %{}},
+        errors: [serial_number: {"is too short", []}],
+        submitted?: true,
+        visibility: %{["serial_number"] => :show},
+        issues:
+          {:ok,
+           [
+             %Formentation.Phoenix.StateView.Issue{
+               path: InstancePath.new!([]),
+               message: "fix the form"
+             }
+           ]}
+      }
+
+      form = FormData.to_form(source, as: "payload")
+
+      doc =
+        render_component(&Formentation.Phoenix.fields/1, definition: definition, form: form)
+        |> parse!()
+
+      assert [_] = Floki.find(doc, ~s(div.ftn-error-summary[role="alert"]))
+
+      serial_control = field_id("payload", ["serial_number"], :control)
+      assert [_] = Floki.find(doc, ~s(a[href="##{serial_control}"]))
+
+      assert Floki.find(doc, ".ftn-error-summary span")
+             |> Floki.text() =~ "fix the form"
+
+      assert Floki.attribute(find_one(doc, ~s([id="#{serial_control}"])), "aria-invalid") ==
+               ["true"]
+    end
+
+    test "a generic source's :hide answer suppresses an error that would otherwise show" do
+      definition = nested_definition()
+
+      source = %Formentation.SourceFixture{
+        params: %{"serial_number" => "PX", "address" => %{}},
+        errors: [serial_number: {"is too short", []}],
+        submitted?: true,
+        visibility: %{["serial_number"] => :hide}
+      }
+
+      form = FormData.to_form(source, as: "payload")
+
+      doc =
+        render_component(&Formentation.Phoenix.fields/1, definition: definition, form: form)
+        |> parse!()
+
+      serial_control = field_id("payload", ["serial_number"], :control)
+
+      assert Floki.find(doc, ".ftn-errors") == []
+      assert Floki.find(doc, ~s(a[href="##{serial_control}"])) == []
+      assert Floki.attribute(find_one(doc, ~s([id="#{serial_control}"])), "aria-invalid") == []
+    end
+
+    test "both components require an explicit definition for a generic form" do
+      definition = nested_definition()
+
+      form =
+        FormData.to_form(
+          %Formentation.SourceFixture{params: %{"serial_number" => "PX-1", "address" => %{}}},
+          as: "payload"
+        )
+
+      assert_raise ArgumentError, ~r/native projected form.*generic form plus definition:/, fn ->
+        render_component(&Formentation.Phoenix.fields/1, form: form)
+      end
+
+      assert_raise ArgumentError, ~r/native projected form.*generic form plus definition:/, fn ->
+        render_component(&Formentation.Phoenix.field/1, form: form, path: ["serial_number"])
+      end
+
+      fields_doc =
+        render_component(&Formentation.Phoenix.fields/1, definition: definition, form: form)
+        |> parse!()
+
+      field_doc =
+        render_component(&Formentation.Phoenix.field/1,
+          definition: definition,
+          form: form,
+          path: ["serial_number"]
+        )
+        |> parse!()
+
+      assert [_] = Floki.find(fields_doc, ~s(input[name="payload[serial_number]"]))
+      assert [_] = Floki.find(field_doc, ~s(input[name="payload[serial_number]"]))
+    end
+  end
+
+  describe "error summary placement" do
+    defp summary_forms do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"hours", %{kind: :integer}},
+            {"address",
+             %{kind: :object, title: "Address", properties: [{"floor", %{kind: :integer}}]}}
+          ]
+        })
+
+      state =
+        Form.transition(Form.new(definition), %Params{
+          values: %{"hours" => "5o", "address" => %{"floor" => "3x"}},
+          event: :submit
+        })
+
+      root = FormData.to_form(state, as: "asset[payload]", id: "asset_payload")
+      [address] = FormData.to_form(state, root, :address, [])
+      {root, address}
+    end
+
+    test "a root form renders the submit-gated summary" do
+      {root, _address} = summary_forms()
+      doc = render_component(&Formentation.Phoenix.fields/1, form: root) |> parse!()
+
+      assert [_] = Floki.find(doc, ~s(div.ftn-error-summary[role="alert"]))
+    end
+
+    test "a nested form renders no summary of its own by default" do
+      {_root, address} = summary_forms()
+      doc = render_component(&Formentation.Phoenix.fields/1, form: address) |> parse!()
+
+      assert Floki.find(doc, ~s([role="alert"])) == []
+      assert [_] = Floki.find(doc, ".ftn-errors")
+    end
+
+    test "summary={true} places the summary on a nested form" do
+      {_root, address} = summary_forms()
+
+      doc =
+        render_component(&Formentation.Phoenix.fields/1, form: address, summary: true) |> parse!()
+
+      assert [_] = Floki.find(doc, ~s(div.ftn-error-summary[role="alert"]))
+      assert_all_references_resolve(doc)
+    end
+
+    test "summary={false} suppresses the summary on a root form" do
+      {root, _address} = summary_forms()
+
+      doc =
+        render_component(&Formentation.Phoenix.fields/1, form: root, summary: false) |> parse!()
+
+      assert Floki.find(doc, ~s([role="alert"])) == []
+    end
+  end
+
   describe "field/1" do
+    test "renders a nested object's own fieldset at the relative root path" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"serial_number", %{kind: :string}},
+            {"address",
+             %{
+               kind: :object,
+               title: "Address",
+               help: "Where it lives.",
+               properties: [{"street", %{kind: :string}}]
+             }}
+          ]
+        })
+
+      form_state = Form.new(definition, %{"address" => %{"street" => "Elm"}})
+      root = FormData.to_form(form_state, as: "asset[payload]", id: "asset_payload")
+      [address] = FormData.to_form(form_state, root, :address, [])
+
+      doc = render_component(&Formentation.Phoenix.field/1, form: address, path: []) |> parse!()
+
+      assert [_] = Floki.find(doc, "fieldset")
+      assert Floki.text(find_one(doc, "legend")) |> String.trim() == "Address"
+      assert Floki.text(find_one(doc, ".ftn-group-help")) |> String.trim() == "Where it lives."
+
+      assert [_] = Floki.find(doc, ~s(input[name="asset[payload][address][street]"]))
+      assert Floki.find(doc, ~s(input[name="asset[payload][serial_number]"])) == []
+
+      assert_all_references_resolve(doc)
+    end
+
     test "renders root help when explicitly projecting the root subtree" do
       definition = compile!(%{kind: :object, help: "Root help.", properties: []})
       form = FormData.to_form(Form.new(definition), as: "payload")

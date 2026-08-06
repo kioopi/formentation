@@ -5,8 +5,7 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
   # Spec: docs/superpowers/specs/2026-07-23-phase1-step5-formdata-design.md
 
   alias Formentation.{Form, Info, Semantic}
-
-  @path_key :__formentation__
+  alias Formentation.Phoenix.ProjectedForm
 
   def to_form(form_state, opts) do
     reject_owned_option!(opts, :action)
@@ -31,13 +30,13 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
       errors: errors_for(form_state, []),
       action: form_state.action,
       hidden: [],
-      options: Keyword.put(opts, @path_key, [])
+      options: ProjectedForm.put_root_path(opts, [])
     }
   end
 
   def to_form(form_state, form, field, opts) when is_atom(field) or is_binary(field) do
     key = field_to_string(field)
-    path = path_of(form) ++ [key]
+    path = ProjectedForm.root_segments!(form) ++ [key]
 
     case Info.semantic_kind(form_state.definition, path) do
       :object -> [nested_form(form_state, form, key, path, opts)]
@@ -59,18 +58,23 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
     opts = drop_collection_options!(opts)
     {name, opts} = Keyword.pop(opts, :as)
     {id, opts} = Keyword.pop(opts, :id)
-
+    # Phoenix.HTML.Form.t()'s spec narrows id/name to binaries, but the
+    # anonymous-form boundary (`to_form(state, [])`) intentionally supports
+    # nil at runtime. Reading through Map.get/2 keeps Dialyzer from judging
+    # the nil clauses of join_id/2 and join_name/2 unreachable; direct
+    # `form.id` access reports two pattern_match errors here. Map.get/2 takes
+    # the struct as-is, so this costs nothing beyond the lookup.
     %Phoenix.HTML.Form{
       source: form_state,
       impl: __MODULE__,
-      id: (id && to_string(id)) || join_id(form.id, key),
-      name: (name && to_string(name)) || join_name(form.name, key),
+      id: (id && to_string(id)) || join_id(Map.get(form, :id), key),
+      name: (name && to_string(name)) || join_name(Map.get(form, :name), key),
       params: sub_map(form.params, key),
       data: sub_map(form.data, key),
       errors: errors_for(form_state, path),
       action: form.action,
       hidden: [],
-      options: Keyword.put(opts, @path_key, path)
+      options: ProjectedForm.put_root_path(opts, path)
     }
   end
 
@@ -105,7 +109,7 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
 
   def input_value(form_state, form, field) do
     key = field_to_string(field)
-    path = path_of(form) ++ [key]
+    path = ProjectedForm.root_segments!(form) ++ [key]
 
     case Info.node_at(form_state.definition, path) do
       %Semantic.Field{} -> Form.field(form_state, path).display_value
@@ -120,10 +124,8 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
     end
   end
 
-  defp path_of(%{options: options}), do: Keyword.fetch!(options, @path_key)
-
   def input_validations(form_state, form, field) do
-    path = path_of(form) ++ [field_to_string(field)]
+    path = ProjectedForm.root_segments!(form) ++ [field_to_string(field)]
 
     case Info.node_at(form_state.definition, path) do
       %Semantic.Field{} = node -> validations(node)

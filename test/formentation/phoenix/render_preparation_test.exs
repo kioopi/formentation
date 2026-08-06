@@ -1,13 +1,45 @@
-defmodule Formentation.Phoenix.ProjectorTest do
+defmodule Formentation.Phoenix.RenderPreparationTest.ProjectorAdapter do
+  @moduledoc """
+  Keeps the pre-rename `Projector.project/2,3` and `project_at/3,4` call
+  shapes working so ~1200 lines of behavioural assertions did not have to be
+  rewritten under the rename.
+
+  Passing `definition:` does **not** select the generic branch.
+  `resolve_context/2` dispatches on `ProjectedForm.native_context/1` first, so
+  a form whose source is a `%Formentation.Form{}` takes the **native** branch
+  regardless, and the shim's explicit definition is then checked by
+  `validate_native_definition!/2` as a matching redundant definition. Most of
+  this file's forms are native, so the bulk of preparation coverage exercises
+  native derivation plus that redundancy check. Only the map-source and
+  `SourceFixture` forms reach the generic branch — which is where the
+  `definition:` requirement itself is proved.
+  """
+
+  alias Formentation.Phoenix.RenderPreparation
+
+  def project(definition, form), do: RenderPreparation.prepare(form, definition: definition)
+
+  def project(definition, form, opts),
+    do: RenderPreparation.prepare(form, Keyword.put(opts, :definition, definition))
+
+  def project_at(definition, form, path),
+    do: RenderPreparation.prepare_at(form, path, definition: definition)
+
+  def project_at(definition, form, path, opts),
+    do: RenderPreparation.prepare_at(form, path, Keyword.put(opts, :definition, definition))
+end
+
+defmodule Formentation.Phoenix.RenderPreparationTest do
   use ExUnit.Case, async: true
 
   import Formentation.Test.FormHelpers
 
-  doctest Formentation.Phoenix.Projector
+  doctest Formentation.Phoenix.RenderPreparation
 
   alias Formentation.Definition.Finalizer
   alias Formentation.{Form, InstancePath, NodeId, TemplatePath}
-  alias Formentation.Phoenix.{DOMIdentity, Projector, RenderNode, RenderPlan}
+  alias Formentation.Phoenix.{DOMIdentity, RenderNode, RenderPlan, RenderPreparation}
+  alias Formentation.Phoenix.RenderPreparationTest.ProjectorAdapter, as: Projector
   alias Formentation.Presentation, as: NativePresentation
   alias Formentation.Semantic
   alias Phoenix.HTML.FormData
@@ -36,6 +68,30 @@ defmodule Formentation.Phoenix.ProjectorTest do
         {"notes", %{kind: :string, help: "Visible to all technicians."}}
       ]
     })
+  end
+
+  defp nested_projection_definition do
+    compile!(%{
+      kind: :object,
+      properties: [
+        {"title", %{kind: :string}},
+        {"address",
+         %{
+           kind: :object,
+           title: "Address",
+           help: "Where it lives.",
+           properties: [{"street", %{kind: :string}}]
+         }}
+      ]
+    })
+  end
+
+  defp nested_projection_forms do
+    definition = nested_projection_definition()
+    state = Form.new(definition, %{"title" => "root", "address" => %{"street" => "Elm"}})
+    root = FormData.to_form(state, as: "asset[payload]", id: "asset_payload")
+    [address] = FormData.to_form(state, root, :address, [])
+    {root, address}
   end
 
   defp decode_error_form(event, extra_values \\ %{}) do
@@ -181,6 +237,201 @@ defmodule Formentation.Phoenix.ProjectorTest do
     plan = single_field_plan(spec)
     [%RenderNode.Field{widget: widget}] = plan.root.children
     {widget, plan.diagnostics}
+  end
+
+  describe "native and generic preparation contexts" do
+    test "derives the definition from a native root form" do
+      definition = flat_definition()
+      form = FormData.to_form(Form.new(definition), as: "payload")
+
+      assert %RenderPlan{} = RenderPreparation.prepare(form)
+    end
+
+    test "requires an explicit definition for a generic form" do
+      form = FormData.to_form(%{}, as: "payload")
+
+      assert_raise ArgumentError, ~r/native projected form.*generic form plus definition:/, fn ->
+        RenderPreparation.prepare(form)
+      end
+
+      assert %RenderPlan{} = RenderPreparation.prepare(form, definition: flat_definition())
+    end
+
+    test "rejects an explicit definition that differs from a native form source" do
+      native_definition = flat_definition()
+      other_definition = compile!(%{kind: :object, properties: [{"name", %{kind: :string}}]})
+      form = FormData.to_form(Form.new(native_definition), as: "payload")
+
+      assert_raise ArgumentError, ~r/source definition is authoritative.*remove/, fn ->
+        RenderPreparation.prepare(form, definition: other_definition)
+      end
+    end
+
+    test "rejects malformed metadata on a native form instead of treating it as generic" do
+      form = FormData.to_form(Form.new(flat_definition()), as: "payload")
+      broken = %{form | options: Keyword.delete(form.options, :__formentation__)}
+
+      assert_raise ArgumentError, ~r/not a valid Formentation projection.*rebuild/, fn ->
+        RenderPreparation.prepare(broken, definition: flat_definition())
+      end
+    end
+
+    test "prepares a nested form's own object at the relative root path" do
+      {_root, address} = nested_projection_forms()
+
+      node = RenderPreparation.prepare_at(address, [])
+
+      assert %RenderNode.Group{legend: "Address", help: "Where it lives."} = node
+
+      assert node.dom.container ==
+               DOMIdentity.object(
+                 "asset_payload_address",
+                 InstancePath.new!(["address"]),
+                 :container
+               )
+
+      # The child name is what proves no second nesting happened: a double
+      # descent would produce asset[payload][address][address][street].
+      assert [%RenderNode.Field{field: %{name: "asset[payload][address][street]"}}] =
+               node.children
+    end
+
+    test "rejects a projection root that is not an object from both entry points" do
+      {root, _address} = nested_projection_forms()
+
+      tampered = %{
+        root
+        | options: Keyword.put(root.options, :__formentation__, ["address", "street"])
+      }
+
+      message = ~r/projected form root \["address", "street"\] is not an object/
+
+      assert_raise ArgumentError, message, fn -> RenderPreparation.prepare(tampered) end
+      assert_raise ArgumentError, message, fn -> RenderPreparation.prepare_at(tampered, []) end
+
+      assert_raise ArgumentError, message, fn ->
+        RenderPreparation.prepare_at(tampered, ["street"])
+      end
+    end
+
+    test "rejects a projection root that names nothing or an unsupported node" do
+      definition =
+        compile_json!(%{
+          "type" => "object",
+          "properties" => %{
+            "title" => %{"type" => "string"},
+            "weird" => %{"not" => %{"type" => "string"}}
+          }
+        })
+
+      root = FormData.to_form(Form.new(definition), as: "payload", id: "payload")
+
+      missing = %{root | options: Keyword.put(root.options, :__formentation__, ["nope"])}
+      unsupported = %{root | options: Keyword.put(root.options, :__formentation__, ["weird"])}
+
+      assert_raise ArgumentError, ~r/projected form root \["nope"\] does not exist/, fn ->
+        RenderPreparation.prepare(missing)
+      end
+
+      assert_raise ArgumentError, ~r/projected form root \["weird"\] is unsupported/, fn ->
+        RenderPreparation.prepare(unsupported)
+      end
+
+      # Both entry points, since validation now lives in the shared context.
+      assert_raise ArgumentError, ~r/projected form root \["nope"\] does not exist/, fn ->
+        RenderPreparation.prepare_at(missing, [])
+      end
+
+      assert_raise ArgumentError, ~r/projected form root \["weird"\] is unsupported/, fn ->
+        RenderPreparation.prepare_at(unsupported, ["anything"])
+      end
+    end
+
+    test "prepares only a nested form's subtree and resolves relative field paths" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"title", %{kind: :string}},
+            {"address", %{kind: :object, properties: [{"street", %{kind: :string}}]}}
+          ]
+        })
+
+      form_state = Form.new(definition, %{"title" => "root", "address" => %{"street" => "Main"}})
+      root = FormData.to_form(form_state, as: "asset[payload]")
+      [address] = FormData.to_form(form_state, root, :address, [])
+
+      plan = RenderPreparation.prepare(address)
+
+      assert [%RenderNode.Field{field: %{name: "asset[payload][address][street]"}}] =
+               plan.root.children
+
+      assert %RenderNode.Field{field: %{name: "asset[payload][address][street]"}} =
+               RenderPreparation.prepare_at(address, ["street"])
+
+      assert_raise ArgumentError, ~r/relative path.*projected root/, fn ->
+        RenderPreparation.prepare_at(address, ["title"])
+      end
+    end
+
+    test "a nested plan's DOM identities carry the nested form's joined id" do
+      {root, address} = nested_projection_forms()
+
+      [root_street] =
+        RenderPreparation.prepare(root).root.children
+        |> Enum.filter(&match?(%RenderNode.Group{}, &1))
+        |> Enum.flat_map(& &1.children)
+
+      [nested_street] = RenderPreparation.prepare(address).root.children
+
+      assert root_street.field.name == nested_street.field.name
+
+      assert root_street.dom.control ==
+               DOMIdentity.field(
+                 "asset_payload",
+                 InstancePath.new!(["address", "street"]),
+                 :control
+               )
+
+      assert nested_street.dom.control ==
+               DOMIdentity.field(
+                 "asset_payload_address",
+                 InstancePath.new!(["address", "street"]),
+                 :control
+               )
+    end
+
+    test "resolves a relative path deeper than the projected root by one level" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"address",
+             %{
+               kind: :object,
+               properties: [
+                 {"geo", %{kind: :object, properties: [{"lat", %{kind: :number}}]}}
+               ]
+             }}
+          ]
+        })
+
+      state = Form.new(definition, %{"address" => %{"geo" => %{"lat" => 51.5}}})
+      root = FormData.to_form(state, as: "asset[payload]", id: "asset_payload")
+      [address] = FormData.to_form(state, root, :address, [])
+
+      node = RenderPreparation.prepare_at(address, ["geo", "lat"])
+
+      assert node.field.name == "asset[payload][address][geo][lat]"
+      assert node.field.value == "51.5"
+
+      assert node.dom.control ==
+               DOMIdentity.field(
+                 "asset_payload_address",
+                 InstancePath.new!(["address", "geo", "lat"]),
+                 :control
+               )
+    end
   end
 
   describe "widget resolution" do
@@ -380,7 +631,13 @@ defmodule Formentation.Phoenix.ProjectorTest do
         )
         |> compile!()
 
-      form = FormData.to_form(Form.new(first), as: "payload")
+      # A native source pins its own definition (D-041), so the two-definition
+      # comparison below is illegal by construction against one: passing
+      # `second` against a form built from `first` makes
+      # validate_native_definition!/2 raise. A map source proves the same
+      # claim — DOM identities are a pure function of definition structure —
+      # and is the only source that can hold both definitions.
+      form = FormData.to_form(%{}, as: "payload")
       assert Projector.project(first, form) == Projector.project(first, form)
 
       identities = fn definition ->
@@ -392,6 +649,18 @@ defmodule Formentation.Phoenix.ProjectorTest do
       end
 
       assert identities.(first) == identities.(second)
+
+      # The native route mints the same identities, so the D-034 claim is not
+      # proved only against a source ordinary rendering never uses.
+      native_identities =
+        Form.new(first)
+        |> FormData.to_form(as: "payload")
+        |> RenderPreparation.prepare()
+        |> Map.fetch!(:root)
+        |> flatten_fields()
+        |> Map.new(&{&1.field.name, &1.dom})
+
+      assert native_identities == identities.(first)
     end
 
     test "presentation order can differ from semantic declaration order" do
@@ -845,6 +1114,75 @@ defmodule Formentation.Phoenix.ProjectorTest do
       Phoenix.HTML.FormData.to_form(source, as: "payload")
     end
 
+    test "a nested plan's summary carries exactly the non-field issues at or under its root" do
+      # One fixture, four boundaries relative to the projected root ["address"]:
+      #
+      #   []                 ancestor of the root  → excluded
+      #   ["address"]        the root itself       → included
+      #   ["address","geo"]  descendant            → included
+      #   ["contact"]        sibling               → excluded
+      #
+      # The [] and descendant cases are what distinguish ancestor/self
+      # semantics from an equality-only filter; both minProperties issues are
+      # filed at the *object's own* path, which is what makes them non-field
+      # entries rather than per-field errors.
+      definition =
+        compile_json!(%{
+          "type" => "object",
+          "minProperties" => 4,
+          "required" => ["address", "contact"],
+          "properties" => %{
+            "title" => %{"type" => "string"},
+            "address" => %{
+              "type" => "object",
+              "title" => "Address",
+              "minProperties" => 3,
+              "required" => ["geo"],
+              "properties" => %{
+                "street" => %{"type" => "string", "minLength" => 1},
+                "geo" => %{
+                  "type" => "object",
+                  "required" => ["lat"],
+                  "properties" => %{"lat" => %{"type" => "string", "minLength" => 1}}
+                }
+              }
+            },
+            "contact" => %{
+              "type" => "object",
+              "title" => "Contact",
+              "required" => ["email"],
+              "properties" => %{"email" => %{"type" => "string", "minLength" => 1}}
+            }
+          }
+        })
+
+      form_state =
+        submitted_form(Form.new(definition), %{"title" => "t", "address" => %{"street" => "Elm"}})
+
+      root = FormData.to_form(form_state, as: "asset[payload]", id: "asset_payload")
+      [address] = FormData.to_form(form_state, root, :address, [])
+
+      assert Enum.map(RenderPreparation.prepare(root).summary, & &1.message) == [
+               "value must have at least 4 properties, got 2",
+               "value must have at least 3 properties, got 1",
+               "property 'geo' is required",
+               "property 'contact' is required"
+             ]
+
+      # Root-of-form and sibling entries are gone; self and descendant remain,
+      # in adapter order — the filter never reorders.
+      address_summary = RenderPreparation.prepare(address).summary
+
+      assert Enum.map(address_summary, & &1.message) == [
+               "value must have at least 3 properties, got 1",
+               "property 'geo' is required"
+             ]
+
+      # Both nested entries are unlinked and unlabelled: they name objects, so
+      # summary_label/2 returns nil and there is no focusable control to target.
+      assert Enum.all?(address_summary, &(&1.label == nil))
+    end
+
     test "a root issue appears once, unlinked, and never enters a field's errors" do
       plan =
         Projector.project(
@@ -1197,13 +1535,46 @@ defmodule Formentation.Phoenix.ProjectorTest do
     # A source-text assertion states that obligation directly, and is the
     # regression PR #13 must keep green when it rebases its blocker work
     # into the Formentation.Form state view.
-    @projector_source File.read!("lib/formentation/phoenix/projector.ex")
+    @projector_source File.read!("lib/formentation/phoenix/render_preparation.ex")
     # File.read!/1 above is not a Mix compile dependency by itself; it
     # currently recompiles correctly only incidentally, via the
-    # `doctest Formentation.Phoenix.Projector` at the top of this file.
+    # `doctest Formentation.Phoenix.RenderPreparation` at the top of this file.
     # This makes the recompilation guarantee explicit rather than
     # incidental, so the pin can never validate a stale snapshot.
-    @external_resource "lib/formentation/phoenix/projector.ex"
+    @external_resource "lib/formentation/phoenix/render_preparation.ex"
+
+    # #28 requires one authoritative decoder of the private projection key.
+    # Reach cannot express "no module but these two mentions this atom" — it
+    # is a literal, not a call — so a source-text pin states it directly.
+    @projection_key_readers ["lib/formentation/phoenix/projected_form.ex"]
+    @external_resource "lib/formentation/phoenix/projected_form.ex"
+
+    test "only ProjectedForm spells the private projection key" do
+      offenders =
+        "lib/**/*.ex"
+        |> Path.wildcard()
+        |> Enum.filter(&(File.read!(&1) =~ ":__formentation__"))
+        |> Enum.reject(&(&1 in @projection_key_readers))
+
+      assert offenders == []
+    end
+
+    test "the projection decoder never reaches for runtime state" do
+      source = File.read!("lib/formentation/phoenix/projected_form.ex")
+
+      # Call shapes, not vocabulary: the point is that ProjectedForm decodes
+      # projection metadata and never asks the source a state-dependent
+      # question. A comment mentioning issues or submission must not fail
+      # this — only a call to StateView can. The capitalised, word-bounded
+      # pattern below additionally guards against ProjectedForm reaching for
+      # a concrete %Formentation.Issue{} struct, without tripping on the
+      # lowercase prose "issue"/"issues" that Task 5 deliberately allows.
+      refute source =~ ~r/\bStateView\b/
+      refute source =~ ~r/\bsubmitted\?\(/
+      refute source =~ ~r/\bissue_visibility\(/
+      refute source =~ ~r/\bissues\(/
+      refute source =~ ~r/\bIssue\b/
+    end
 
     test "the projector names no concrete runtime-state struct" do
       refute @projector_source =~ "Formentation.Form"
@@ -1221,6 +1592,49 @@ defmodule Formentation.Phoenix.ProjectorTest do
       refute @projector_source =~ ~r/\bdefinition\.root\b|%Definition\{root:/
       refute @projector_source =~ "nests_data?"
       refute @projector_source =~ "%Node.Group"
+    end
+
+    test "the preparation context validates the projection root without building it" do
+      # Building the root descriptor is recursive and only prepare/2 consumes it.
+      # Putting it in the context made every prepare_at/3 call — that is, every
+      # field/1 render — materialize the whole presentation tree to answer a
+      # question about one node. A wall-clock assertion would be flaky, so pin
+      # the seam instead, in the idiom this block already uses.
+      assert @projector_source =~ "defp context(", "expected defp context/5 in the source"
+      [_head, after_head] = String.split(@projector_source, "defp context(", parts: 2)
+      [context_body, _rest] = String.split(after_head, "\n  end\n", parts: 2)
+
+      assert context_body =~ "validate_projection_root!"
+      refute context_body =~ "presentation_root_at"
+
+      # The claim above is narrower than it looks: it only pins that
+      # context/5's own body doesn't call presentation_root_at/2. Someone
+      # could move the eager build one level down, into
+      # validate_projection_root!/2 (still called from context/5), and
+      # reinstate the exact performance regression with the assertions
+      # above still green. Pin the real claim instead: presentation_root_at
+      # is called only from prepare/2. It appears three times in the source
+      # by construction — its two `defp` clause heads plus exactly one call
+      # site — and that one call site must be inside prepare/2's body.
+      prepare_marker =
+        "def prepare(%Phoenix.HTML.Form{} = form, opts) when is_list(opts) do"
+
+      assert @projector_source =~ prepare_marker, "expected prepare/2 in the source"
+
+      [_before_prepare, after_prepare_head] =
+        String.split(@projector_source, prepare_marker, parts: 2)
+
+      [prepare_body, _rest] = String.split(after_prepare_head, "\n  end\n", parts: 2)
+
+      assert prepare_body =~ "presentation_root_at"
+
+      occurrences =
+        @projector_source
+        |> String.split("presentation_root_at(")
+        |> length()
+        |> Kernel.-(1)
+
+      assert occurrences == 3
     end
   end
 

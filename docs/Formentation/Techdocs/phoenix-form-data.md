@@ -12,7 +12,7 @@ status: current
 
 # The `FormData` projection
 
-> [!note] As of 2026-07-23 · step 6 complete
+> [!note] As of 2026-08-05 · projection-root metadata and source-owned definitions (D-041)
 > Describes `defimpl Phoenix.HTML.FormData, for: Formentation.Form` as
 > built. The state being projected is
 > [[form-state-and-transitions|Form state and transitions]]; what the
@@ -46,15 +46,26 @@ this layer has to satisfy exactly; most of what follows is that contract.
 | `input_value/3` | `FieldState.display_value` |
 | `input_validations/3` | the node's schema constraints plus input policy |
 
-### Instance path travels in the options
+### Projection root travels in the options
 
 A Phoenix form has a `name` and an `id` but no notion of *where in the
 data* it sits. The implementation therefore carries the current
-[[paths-and-identity|`InstancePath`]] in a private options key, and every
-callback resolves `path_of(form) ++ [field]` before asking `Info` which
-node governs it. Nesting a form extends the path by one segment. This is
-the mechanism that lets one `Definition` describe a tree while Phoenix
-hands out flat, per-level form structs.
+[[paths-and-identity|`InstancePath`]] segments in a private options key; the
+**source** carries the authoritative form state and, through it, the compiled
+definition. Every callback resolves `ProjectedForm.root_segments!(form) ++ [field]`
+before asking `Info` which node governs it, and nesting a form extends the path
+by one segment. `Formentation.Phoenix.ProjectedForm` is the single decoder of
+that pair — `native_context/1` returns
+`{:ok, %{definition: …, state: …, root_path: …}}`, `:not_native`, or
+`{:error, reason}` — and it is what lets rendering recover its ordinary input
+from a native form alone.
+
+What is stored is validated segments, not an `%InstancePath{}` struct:
+`put_root_path/2` round-trips through `InstancePath.new!/1` and the struct is
+rebuilt on read. `root_segments!/1` **raises** for a non-native or malformed
+form, so the `FormData` callbacks now fail loudly on a hand-built form struct
+rather than silently treating it as root-anchored. That is a behaviour change
+to the projection layer, not only to rendering.
 
 ### Nesting materializes forms directly
 

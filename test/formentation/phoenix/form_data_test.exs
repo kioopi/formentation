@@ -5,6 +5,7 @@ defmodule Formentation.Phoenix.FormDataTest do
 
   alias Formentation.Fixtures.PumpInspection
   alias Formentation.{Form, Params}
+  alias Formentation.Phoenix.ProjectedForm
   alias Phoenix.HTML.FormData
 
   defp pump_definition do
@@ -15,6 +16,13 @@ defmodule Formentation.Phoenix.FormDataTest do
   end
 
   defp pump_form(data \\ %{}), do: Form.new(pump_definition(), data)
+
+  defp compile!(declaration) do
+    {:ok, definition, _diagnostics} =
+      Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
+    definition
+  end
 
   defp nested_definition do
     declaration = %{
@@ -74,6 +82,28 @@ defmodule Formentation.Phoenix.FormDataTest do
       assert namespaced[:serial_number].name == "asset[payload][serial_number]"
     end
 
+    test "nesting an anonymous form uses the bare key as id and name" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"address", %{kind: :object, properties: [{"street", %{kind: :string}}]}}
+          ]
+        })
+
+      state = Form.new(definition, %{"address" => %{"street" => "Elm"}})
+      root = Phoenix.HTML.FormData.to_form(state, [])
+
+      assert root.id == nil
+      assert root.name == nil
+
+      [address] = Phoenix.HTML.FormData.to_form(state, root, :address, [])
+
+      assert address.id == "address"
+      assert address.name == "address"
+      assert address[:street].name == "address[street]"
+    end
+
     test "params expose the Phoenix-compatible view after a transition" do
       form_state =
         Form.transition(pump_form(), %Params{
@@ -105,6 +135,61 @@ defmodule Formentation.Phoenix.FormDataTest do
     test "remaining options are stored" do
       form = FormData.to_form(pump_form(), foo: :bar)
       assert form.options[:foo] == :bar
+    end
+  end
+
+  describe "native projection metadata" do
+    test "decodes root and nested object paths from native forms" do
+      form_state = Form.new(nested_definition())
+      root = FormData.to_form(form_state, as: "payload", marker: :kept)
+      [address] = FormData.to_form(form_state, root, :address, marker: :address)
+      [geo] = FormData.to_form(form_state, address, :geo, marker: :geo)
+
+      assert {:ok, %{definition: definition, state: ^form_state, root_path: root_path}} =
+               ProjectedForm.native_context(root)
+
+      assert definition == form_state.definition
+      assert root_path.segments == []
+
+      assert {:ok, %{state: ^form_state, root_path: %{segments: ["address"]}}} =
+               ProjectedForm.native_context(address)
+
+      assert {:ok, %{state: ^form_state, root_path: %{segments: ["address", "geo"]}}} =
+               ProjectedForm.native_context(geo)
+
+      assert root.options[:marker] == :kept
+      assert address.options[:marker] == :address
+      assert geo.options[:marker] == :geo
+    end
+
+    test "identifies arbitrary FormData as non-native" do
+      form = FormData.to_form(%{}, as: "payload")
+
+      assert :not_native = ProjectedForm.native_context(form)
+    end
+
+    test "rejects native forms with missing or invalid projection metadata" do
+      form = FormData.to_form(Form.new(nested_definition()), as: "payload")
+
+      assert {:error, :missing_root_path} =
+               ProjectedForm.native_context(%{
+                 form
+                 | options: Keyword.delete(form.options, :__formentation__)
+               })
+
+      for invalid_path <- ["address", [:address], ["address", -1]] do
+        assert {:error, {:invalid_root_path, ^invalid_path}} =
+                 ProjectedForm.native_context(%{form | options: [__formentation__: invalid_path]})
+      end
+    end
+
+    test "raises actionable guidance when FormData needs malformed native metadata" do
+      form = FormData.to_form(Form.new(nested_definition()), as: "payload")
+      broken = %{form | options: Keyword.delete(form.options, :__formentation__)}
+
+      assert_raise ArgumentError, ~r/rebuild it through .*to_form.*inputs_for/, fn ->
+        ProjectedForm.root_segments!(broken)
+      end
     end
   end
 
@@ -423,6 +508,12 @@ defmodule Formentation.Phoenix.FormDataTest do
       form = FormData.to_form(Form.new(nested_definition()), [])
       assert validations(form, :address) == []
       assert validations(form, :no_such_field) == []
+    end
+
+    test "nested validations resolve from the shared projection path" do
+      {_state, _root, nested} = nested_form()
+
+      assert validations(nested, :number) == [step: 1]
     end
 
     test "maximum constraints map to their HTML counterparts" do

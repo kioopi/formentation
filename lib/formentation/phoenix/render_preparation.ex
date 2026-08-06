@@ -1,21 +1,9 @@
-defmodule Formentation.Phoenix.Projector do
-  @moduledoc """
-  Combines a compiled definition with a `%Phoenix.HTML.Form{}` into a
-  `Formentation.Phoenix.RenderPlan` (the rendering boundary in
-  Planning/06-runtime-projection). Two-part boundary: Phoenix form
-  conventions carry field-level mechanics, so any `Phoenix.HTML.FormData`
-  implementation still projects; the source's
-  `Formentation.Phoenix.StateView` (D-027) carries submission, issue
-  visibility, and non-field issues Phoenix cannot express. Pure — same
-  inputs, same plan.
-
-  Spec: docs/superpowers/specs/2026-07-23-phase1-step6-projector-components-theme-design.md
-  Spec: docs/superpowers/specs/2026-07-25-runtime-state-view-contract-design.md
-  """
+defmodule Formentation.Phoenix.RenderPreparation do
+  @moduledoc false
 
   alias Formentation.{Definition, Diagnostic, Info, InstancePath, Semantic}
   alias Formentation.Info.Presentation
-  alias Formentation.Phoenix.{DOMIdentity, RenderNode, RenderPlan, StateView}
+  alias Formentation.Phoenix.{DOMIdentity, ProjectedForm, RenderNode, RenderPlan, StateView}
 
   @missing_namespace ~S"""
                      Formentation cannot mint DOM ids without a namespace. Give the form a name or an id
@@ -48,14 +36,13 @@ defmodule Formentation.Phoenix.Projector do
       ...>     adapter: Formentation.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
-      iex> plan = Formentation.Phoenix.Projector.project(definition, form)
+      iex> plan = Formentation.Phoenix.RenderPreparation.prepare(form, definition: definition)
       iex> [field] = plan.root.children
       iex> {field.widget, field.label, field.field.name}
       {:email_input, "Email", "payload[email]"}
   """
-  @spec project(Definition.t(), Phoenix.HTML.Form.t()) :: RenderPlan.t()
-  def project(%Definition{} = definition, %Phoenix.HTML.Form{} = form),
-    do: project(definition, form, [])
+  @spec prepare(Phoenix.HTML.Form.t()) :: RenderPlan.t()
+  def prepare(%Phoenix.HTML.Form{} = form), do: prepare(form, [])
 
   @doc """
   Projects the whole definition with an explicit renderer-owned DOM namespace.
@@ -68,23 +55,22 @@ defmodule Formentation.Phoenix.Projector do
       ...>     adapter: Formentation.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
-      iex> [field] = Formentation.Phoenix.Projector.project(definition, form, dom_namespace: "asset_payload").root.children
+      iex> [field] = Formentation.Phoenix.RenderPreparation.prepare(form, definition: definition, dom_namespace: "asset_payload").root.children
       iex> {field.dom.control, field.field.name}
       {"ftn--asset_payload--field--control--email", "payload[email]"}
   """
-  @spec project(Definition.t(), Phoenix.HTML.Form.t(), keyword()) :: RenderPlan.t()
-  def project(%Definition{} = definition, %Phoenix.HTML.Form{} = form, opts) when is_list(opts) do
-    ctx =
-      context(
-        definition,
-        form,
-        [],
-        Info.semantic_node_index(definition),
-        dom_namespace!(form, opts)
-      )
+  @spec prepare(Phoenix.HTML.Form.t(), keyword()) :: RenderPlan.t()
+  def prepare(%Phoenix.HTML.Form{} = form, opts) when is_list(opts) do
+    ctx = resolve_context(form, opts)
+    descriptor = presentation_root_at(ctx.definition, ctx.root_path)
+    {root, diagnostics} = project_descriptor(descriptor, form, ctx)
 
-    {root, diagnostics} = project_descriptor(Info.presentation_root(definition), form, ctx)
-    %RenderPlan{root: root, summary: summary(root, ctx), diagnostics: diagnostics}
+    %RenderPlan{
+      root: root,
+      root_path: ctx.root_path,
+      summary: summary(root, ctx),
+      diagnostics: diagnostics
+    }
   end
 
   @doc """
@@ -102,62 +88,159 @@ defmodule Formentation.Phoenix.Projector do
       ...>     adapter: Formentation.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
-      iex> node = Formentation.Phoenix.Projector.project_at(definition, form, ["email"])
+      iex> node = Formentation.Phoenix.RenderPreparation.prepare_at(form, ["email"], definition: definition)
       iex> {node.widget, node.field.name}
       {:email_input, "payload[email]"}
   """
-  @spec project_at(Definition.t(), Phoenix.HTML.Form.t(), [String.t()]) ::
+  @spec prepare_at(Phoenix.HTML.Form.t(), [String.t()]) ::
           RenderNode.t() | nil
-  def project_at(%Definition{} = definition, %Phoenix.HTML.Form{} = form, segments)
+  def prepare_at(%Phoenix.HTML.Form{} = form, segments)
       when is_list(segments),
-      do: project_at(definition, form, segments, [])
+      do: prepare_at(form, segments, [])
 
   @doc """
   Projects one subtree with an explicit renderer-owned DOM namespace.
   """
-  @spec project_at(Definition.t(), Phoenix.HTML.Form.t(), [String.t()], keyword()) ::
+  @spec prepare_at(Phoenix.HTML.Form.t(), [String.t()], keyword()) ::
           RenderNode.t() | nil
-  def project_at(%Definition{} = definition, %Phoenix.HTML.Form{} = form, segments, opts)
+  def prepare_at(%Phoenix.HTML.Form{} = form, segments, opts)
       when is_list(segments) do
     %InstancePath{segments: segments} = InstancePath.new!(segments)
+    ctx = resolve_context(form, opts)
+    absolute_path = ctx.root_path ++ segments
 
-    case Info.presentation_at(definition, segments) do
+    case Info.presentation_at(ctx.definition, absolute_path) do
       :not_found ->
-        raise ArgumentError, "no node at instance path #{inspect(segments)}"
+        raise_path_error!("no node", segments, ctx.root_path)
 
       :unsupported ->
-        raise ArgumentError, "the node at #{inspect(segments)} is unsupported and cannot render"
+        raise_path_error!("the node is unsupported and cannot render", segments, ctx.root_path)
 
       {:ok, descriptor} ->
         parent = descriptor_parent_path(descriptor)
+        {starting_form, cursor} = subtree_cursor(parent, form, ctx)
 
-        ctx =
-          context(
-            definition,
-            form,
-            parent,
-            Info.semantic_node_index(definition),
-            dom_namespace!(form, opts)
-          )
+        {render, _diagnostics} =
+          project_descriptor(descriptor, starting_form, %{ctx | path: cursor})
 
-        {render, _diagnostics} = project_descriptor(descriptor, descend(form, parent), ctx)
         render
     end
   end
 
   # The projection cursor. `path` holds raw segments — an %InstancePath{}
   # is built only where a path crosses into StateView — and `root_form`
-  # and `source` stay pinned to the form handed to project/2 or
-  # project_at/3, never a nested form built during traversal.
-  defp context(definition, form, path, semantic_nodes, dom_namespace) do
+  # and `source` stay pinned to the form handed to prepare/2 or
+  # prepare_at/3, never a nested form built during traversal. Preparation
+  # always starts with the cursor on the projection root, so `path` and
+  # `root_path` are the same segments here; only traversal moves `path`.
+  defp context(definition, form, root_path, semantic_nodes, dom_namespace) do
+    validate_projection_root!(definition, root_path)
+
     %{
       definition: definition,
       root_form: form,
       source: form.source,
-      path: path,
+      path: root_path,
+      root_path: root_path,
+      root_instance_path: InstancePath.new!(root_path),
       semantic_nodes: semantic_nodes,
       dom_namespace: dom_namespace
     }
+  end
+
+  # Validating the root is not the same as building it. semantic_kind/2 is a
+  # single index lookup; presentation_root_at/2 materializes the descriptor
+  # tree recursively, and only prepare/2 consumes that. Building it here made
+  # every prepare_at/3 call — that is, every field/1 render — pay for
+  # whole-body presentation traversal to answer a question about one node.
+  defp validate_projection_root!(definition, root_path) do
+    case Info.semantic_kind(definition, root_path) do
+      :object ->
+        :ok
+
+      nil ->
+        raise ArgumentError, "projected form root #{inspect(root_path)} does not exist"
+
+      :unsupported ->
+        raise ArgumentError, "projected form root #{inspect(root_path)} is unsupported"
+
+      _field ->
+        raise ArgumentError, "projected form root #{inspect(root_path)} is not an object"
+    end
+  end
+
+  defp resolve_context(form, opts) do
+    case ProjectedForm.native_context(form) do
+      {:ok, %{definition: definition, root_path: %{segments: root_path}}} ->
+        validate_native_definition!(definition, Keyword.get(opts, :definition))
+
+        context(
+          definition,
+          form,
+          root_path,
+          Info.semantic_node_index(definition),
+          dom_namespace!(form, opts)
+        )
+
+      :not_native ->
+        definition = generic_definition!(opts)
+
+        context(
+          definition,
+          form,
+          [],
+          Info.semantic_node_index(definition),
+          dom_namespace!(form, opts)
+        )
+
+      {:error, reason} ->
+        raise ArgumentError,
+              "Phoenix form is not a valid Formentation projection (#{inspect(reason)}); " <>
+                "rebuild it through Phoenix.HTML.FormData.to_form/2 or inputs_for"
+    end
+  end
+
+  defp validate_native_definition!(_native, nil), do: :ok
+  defp validate_native_definition!(native, native), do: :ok
+
+  defp validate_native_definition!(_native, _provided) do
+    raise ArgumentError,
+          "the native form source definition is authoritative; remove the redundant definition assign"
+  end
+
+  defp generic_definition!(opts) do
+    case Keyword.get(opts, :definition) do
+      %Definition{} = definition ->
+        definition
+
+      _other ->
+        raise ArgumentError,
+              "render preparation requires a native projected form or a generic form plus definition:"
+    end
+  end
+
+  defp presentation_root_at(definition, []), do: Info.presentation_root(definition)
+
+  defp presentation_root_at(definition, root_path) do
+    case Info.presentation_at(definition, root_path) do
+      {:ok, %Presentation.Object{} = descriptor} ->
+        descriptor
+
+      other ->
+        invariant!(
+          "projection root #{inspect(root_path)} resolved to #{inspect(other)} " <>
+            "after validate_projection_root!/2 accepted it"
+        )
+    end
+  end
+
+  defp raise_path_error!(message, relative_path, []) do
+    raise ArgumentError, "#{message} at instance path #{inspect(relative_path)}"
+  end
+
+  defp raise_path_error!(message, relative_path, root_path) do
+    raise ArgumentError,
+          "#{message} at relative path #{inspect(relative_path)} under projected root #{inspect(root_path)}"
   end
 
   defp descend(form, segments) do
@@ -165,6 +248,18 @@ defmodule Formentation.Phoenix.Projector do
       [nested] = Phoenix.HTML.FormData.to_form(form.source, form, segment, [])
       nested
     end)
+  end
+
+  # A descriptor reachable from this context sits either at the projection
+  # root (its own parent is above the root) or strictly below it. The root
+  # path has already been validated by resolve_context/2, so there is
+  # no malformed-root case left for traversal to handle.
+  defp subtree_cursor(parent, form, ctx) do
+    if InstancePath.ancestor_or_self?(ctx.root_instance_path, InstancePath.new!(parent)) do
+      {descend(form, Enum.drop(parent, length(ctx.root_path))), parent}
+    else
+      {form, ctx.root_path}
+    end
   end
 
   defp project_descriptor(%Presentation.Object{semantic_path: path} = object, form, ctx) do
@@ -435,7 +530,7 @@ defmodule Formentation.Phoenix.Projector do
 
       {:ok, issues} ->
         issues
-        |> Enum.filter(&non_field_visible?(ctx, &1))
+        |> Enum.filter(&(inside_projection?(ctx, &1) and non_field_visible?(ctx, &1)))
         |> Enum.map(&summary_entry(nil, summary_label(ctx, &1.path), &1.message))
     end
   end
@@ -452,6 +547,21 @@ defmodule Formentation.Phoenix.Projector do
 
   defp field_path?(ctx, %InstancePath{segments: segments}) do
     Info.semantic_kind(ctx.definition, segments) == :field
+  end
+
+  # D-028's shared predicate, not a second implementation of it: "is this
+  # path under that path" is decided segment-wise in one place, so
+  # ["tag"] never counts as an ancestor of ["tags"].
+  #
+  # Nuance worth knowing before someone reports it as a bug: an object-level
+  # issue at the projection root *itself* passes this filter and then gets
+  # summary_label/2 == nil, because Info.semantic_kind/2 says :object. It
+  # therefore renders as an unlabelled plain-text entry — visually identical
+  # to a root-of-form issue. At root_path == [] that reading was exactly
+  # right; at root_path == ["address"] it is slightly misleading, but not
+  # enough to warrant a second label rule.
+  defp inside_projection?(ctx, %StateView.Issue{path: path}) do
+    InstancePath.ancestor_or_self?(ctx.root_instance_path, path)
   end
 
   # An unsupported node carries a name a reader can recognize, so its

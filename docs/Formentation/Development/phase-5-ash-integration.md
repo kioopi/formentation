@@ -79,7 +79,7 @@ Ash-specific component forks.
 - no duplication of Ash validation/submission;
 - helpers or documentation for using existing `AshPhoenix.Form` transitions in LiveView.
 
-Alongside the `FormData` view, this adapter supplies a `Formentation.Phoenix.StateView` implementation for the Ash form's own submission, issue-visibility, and global-error semantics, so `Formentation.Phoenix.Projector` renders it unchanged — see [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]].
+Alongside the `FormData` view, this adapter supplies a `Formentation.Phoenix.StateView` implementation for the Ash form's own submission, issue-visibility, and global-error semantics, so `Formentation.Phoenix.RenderPreparation` renders it unchanged — see [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]].
 
 ### UI metadata strategy
 

@@ -14,7 +14,11 @@ defmodule Formentation.Phoenix do
 
   use Phoenix.Component
 
-  alias Formentation.Phoenix.{Projector, Theme.Reference}
+  alias Formentation.Phoenix.{ReferenceComponents, RenderPlan, RenderPreparation}
+
+  @definition_doc "required only when `form`'s source is not a `%Formentation.Form{}`; a form " <>
+                    "projected from `Formentation.Form` carries its own definition, and passing " <>
+                    "a different one raises"
 
   @doc """
   Renders the whole payload form body — error summary first, then every
@@ -23,7 +27,7 @@ defmodule Formentation.Phoenix do
   ```heex
   <.form for={@asset_form} phx-change="validate" phx-submit="save">
     <.input field={@asset_form[:name]} label="Asset name" />
-    <Formentation.Phoenix.fields definition={@definition} form={@payload_form} />
+    <Formentation.Phoenix.fields form={@payload_form} />
   </.form>
   ```
 
@@ -39,26 +43,48 @@ defmodule Formentation.Phoenix do
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(Formentation.Form.new(definition), as: "payload")
       iex> import Phoenix.LiveViewTest
-      iex> html = render_component(&Formentation.Phoenix.fields/1, definition: definition, form: form)
+      iex> html = render_component(&Formentation.Phoenix.fields/1, form: form)
       iex> html =~ ~s(name="payload[email]") and not (html =~ "<form")
       true
+
+  ## Generic form sources
+
+  Any other `Phoenix.HTML.FormData` source — an `AshPhoenix.Form`, an Ecto
+  changeset form, your own struct — is a permanent supported route rather than
+  a compatibility shim. It cannot carry a definition, so pass one:
+
+  ```heex
+  <Formentation.Phoenix.fields definition={@definition} form={@ash_form} />
+  ```
+
+  Such a source decides submission and issue visibility through
+  `Formentation.Phoenix.StateView`; without an implementation it falls back to
+  the Phoenix action/`used_input?` rule.
   """
-  attr(:definition, Formentation.Definition, required: true)
+  attr(:definition, Formentation.Definition, default: nil, doc: @definition_doc)
   attr(:form, Phoenix.HTML.Form, required: true)
   attr(:dom_namespace, :string, default: nil, doc: "override for renderer-owned DOM ids")
 
+  attr(:summary, :boolean,
+    default: nil,
+    doc:
+      "whether to render the submit-gated error summary; defaults to rendering it " <>
+        "only at the form's projection root, so a nested form composed under " <>
+        "`<.inputs_for>` does not emit a second `role=\"alert\"` region"
+  )
+
   def fields(assigns) do
+    plan = RenderPreparation.prepare(assigns.form, preparation_opts(assigns))
+
     assigns =
-      assign(
-        assigns,
-        :plan,
-        Projector.project(assigns.definition, assigns.form, projector_opts(assigns))
-      )
+      assigns
+      |> assign(:plan, plan)
+      |> assign(:summary?, summary?(assigns.summary, plan))
 
     ~H"""
     <div class="ftn-form">
-      <Reference.error_summary summary={@plan.summary} />
-      <Reference.node :for={child <- @plan.root.children} node={child} />
+      <ReferenceComponents.error_summary :if={@summary?} summary={@plan.summary} />
+      <ReferenceComponents.node :for={child <- @plan.root.children} node={child} />
     </div>
     """
   end
@@ -72,14 +98,13 @@ defmodule Formentation.Phoenix do
 
   ```heex
   <Formentation.Phoenix.field
-    definition={@definition}
     form={@payload_form}
     path={["address", "street"]}
   />
   ```
   """
-  attr(:definition, Formentation.Definition, required: true)
-  attr(:form, Phoenix.HTML.Form, required: true)
+  attr(:definition, Formentation.Definition, default: nil, doc: @definition_doc)
+  attr(:form, Phoenix.HTML.Form, required: true, doc: "the projected form to render")
   attr(:dom_namespace, :string, default: nil, doc: "override for renderer-owned DOM ids")
 
   attr(:path, :list,
@@ -92,19 +117,26 @@ defmodule Formentation.Phoenix do
       assign(
         assigns,
         :node,
-        Projector.project_at(
-          assigns.definition,
-          assigns.form,
-          assigns.path,
-          projector_opts(assigns)
-        )
+        RenderPreparation.prepare_at(assigns.form, assigns.path, preparation_opts(assigns))
       )
 
     ~H"""
-    <Reference.node :if={@node} node={@node} />
+    <ReferenceComponents.node :if={@node} node={@node} />
     """
   end
 
-  defp projector_opts(%{dom_namespace: nil}), do: []
-  defp projector_opts(%{dom_namespace: namespace}), do: [dom_namespace: namespace]
+  defp preparation_opts(assigns) do
+    [definition: assigns.definition, dom_namespace: assigns.dom_namespace]
+    |> Keyword.reject(fn {_key, value} -> is_nil(value) end)
+  end
+
+  # The error summary is a form-level affordance owned by the outermost
+  # render: two role="alert" regions for one form is an accessibility
+  # regression, and a nested plan's entries carry the nested form's DOM
+  # namespace, so the same error would appear twice under different ids.
+  # Unset therefore means "only at the projection root"; an explicit
+  # true/false always wins, so a caller composing subtrees by hand decides
+  # where the one summary goes.
+  defp summary?(nil, %RenderPlan{root_path: root_path}), do: root_path == []
+  defp summary?(summary?, _plan) when is_boolean(summary?), do: summary?
 end

@@ -111,6 +111,24 @@ defmodule Formentation.MixProject do
     end
   end
 
+  defp internal_documentation_module?(module) do
+    # Two categories, one predicate. RenderPreparation and ReferenceComponents
+    # are @moduledoc false and would be excluded anyway; they are listed for
+    # grep-ability, and that is the convention — a new internal module gets
+    # both @moduledoc false and an entry here. RenderPlan and the RenderNode.*
+    # structs keep their moduledocs on purpose (`h Formentation.Phoenix.RenderPlan`
+    # in IEx is supported), so this filter is the only thing keeping them out
+    # of the published docs. The string prefix, rather than a list, covers
+    # RenderNode.FieldDOM/GroupDOM and any future sibling without a list edit.
+    module in [
+      Formentation.Phoenix.ProjectedForm,
+      Formentation.Phoenix.RenderPreparation,
+      Formentation.Phoenix.ReferenceComponents,
+      Formentation.Phoenix.RenderPlan,
+      Formentation.Phoenix.RenderNode
+    ] or String.starts_with?(Atom.to_string(module), "Elixir.Formentation.Phoenix.RenderNode.")
+  end
+
   defp package do
     [
       licenses: ["MIT"],
@@ -127,7 +145,9 @@ defmodule Formentation.MixProject do
       # compiles `demo/` (:dev, :test) and `test/support/` (:test), and
       # `mix ci` runs `mix docs` in MIX_ENV=test — filtering on the compile
       # source keeps the gated doc surface equal to the published one.
-      filter_modules: fn module, _metadata -> library_module?(module) end,
+      filter_modules: fn module, _metadata ->
+        library_module?(module) and not internal_documentation_module?(module)
+      end,
       groups_for_modules: [
         "Compile & query": [
           Formentation,
@@ -158,12 +178,8 @@ defmodule Formentation.MixProject do
         "Phoenix rendering": [
           Formentation.Phoenix,
           Formentation.Phoenix.DOMIdentity,
-          Formentation.Phoenix.Projector,
-          Formentation.Phoenix.RenderPlan,
-          Formentation.Phoenix.RenderNode,
-          Formentation.Phoenix.RenderNode.Field,
-          Formentation.Phoenix.RenderNode.Group,
-          Formentation.Phoenix.Theme.Reference
+          Formentation.Phoenix.StateView,
+          Formentation.Phoenix.StateView.Issue
         ],
         Sources: [
           Formentation.Source,

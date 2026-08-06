@@ -1,14 +1,14 @@
-defmodule Formentation.Phoenix.ThemeTest do
+defmodule Formentation.Phoenix.ReferenceComponentsTest do
   use ExUnit.Case, async: true
 
-  doctest Formentation.Phoenix.Theme.Reference
+  doctest Formentation.Phoenix.ReferenceComponents
 
   import Formentation.HTMLAssertions
   import Phoenix.LiveViewTest, only: [render_component: 2]
 
   alias Formentation.InstancePath
   alias Formentation.Phoenix.{DOMIdentity, RenderNode}
-  alias Formentation.Phoenix.Theme.Reference
+  alias Formentation.Phoenix.ReferenceComponents, as: Reference
 
   defp field_id(path, part), do: DOMIdentity.field("payload", InstancePath.new!(path), part)
 

@@ -125,12 +125,11 @@ form). To fill in declared defaults for absent keys, pass
 
 ## 4 · Render it
 
-Convert the state into a Phoenix form and hand both it and the definition
-to the `fields` component:
+Convert the state into a Phoenix form and hand it to the `fields` component:
 
 ```heex
 <.form for={@form} action={~p"/signup"} method="post">
-  <Formentation.Phoenix.fields definition={@definition} form={@form} />
+  <Formentation.Phoenix.fields form={@form} />
   <button type="submit">Save</button>
 </.form>
 ```
@@ -138,10 +137,7 @@ to the `fields` component:
 with the assigns prepared as:
 
 ```elixir
-assign(conn,
-  definition: definition,
-  form: Phoenix.Component.to_form(form, as: "payload")
-)
+assign(conn, form: Phoenix.Component.to_form(form, as: "payload"))
 ```
 
 The `as: "payload"` option namespaces every input. That produces:

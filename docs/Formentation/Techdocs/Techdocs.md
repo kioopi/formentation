@@ -31,7 +31,7 @@ Start with [[end-to-end-data-flow|End-to-end data flow]] for the shape of the wh
 5. [[diagnostics-and-origins|Diagnostics and origins]] — the `Diagnostic`/`Issue` split, what produces diagnostics, and the simplified provenance model. **Written.**
 6. [[form-state-and-transitions|Form state and transitions]] — the runtime state model, transport normalization, and the decode policy. **Written.**
 7. [[phoenix-form-data|The FormData projection]] — how form state becomes an ordinary Phoenix form source. **Written.**
-8. [[rendering|Rendering]] — the projector's data flow, render-node shapes, widget resolution, the reference theme's markup and accessibility contract, and the Phoenix-generic boundary. **Written.**
+8. [[rendering|Rendering]] — render preparation, render-node shapes, widget resolution, the reference components' markup and accessibility contract, and the Phoenix-generic boundary. **Written.**
 9. [[test-and-verification-architecture|Test and verification architecture]] — the kinds of test in the suite, what each pins, and the static gates in `mix ci`. **Written.**
 10. [[browser-testing|Browser testing]] — the opt-in Playwright suite: the mise toolchain, the `PLAYWRIGHT_E2E`-gated config, what each seed test pins, and the native-validation toggle it depends on. **Written.**
 
