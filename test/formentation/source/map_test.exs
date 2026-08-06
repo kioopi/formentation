@@ -322,6 +322,40 @@ defmodule Formentation.Source.MapTest do
                 ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
       end
     end
+
+    test "reports the first invalid member in source order deterministically" do
+      declaration = %{
+        kind: :object,
+        properties: [
+          {"choice", %{kind: :string, one_of: ["valid1", %{first: 1}, "valid2", %{second: 2}]}}
+        ]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  severity: :error,
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "choice", :one_of, 1]},
+                  message: msg
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
+      assert msg =~ "one_of option 1"
+      assert msg =~ "%{first: 1}"
+    end
+
+    test "does not return a partial option set or definition on invalid option" do
+      declaration = %{
+        kind: :object,
+        properties: [
+          {"choice", %{kind: :string, one_of: ["valid_before", %{invalid: 1}, "valid_after"]}}
+        ]
+      }
+
+      assert {:error, [_diagnostic]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
   end
 
   describe "widget, help, and constraints" do
