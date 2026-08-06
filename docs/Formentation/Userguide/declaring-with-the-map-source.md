@@ -161,11 +161,13 @@ diagnostic rather than failing.
 
 ### Option sets
 
-`:one_of` gives a string field a fixed set of values:
+`:one_of` gives a field a fixed set of scalar values (strings, numbers, or booleans):
 
 ```elixir
 {"condition", %{kind: :string, title: "Condition", one_of: ["good", "worn", "defective"]}}
 ```
+
+On scalar fields (`:string`, `:integer`, `:number`, `:boolean`), option values must be scalars (`String.t()`, `number()`, or `boolean()`). Unsupported non-scalar values (such as maps, tuples, nested lists, atoms, or `nil`) fail compilation with an `:invalid_declaration` diagnostic. An explicit `one_of: nil` is treated as absent and emits an `:unsupported_keyword` warning; other non-list `:one_of` declarations fail compilation with an `:invalid_declaration` diagnostic.
 
 The field's role becomes `:select` and it renders as a `<select>` — or as
 a radio group if you set `widget: :radio`. The rendered select always
