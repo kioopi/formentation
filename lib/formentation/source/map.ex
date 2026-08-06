@@ -229,7 +229,9 @@ defmodule Formentation.Source.Map do
     source_path = ctx.source_path ++ [:properties, name]
 
     with {:ok, ctx} <- take_budget(ctx),
-         {:ok, examples, examples_origin} <- fetch_examples(spec, name, source_path, ctx) do
+         {:ok, examples, examples_origin} <- fetch_examples(spec, name, source_path, ctx),
+         {:ok, options, options_origin} <-
+           fetch_one_of_options(spec, name, source_path, template_path, ctx) do
       {label, label_origin} = resolve_label(spec, name, source_path)
       {role, role_origin} = resolve_role(spec, source_path)
 
@@ -248,7 +250,7 @@ defmodule Formentation.Source.Map do
           role: role_origin,
           widget: key_origin(spec, :widget, source_path),
           help: key_origin(spec, :help, source_path),
-          options: options_origin(spec, source_path),
+          options: options_origin,
           examples: examples_origin,
           default: default_origin,
           hidden: hidden_origin,
@@ -260,7 +262,7 @@ defmodule Formentation.Source.Map do
           role: role,
           required?: required?,
           read_only?: read_only,
-          options: one_of_options(spec),
+          options: options,
           default: default,
           examples: examples,
           constraints: Map.take(spec, @constraint_keys),
@@ -379,14 +381,50 @@ defmodule Formentation.Source.Map do
     if Map.has_key?(spec, key), do: {:map_source, source_path ++ [key]}
   end
 
-  defp one_of_options(%{one_of: options}) when is_list(options), do: options
-  defp one_of_options(_spec), do: nil
-
-  defp options_origin(%{one_of: options}, source_path) when is_list(options) do
-    {:map_source, source_path ++ [:one_of]}
+  defp scalar_option?(value) do
+    is_binary(value) or is_number(value) or is_boolean(value)
   end
 
-  defp options_origin(_spec, _source_path), do: nil
+  defp fetch_one_of_options(spec, name, source_path, template_path, _ctx) do
+    case Map.fetch(spec, :one_of) do
+      {:ok, options} when is_list(options) ->
+        case validate_scalar_options(options, name, source_path, template_path) do
+          :ok ->
+            {:ok, options, {:map_source, source_path ++ [:one_of]}}
+
+          {:error, diagnostic} ->
+            {:error, diagnostic}
+        end
+
+      _ ->
+        {:ok, nil, nil}
+    end
+  end
+
+  defp validate_scalar_options(options, name, source_path, template_path) do
+    options
+    |> Enum.with_index()
+    |> Enum.reduce_while(:ok, fn {value, index}, :ok ->
+      if scalar_option?(value) do
+        {:cont, :ok}
+      else
+        origin_path = source_path ++ [:one_of, index]
+
+        message =
+          "one_of option #{index} for property #{inspect(name)} must be a string, number, or boolean, got: #{inspect(value)}"
+
+        diagnostic = %Diagnostic{
+          severity: :error,
+          code: :invalid_declaration,
+          message: message,
+          origin: {:map_source, origin_path},
+          template_path: template_path
+        }
+
+        {:halt, {:error, diagnostic}}
+      end
+    end)
+  end
 
   @semantic_origin_keys [:role, :options, :examples, :default, :read_only]
   @presentation_origin_keys [:label, :widget, :help, :hidden]

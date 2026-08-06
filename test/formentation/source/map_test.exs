@@ -274,6 +274,54 @@ defmodule Formentation.Source.MapTest do
       assert Info.origins(definition, ["condition"])[:options] ==
                {:map_source, [:properties, "condition", :one_of]}
     end
+
+    test "an invalid map option member fails compilation with structured diagnostic" do
+      declaration = %{
+        kind: :object,
+        properties: [
+          {"condition", %{kind: :string, one_of: ["valid", %{a: 1}]}}
+        ]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  severity: :error,
+                  code: :invalid_declaration,
+                  message:
+                    "one_of option 1 for property \"condition\" must be a string, number, or boolean, got: %{a: 1}",
+                  origin: {:map_source, [:properties, "condition", :one_of, 1]},
+                  template_path: %{segments: ["condition"]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "unsupported option values return invalid_declaration diagnostic" do
+      invalid_values = [
+        {[1], "[1]"},
+        {{1}, "{1}"},
+        {:foo, ":foo"},
+        {nil, "nil"}
+      ]
+
+      for {invalid_val, _desc} <- invalid_values do
+        declaration = %{
+          kind: :object,
+          properties: [
+            {"field", %{kind: :string, one_of: [invalid_val]}}
+          ]
+        }
+
+        assert {:error,
+                [
+                  %Formentation.Diagnostic{
+                    severity: :error,
+                    code: :invalid_declaration,
+                    origin: {:map_source, [:properties, "field", :one_of, 0]}
+                  }
+                ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      end
+    end
   end
 
   describe "widget, help, and constraints" do
