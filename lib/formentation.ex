@@ -30,7 +30,20 @@ defmodule Formentation do
   @spec compile(term(), keyword()) ::
           {:ok, Definition.t(), [Diagnostic.t()]} | {:error, [Diagnostic.t()]}
   def compile(source, opts) do
-    {adapter, opts} = Keyword.pop!(opts, :adapter)
-    adapter.compile(source, opts)
+    {selection, opts} = take_adapter!(opts)
+    selection.compile(source, opts)
+  end
+
+  defp take_adapter!(opts) do
+    missing = make_ref()
+
+    case Keyword.pop(opts, :adapter, missing) do
+      {^missing, _opts} ->
+        raise ArgumentError,
+              "missing required :adapter option; use :map, :json_schema, or an adapter module"
+
+      pair ->
+        pair
+    end
   end
 end
