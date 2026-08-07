@@ -31,8 +31,12 @@ defmodule Formentation do
           {:ok, Definition.t(), [Diagnostic.t()]} | {:error, [Diagnostic.t()]}
   def compile(source, opts) do
     {selection, opts} = take_adapter!(opts)
-    selection.compile(source, opts)
+    adapter = resolve_adapter!(selection)
+    adapter.compile(source, opts)
   end
+
+  defp resolve_adapter!(:map), do: Formentation.Source.Map
+  defp resolve_adapter!(adapter), do: adapter
 
   defp take_adapter!(opts) do
     missing = make_ref()
