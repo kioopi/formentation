@@ -28,9 +28,9 @@ the seams between layers are visible in one place.
 
 ```mermaid
 flowchart TD
-    Decl["Declaration<br/>schema.json + ui.json"]
-    Def["Definition<br/>inert · cacheable · shared"]
-    State["Form<br/>per-request state"]
+    Decl["Declaration"]
+    Def["Definition"]
+    State["Form"]
     PForm["%Phoenix.HTML.Form{}"]
     Plan["RenderPlan"]
     HTML["HTML"]
