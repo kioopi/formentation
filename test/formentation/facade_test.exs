@@ -176,4 +176,47 @@ defmodule Formentation.FacadeTest do
       assert opts == [notify: self()]
     end
   end
+
+  describe "compile/2 adapter resolution during compilation" do
+    @describetag :tmp_dir
+
+    test "accepts an adapter module still being compiled in the same run", %{tmp_dir: tmp_dir} do
+      adapter_file = Path.join(tmp_dir, "late_adapter.ex")
+      caller_file = Path.join(tmp_dir, "late_caller.ex")
+
+      # The sleep forces the unfavourable ordering deterministically: the caller
+      # resolves the adapter before the parallel compiler has produced it.
+      File.write!(adapter_file, """
+      Process.sleep(200)
+
+      defmodule LateAdapter do
+        def compile(_source, _opts), do: {:ok, :late_adapter_ran, []}
+      end
+      """)
+
+      File.write!(caller_file, """
+      defmodule LateCaller do
+        @compiled Formentation.compile(%{kind: :object, properties: []}, adapter: LateAdapter)
+        def compiled, do: @compiled
+      end
+      """)
+
+      on_exit(fn ->
+        for module <- [LateCaller, LateAdapter] do
+          :code.purge(module)
+          :code.delete(module)
+        end
+      end)
+
+      assert {:ok, modules, _diagnostics} =
+               Kernel.ParallelCompiler.compile([caller_file, adapter_file],
+                 return_diagnostics: true
+               )
+
+      # Resolved through a runtime value: the module does not exist when this
+      # test file itself is compiled.
+      assert caller = Enum.find(modules, &(&1 == LateCaller))
+      assert caller.compiled() == {:ok, :late_adapter_ran, []}
+    end
+  end
 end

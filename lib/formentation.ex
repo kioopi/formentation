@@ -83,7 +83,12 @@ defmodule Formentation do
   defp resolve_adapter!(:json_schema), do: Formentation.JSONSchema
 
   defp resolve_adapter!(adapter) when is_atom(adapter) do
-    if Code.ensure_loaded?(adapter) and function_exported?(adapter, :compile, 2) do
+    # `ensure_compiled/1`, not `ensure_loaded?/1`: an adapter defined in the
+    # caller's own project may still be in flight in the same parallel-compiler
+    # run when a definition is compiled at compile time. `ensure_loaded?/1` does
+    # not wait for it and would reject a perfectly valid adapter, intermittently.
+    if match?({:module, _}, Code.ensure_compiled(adapter)) and
+         function_exported?(adapter, :compile, 2) do
       adapter
     else
       raise ArgumentError, adapter_error_message(adapter)
