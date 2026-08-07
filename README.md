@@ -10,6 +10,37 @@ Remaining in Phase 1: collections. See [what isn't supported yet](docs/Formentat
 
 **Using Formentation?** Start with the [user guide](docs/Formentation/Userguide/Userguide.md). **Working on it?** Start with the [end-to-end data flow](docs/Formentation/Techdocs/end-to-end-data-flow.md).
 
+## Development environment
+
+The repository pins its development toolchain in [`mise.toml`](mise.toml):
+Elixir, Erlang/OTP, Node.js, and the Playwright CLI. If you already use
+[mise](https://mise.jdx.dev/), bootstrap a local checkout with:
+
+```sh
+mise install
+mix local.hex --force
+mix local.rebar --force
+mix deps.get
+mise run playwright-browsers
+```
+
+If you use [direnv](https://direnv.net/), the checked-in `.envrc` loads the same
+`mise` environment automatically after `direnv allow`.
+
+### Dev Container
+
+A VS Code/Codespaces-compatible dev container is available in `.devcontainer/`.
+It installs `mise`, uses the pinned tools from `mise.toml`, fetches Mix
+dependencies, and downloads the Chromium build used by the browser tests. Open
+the repository in a dev container and then run:
+
+```sh
+mix test
+mix demo
+```
+
+The demo server listens on port 4000, which the container forwards.
+
 ## Installation
 
 Formentation is not yet published to Hex. Add it as a git dependency, pinned to a tag:
