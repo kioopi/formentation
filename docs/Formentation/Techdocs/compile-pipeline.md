@@ -10,7 +10,7 @@ status: draft
 
 # Compile pipeline
 
-> [!note] As of 2026-07-23 · step 6 complete
+> [!note] As of 2026-08-07 · Wave 3 façade (A3) complete
 > Describes the compile pipeline as built. The `Node` representation uses one struct per kind ([[18-decisions#D-015 — One struct per node kind|D-015]]); this note stays at pipeline altitude and defers `Node` internals to [[definition-and-node|Definition and Node]].
 
 The **compile pipeline** turns a declarative form description into a static, source-independent [[definition-and-node|`Definition`]] that can be cached, inspected, and queried — with no runtime state attached. It is the first half of Formentation: everything here runs once, ahead of any user interaction. The runtime half consumes the `Definition` and is documented in [[form-state-and-transitions|Form state and transitions]], [[phoenix-form-data|the FormData projection]], and [[rendering|Rendering]]; [[end-to-end-data-flow|End-to-end data flow]] joins both halves into one walk.
@@ -49,7 +49,9 @@ flowchart TD
 
 ### 1. Entry — `Formentation.compile/2`
 
-`compile(declaration, adapter: MyAdapter)` is the single public entry point. It pops the `:adapter` option, passes the rest through, and delegates to that adapter. It carries no logic of its own — source selection is the only decision made here.
+`compile(declaration, adapter: MyAdapter)` is the single public entry point. It resolves `:adapter` — a stable built-in selector (`:map`, `:json_schema`), or a module implementing `Formentation.Source` — passes the rest through, and delegates to that adapter. Resolution failures (a missing, unsupported, or invalid `:adapter`) raise `ArgumentError` at this boundary rather than producing a diagnostic, since no adapter has run yet. Beyond that resolution, it carries no logic of its own — source selection is the only decision made here.
+
+`Formentation.form/2` is a compile-and-initialize façade over the same boundary: it partitions `data:`/`defaults:` for `Formentation.Form.new/3`, forwards everything else to `compile/2` unchanged, and only initializes a form after successful compilation.
 
 Contract:
 

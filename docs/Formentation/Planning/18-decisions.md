@@ -981,6 +981,58 @@ the native and generic branches share the same downstream context shape, and
 the Phoenix dependency stays on the traversal side of the boundary. This is an
 internal extraction with no rendering or public API behaviour change.
 
+## D-046 — Adapter resolution failures raise; compilation failures stay diagnostics
+
+*2026-08-07*
+
+**Context.** [GitHub issue #27](https://github.com/kioopi/formentation/issues/27)
+(Wave 3, North-star node A3) asked for stable symbolic adapter selectors
+(`:map`, `:json_schema`) on `Formentation.compile/2` and a compile-and-initialize
+façade, `Formentation.form/2`. Before this, a missing `:adapter` failed through
+an incidental `KeyError` (`Keyword.pop!/2`), and an unsupported value failed
+through an incidental `UndefinedFunctionError` once dispatch was attempted —
+neither was an intentional public contract.
+
+**Decision.** Adapter *selection* failures — a missing `:adapter`, an
+unsupported bare atom, a non-atom term, or a module that cannot be loaded or
+does not export `compile/2` — raise `ArgumentError` at the `compile/2`
+boundary rather than producing a `Formentation.Diagnostic.t()`. No adapter has
+run yet in these cases, so there is no declaration location or source
+provenance to attach a diagnostic to, and folding configuration mistakes into
+`{:error, diagnostics}` would make them indistinguishable from genuine
+declaration-compilation failures. Once an adapter is accepted, its `compile/2`
+result — success or `{:error, diagnostics}` — is authoritative and
+unrescued; adapter exception totality remains a separate contract (see
+[GitHub issue #6](https://github.com/kioopi/formentation/issues/6)).
+
+Symbolic selection is a closed, explicit mapping (`:map` →
+`Formentation.Source.Map`, `:json_schema` → `Formentation.JSONSchema`), not a
+registry or source-shape inference — plain maps are inherently ambiguous
+between a map declaration and a decoded JSON Schema, so the adapter stays
+mandatory. Any other atom is accepted as a custom adapter module only when
+`Code.ensure_loaded?/1` and `function_exported?(adapter, :compile, 2)` both
+hold; this is a callable-contract check, not a `@behaviour` metadata check,
+so third-party modules need not retain behaviour metadata at runtime.
+
+`Formentation.form/2` treats `data:` and `defaults:` as an explicit
+initialization-owned allowlist, stripped before compiler options reach the
+adapter, and delegates to `compile/2` (for adapter resolution) and
+`Formentation.Form.new/3` (for initialization) rather than reimplementing
+either. On a compiler error it returns `{:error, diagnostics}` and never
+calls `Form.new/3`; on success it forwards `Form.new/3`'s result — including
+any `FunctionClauseError` from invalid `data:` — unrescued.
+
+**Consequences.** `Formentation.compile/2` and `Formentation.form/2` now fail
+deterministically and legibly on adapter misconfiguration, replacing
+accidental exception types with an intentional one. Built-in adapter usage no
+longer needs to name an implementation module (`adapter: :map` instead of
+`adapter: Formentation.Source.Map`), while module adapters remain fully
+supported for both built-in and third-party sources. `Formentation.form/2`
+gives single-shot callers a compile-once-and-initialize path without
+duplicating `Form.new/3`'s default/apply/revalidate logic; callers who need
+compile-once/reuse continue to use `compile/2` followed by `Form.new/3`
+directly. No change to validation, decoding, submission, or persistence.
+
 ## Related notes
 
 - [[19-north-star-architecture|North-star architecture]]

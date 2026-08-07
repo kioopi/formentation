@@ -26,9 +26,13 @@ defmodule Formentation do
       ...>   ]
       ...> }
       iex> {:ok, definition, []} =
-      ...>   Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      ...>   Formentation.compile(declaration, adapter: :map)
       iex> Formentation.Info.fields(definition) |> Enum.map(& &1.name)
       ["name", "age"]
+
+  Built-in adapters have stable symbolic selectors — `:map` for
+  `Formentation.Source.Map`, `:json_schema` for `Formentation.JSONSchema`.
+  Third-party adapters remain reachable by module.
   """
   @spec compile(term(), keyword()) ::
           {:ok, Definition.t(), [Diagnostic.t()]} | {:error, [Diagnostic.t()]}
@@ -49,6 +53,15 @@ defmodule Formentation do
   Returns `{:ok, form, diagnostics}` on successful compilation, or
   `{:error, diagnostics}` without initializing a form when compilation
   fails.
+
+      iex> declaration = %{
+      ...>   kind: :object,
+      ...>   properties: [{"name", %{kind: :string}}]
+      ...> }
+      iex> {:ok, form, []} =
+      ...>   Formentation.form(declaration, adapter: :map, data: %{"name" => "Ada"})
+      iex> form.original
+      %{"name" => "Ada"}
   """
   @spec form(term(), keyword()) ::
           {:ok, Form.t(), [Diagnostic.t()]} | {:error, [Diagnostic.t()]}

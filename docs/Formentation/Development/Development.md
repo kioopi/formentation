@@ -140,6 +140,20 @@ occurrence to link. See
 [[18-decisions#D-044 — Object-level error-summary entries link to their prepared fieldset|D-044]]
 and the refreshed [[rendering|Rendering]] note.
 
+✅ Done (2026-08-07) — Wave 3 / North-star node A3: stable symbolic source
+selectors and a compile-and-initialize façade ([GitHub issue
+#27](https://github.com/kioopi/formentation/issues/27)). `Formentation.compile/2`
+accepts `adapter: :map` / `adapter: :json_schema` alongside module adapters,
+resolved by one private boundary shared with the new `Formentation.form/2`,
+which compiles and initializes a `Form` in one call. Adapter-selection
+mistakes (missing, unsupported, or invalid `:adapter`) now raise `ArgumentError`
+instead of an incidental `KeyError`/`UndefinedFunctionError`; adapter
+compilation failures remain `{:error, diagnostics}` and are never rescued.
+`form/2` treats `data:`/`defaults:` as an explicit initialization allowlist
+and forwards all other options to the adapter unchanged. See
+[[18-decisions#D-046 — Adapter resolution failures raise; compilation failures stay diagnostics|D-046]]
+and the refreshed [[compile-pipeline|Compile pipeline]] note.
+
 ## Related
 
 - [[13-roadmap|Planning/13 — Roadmap]]
