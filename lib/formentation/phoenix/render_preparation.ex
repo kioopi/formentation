@@ -3,8 +3,8 @@ defmodule Formentation.Phoenix.RenderPreparation do
 
   alias Formentation.{Info, InstancePath, Semantic}
   alias Formentation.Info.Presentation
-  alias Formentation.Phoenix.{DOMIdentity, RenderNode, RenderPlan, StateView}
-  alias Formentation.Phoenix.RenderPreparation.{Context, Summary, Widget}
+  alias Formentation.Phoenix.{DOMIdentity, RenderNode, RenderPlan}
+  alias Formentation.Phoenix.RenderPreparation.{Context, Summary, Visibility, Widget}
 
   @doc """
   Projects the whole definition against `form` into a render plan.
@@ -265,7 +265,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
        options: node.options,
        validations: Phoenix.HTML.Form.input_validations(form, field.field),
        errors: field.errors,
-       show_errors?: show_errors?(field, ctx, path),
+       show_errors?: Visibility.show_errors?(field, Context.visibility_view(ctx), path),
        read_only?: node.read_only?,
        required?: node.required?
      }, diagnostics}
@@ -307,24 +307,6 @@ defmodule Formentation.Phoenix.RenderPreparation do
   defp humanize(name) do
     name |> String.replace("_", " ") |> String.capitalize()
   end
-
-  # D-014, now source-owned: the state view decides, and only falls back
-  # to the Phoenix-compatible default when it answers :default. Computed
-  # here, once, so themes never see markers or actions.
-  defp show_errors?(field, ctx, path) do
-    field.errors != [] and
-      visible?(ctx, path, fn -> submitted?(ctx) or Phoenix.Component.used_input?(field) end)
-  end
-
-  defp visible?(ctx, path, default_fun) do
-    case StateView.issue_visibility(ctx.source, ctx.root_form, InstancePath.new!(path)) do
-      :show -> true
-      :hide -> false
-      :default -> default_fun.()
-    end
-  end
-
-  defp submitted?(ctx), do: StateView.submitted?(ctx.source, ctx.root_form)
 
   defp summary(root, ctx), do: Summary.build(root, Context.summary_view(ctx))
 end

@@ -17,8 +17,10 @@ to `RenderPreparation.Context`; object-level error-summary entries link to their
 focusable fieldset, keyed off `RenderNode.Group`'s `kind`/`occurrence_path`
 provenance, [GitHub issue #34](https://github.com/kioopi/formentation/issues/34);
 summary construction extracted to `RenderPreparation.Summary` with entries
-promoted to `RenderPlan.SummaryEntry` structs, and widget resolution extracted
-to `RenderPreparation.Widget` behind a typed `resolve/2`, with field option ids
+promoted to `RenderPlan.SummaryEntry` structs, widget resolution extracted
+to `RenderPreparation.Widget` behind a typed `resolve/2`, and D-014/D-027
+visibility/submission policy extracted to `RenderPreparation.Visibility`
+(the sole caller of `Phoenix.Component.used_input?/1`), with field option ids
 consolidated into `DOMIdentity.field_options/3` — internal refactors, no
 behaviour change; validated projection roots, projected native Phoenix
 forms, nested subtree summaries,
@@ -124,9 +126,12 @@ One struct per render node shape:
   `validations[:required]` under D-010's policy.
 
 `show_errors?` is computed once during render preparation, so components never
-inspect `_unused_` markers or `form.action` (D-014, D-027). The source's
-`StateView.issue_visibility/3` decides first; only a `:default` answer
-falls back to the Phoenix-generic rule:
+inspect `_unused_` markers or `form.action` (D-014, D-027).
+`Formentation.Phoenix.RenderPreparation.Visibility` owns this decision —
+`prepare/2` hands it the two context facts it reads (`source`, `root_form`),
+narrowed the same way `Summary` is (see below). The source's
+`StateView.issue_visibility/3` decides first; only a `:default` answer falls
+back to the Phoenix-generic rule:
 
 ```
 show_errors? = field.errors != [] and
@@ -136,6 +141,10 @@ show_errors? = field.errors != [] and
     :default -> StateView.submitted?(form.source, form) or Phoenix.Component.used_input?(field)
   end
 ```
+
+`Visibility` is also the only module that calls `Phoenix.Component.used_input?/1`
+and the only source of `submitted?/1`; `Summary` reuses `Visibility.submitted?/1`
+rather than re-deciding D-027 submission on its own.
 
 For a `%Formentation.Form{}` source this never reaches `:default` —
 `Formentation.Form` owns the complete D-014 policy and answers `:show`/`:hide`

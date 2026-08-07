@@ -22,7 +22,7 @@ defmodule Formentation.Phoenix.RenderPreparation.Context do
 
   alias Formentation.{Definition, Info, InstancePath}
   alias Formentation.Phoenix.{ProjectedForm, StateView}
-  alias Formentation.Phoenix.RenderPreparation.Summary
+  alias Formentation.Phoenix.RenderPreparation.{Summary, Visibility}
 
   @missing_namespace ~S"""
                      Formentation cannot mint DOM ids without a namespace. Give the form a name or an id
@@ -209,6 +209,30 @@ defmodule Formentation.Phoenix.RenderPreparation.Context do
       root_instance_path: ctx.root_instance_path,
       definition: ctx.definition
     }
+  end
+
+  @doc """
+  Returns the narrower slice of this context that `Visibility` reads.
+
+  `Visibility` owns the shape — see its `t:Formentation.Phoenix.RenderPreparation.Visibility.ctx/0`
+  — because visibility decisions work only from the source's `StateView` and
+  the root form, never from namespace or traversal state.
+
+  ## Example
+
+      iex> {:ok, definition, []} =
+      ...>   Formentation.compile(
+      ...>     %{kind: :object, properties: [{"email", %{kind: :string}}]},
+      ...>     adapter: Formentation.Source.Map
+      ...>   )
+      iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
+      iex> ctx = Formentation.Phoenix.RenderPreparation.Context.resolve(form, definition: definition)
+      iex> ctx |> Formentation.Phoenix.RenderPreparation.Context.visibility_view() |> Map.keys() |> Enum.sort()
+      [:root_form, :source]
+  """
+  @spec visibility_view(t()) :: Visibility.ctx()
+  def visibility_view(%__MODULE__{} = ctx) do
+    %{source: ctx.source, root_form: ctx.root_form}
   end
 
   defp build(definition, form, root_path, opts) do
