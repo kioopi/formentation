@@ -16,8 +16,9 @@ status: current
 focusable fieldset, keyed off `RenderNode.Group`'s `kind`/`occurrence_path`
 provenance, [GitHub issue #34](https://github.com/kioopi/formentation/issues/34);
 summary construction extracted to `RenderPreparation.Summary` with entries
-promoted to `RenderPlan.SummaryEntry` structs — an internal refactor, no
-behaviour change; validated projection roots, projected native Phoenix
+promoted to `RenderPlan.SummaryEntry` structs, and widget resolution extracted
+to `RenderPreparation.Widget` behind a typed `resolve/2` — internal refactors,
+no behaviour change; validated projection roots, projected native Phoenix
 forms, nested subtree summaries,
 and explicit generic FormData route, [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]; native presentation traversal and semantic-index-backed
 projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]; DOM identity, [[18-decisions#D-034 — Phoenix renderer DOM identities are typed and injective|D-034]]; group help, [[18-decisions#D-036 — Group help uses prepared Phoenix identities|D-036]]; prepared `role`/`required?` on `RenderNode.Field`, [[18-decisions#D-043 — Semantic `role` and schema `required?` join `value_type` as flat prepared facts|D-043]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
@@ -137,7 +138,10 @@ source has no state view and falls back to `Any`, which always answers
 
 ## Widget resolution
 
-First match wins:
+`Formentation.Phoenix.RenderPreparation.Widget` owns this decision —
+`Widget.resolve/2` takes the `Info.Presentation.Field` descriptor and its
+`Semantic.Field` occurrence and returns `{widget, diagnostics}`. First match
+wins:
 
 | # | Condition | Widget |
 | --- | --- | --- |
@@ -154,6 +158,12 @@ unvalidated map source), or a `:checkbox` hint on a non-boolean field
 (D-011's transport contract is boolean-shaped), falls back to the
 *inferred* widget from the table above and records a `:widget_fallback`
 diagnostic on the plan.
+
+The table is covered by property tests that assert the *result* against the
+node's shape rather than restating the clause order — a resolved `:checkbox`
+implies a boolean node, a `:date_input` implies a `:date` role on a string, a
+rejected hint lands exactly where the same node with no hint lands. That keeps
+the oracle independent of the implementation it checks.
 
 ## Error summary
 

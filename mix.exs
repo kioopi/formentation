@@ -115,10 +115,10 @@ defmodule Formentation.MixProject do
     # Two categories, one predicate. RenderPreparation and ReferenceComponents
     # are @moduledoc false and would be excluded anyway; they are listed for
     # grep-ability, and that is the convention — a new internal module gets
-    # both @moduledoc false and an entry here. RenderPlan, RenderPreparation.Summary
-    # and the RenderNode.* structs keep their moduledocs on purpose
-    # (`h Formentation.Phoenix.RenderPlan` in IEx is supported), so this filter
-    # is the only thing keeping them out of the published docs. The string
+    # both @moduledoc false and an entry here. RenderPlan, RenderPreparation.Summary,
+    # RenderPreparation.Widget and the RenderNode.* structs keep their moduledocs
+    # on purpose (`h Formentation.Phoenix.RenderPlan` in IEx is supported), so
+    # this filter is the only thing keeping them out of the published docs. The string
     # prefixes, rather than a list, cover the documented structs nested under
     # an already-excluded parent — RenderNode.FieldDOM/GroupDOM,
     # RenderPlan.SummaryEntry — and any future sibling without a list edit.
@@ -126,6 +126,7 @@ defmodule Formentation.MixProject do
       Formentation.Phoenix.ProjectedForm,
       Formentation.Phoenix.RenderPreparation,
       Formentation.Phoenix.RenderPreparation.Summary,
+      Formentation.Phoenix.RenderPreparation.Widget,
       Formentation.Phoenix.ReferenceComponents,
       Formentation.Phoenix.RenderPlan,
       Formentation.Phoenix.RenderNode

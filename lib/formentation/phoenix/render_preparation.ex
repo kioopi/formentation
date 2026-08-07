@@ -1,10 +1,10 @@
 defmodule Formentation.Phoenix.RenderPreparation do
   @moduledoc false
 
-  alias Formentation.{Definition, Diagnostic, Info, InstancePath, Semantic}
+  alias Formentation.{Definition, Info, InstancePath, Semantic}
   alias Formentation.Info.Presentation
   alias Formentation.Phoenix.{DOMIdentity, ProjectedForm, RenderNode, RenderPlan, StateView}
-  alias Formentation.Phoenix.RenderPreparation.Summary
+  alias Formentation.Phoenix.RenderPreparation.{Summary, Widget}
 
   @missing_namespace ~S"""
                      Formentation cannot mint DOM ids without a namespace. Give the form a name or an id
@@ -351,7 +351,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
 
   defp project_field(%Presentation.Field{} = presentation, %Semantic.Field{} = node, form, ctx) do
     field = form[access_key(node.name)]
-    {widget, diagnostics} = resolve_widget(presentation, node)
+    {widget, diagnostics} = Widget.resolve(presentation, node)
     path = presentation.semantic_path.segments
     instance_path = presentation.semantic_path
 
@@ -380,39 +380,6 @@ defmodule Formentation.Phoenix.RenderPreparation do
      }, diagnostics}
   end
 
-  # Spec order: hidden -> hint -> options -> boolean -> number -> role -> text.
-  defp resolve_widget(%Presentation.Field{hidden?: true}, _node), do: {:hidden_input, []}
-  defp resolve_widget(%Presentation.Field{widget: nil}, node), do: {infer_widget(node), []}
-
-  defp resolve_widget(%Presentation.Field{widget: hint}, node) do
-    case hinted_widget(hint, node) do
-      {:ok, widget} ->
-        {widget, []}
-
-      :fallback ->
-        widget = infer_widget(node)
-        {widget, [fallback_diagnostic(hint, node, widget)]}
-    end
-  end
-
-  defp hinted_widget(:text, _node), do: {:ok, :text_input}
-  defp hinted_widget(:textarea, _node), do: {:ok, :textarea}
-  defp hinted_widget(:select, %Semantic.Field{options: [_ | _]}), do: {:ok, :select}
-  defp hinted_widget(:radio, %Semantic.Field{options: [_ | _]}), do: {:ok, :radio_group}
-  defp hinted_widget(:checkbox, %Semantic.Field{value_type: :boolean}), do: {:ok, :checkbox}
-  defp hinted_widget(_hint, _node), do: :fallback
-
-  defp infer_widget(%Semantic.Field{options: [_ | _]}), do: :select
-  defp infer_widget(%Semantic.Field{value_type: :boolean}), do: :checkbox
-
-  defp infer_widget(%Semantic.Field{value_type: type}) when type in [:integer, :number],
-    do: :number_input
-
-  defp infer_widget(%Semantic.Field{role: :date}), do: :date_input
-  defp infer_widget(%Semantic.Field{role: :email}), do: :email_input
-  defp infer_widget(%Semantic.Field{role: :uri}), do: :url_input
-  defp infer_widget(%Semantic.Field{}), do: :text_input
-
   defp option_ids(nil, _namespace, _path), do: []
   defp option_ids([], _namespace, _path), do: []
 
@@ -420,17 +387,6 @@ defmodule Formentation.Phoenix.RenderPreparation do
     Enum.map(Enum.with_index(options), fn {_option, index} ->
       DOMIdentity.field(namespace, path, {:option, index})
     end)
-  end
-
-  defp fallback_diagnostic(hint, node, widget) do
-    %Diagnostic{
-      severity: :warning,
-      code: :widget_fallback,
-      message:
-        "widget #{inspect(hint)} cannot render field #{inspect(node.name)}; " <>
-          "falling back to #{inspect(widget)}",
-      template_path: node.template_path
-    }
   end
 
   defp object_legend(%Presentation.Object{label: label, semantic_path: %{segments: []}}) do
