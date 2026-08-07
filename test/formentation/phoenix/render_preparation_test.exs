@@ -460,6 +460,19 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
                single_field_plan(%{kind: :number, hidden: true}).root.children
     end
 
+    test "threads semantic role onto the prepared field" do
+      assert [%RenderNode.Field{role: :email}] =
+               single_field_plan(%{kind: :string, role: :email}).root.children
+
+      assert [%RenderNode.Field{role: :date}] =
+               single_field_plan(%{kind: :string, role: :date}).root.children
+    end
+
+    test "threads the inferred semantic role when the source field omits a role" do
+      assert [%RenderNode.Field{role: :text}] =
+               single_field_plan(%{kind: :string}).root.children
+    end
+
     test "infers from options, value type, and role" do
       assert {:text_input, []} = single_widget(%{kind: :string})
       assert {:select, []} = single_widget(%{kind: :string, one_of: ["a", "b"]})
