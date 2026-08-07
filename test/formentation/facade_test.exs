@@ -125,6 +125,24 @@ defmodule Formentation.FacadeTest do
     end
   end
 
+  describe "form/2 failure path" do
+    test "returns the compiler error and never calls Form.new/3" do
+      diagnostics = [%Formentation.Diagnostic{code: :boom, severity: :error, message: "boom"}]
+
+      assert Formentation.form(form_declaration(),
+               adapter: SpyAdapter,
+               result: {:error, diagnostics},
+               data: "not a map"
+             ) == {:error, diagnostics}
+    end
+
+    test "does not rescue a Form.new/3 failure after successful compilation" do
+      assert_raise FunctionClauseError, fn ->
+        Formentation.form(form_declaration(), adapter: :map, data: "not a map")
+      end
+    end
+  end
+
   describe "compile/2 custom module adapters" do
     test "accepts a custom module exporting compile/2" do
       declaration = %{kind: :object, properties: [{"name", %{kind: :string}}]}
