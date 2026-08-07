@@ -17,6 +17,13 @@ defmodule Formentation.Phoenix.ComponentsTest do
     definition
   end
 
+  defp compile_json!(schema) do
+    {:ok, definition, _diagnostics} =
+      Formentation.compile(schema, adapter: Formentation.JSONSchema)
+
+    definition
+  end
+
   defp nested_definition do
     compile!(%{
       kind: :object,
@@ -760,6 +767,192 @@ defmodule Formentation.Phoenix.ComponentsTest do
         render_component(&Formentation.Phoenix.fields/1, form: root, summary: false) |> parse!()
 
       assert Floki.find(doc, ~s([role="alert"])) == []
+    end
+  end
+
+  describe "object summary linking across projection variants (#34)" do
+    # address is present but incomplete (street only, geo missing), so it
+    # fires its own minProperties issue at ["address"] *and* a descendant
+    # "geo is required" issue at ["address", "geo"] — one root issue, one
+    # address issue, one geo issue, routed through three render contexts.
+    defp nested_object_definition do
+      compile_json!(%{
+        "type" => "object",
+        "minProperties" => 3,
+        "required" => ["address"],
+        "properties" => %{
+          "title" => %{"type" => "string"},
+          "address" => %{
+            "type" => "object",
+            "title" => "Address",
+            "minProperties" => 2,
+            "required" => ["geo"],
+            "properties" => %{
+              "street" => %{"type" => "string", "minLength" => 1},
+              "geo" => %{
+                "type" => "object",
+                "required" => ["lat"],
+                "properties" => %{"lat" => %{"type" => "string", "minLength" => 1}}
+              }
+            }
+          }
+        }
+      })
+    end
+
+    defp nested_object_forms do
+      definition = nested_object_definition()
+
+      state =
+        Form.new(definition)
+        |> Form.transition(%Params{
+          values: %{"title" => "t", "address" => %{"street" => "Elm"}},
+          event: :submit
+        })
+
+      root = FormData.to_form(state, as: "payload")
+      [address] = FormData.to_form(state, root, :address, [])
+      {root, address}
+    end
+
+    defp unlinked_summary_entries(doc) do
+      doc |> Floki.find(".ftn-error-summary li") |> Enum.filter(&(Floki.find(&1, "a") == []))
+    end
+
+    test "a whole-form render links the object issue and leaves the root issue unlinked" do
+      {root, _address} = nested_object_forms()
+      doc = render_fields(nested_object_definition(), root) |> parse!()
+
+      target = DOMIdentity.object("payload", InstancePath.new!(["address"]), :container)
+
+      link = find_one(doc, ~s(a[href="##{target}"]))
+      assert Floki.text(link) =~ "Address"
+
+      fieldset = find_one(doc, ~s(fieldset[id="#{target}"]))
+      assert Floki.attribute(fieldset, "tabindex") == ["-1"]
+
+      # The root-of-form issue (minProperties on the whole payload) has no
+      # rendered fieldset of its own, so it stays a plain, unlinked entry.
+      assert [span] = unlinked_summary_entries(doc)
+      assert Floki.text(span) =~ "at least 3 properties"
+
+      assert_all_references_resolve(doc)
+      assert_no_duplicate_ids(doc)
+    end
+
+    test "a nested projected form's own root issue stays unlinked under summary={true}" do
+      {_root, address} = nested_object_forms()
+
+      doc =
+        render_component(&Formentation.Phoenix.fields/1, form: address, summary: true) |> parse!()
+
+      # fields/1 never renders the projected root's own fieldset, so
+      # address's own minProperties issue has nothing to link to here.
+      assert [span] = unlinked_summary_entries(doc)
+      assert Floki.text(span) =~ "at least 2 properties"
+      assert_all_references_resolve(doc)
+    end
+
+    test "a nested projected form's descendant object issue links using its own namespace" do
+      {_root, address} = nested_object_forms()
+
+      doc =
+        render_component(&Formentation.Phoenix.fields/1, form: address, summary: true) |> parse!()
+
+      target =
+        DOMIdentity.object("payload_address", InstancePath.new!(["address", "geo"]), :container)
+
+      link = find_one(doc, ~s(a[href="##{target}"]))
+      assert Floki.text(link) == "Geo: property 'geo' is required"
+
+      fieldset = find_one(doc, ~s(fieldset[id="#{target}"]))
+      assert Floki.attribute(fieldset, "tabindex") == ["-1"]
+
+      assert_all_references_resolve(doc)
+      assert_no_duplicate_ids(doc)
+    end
+
+    test "an explicit dom_namespace changes the summary link and target together" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"address", %{kind: :object, properties: [{"street", %{kind: :string}}]}}
+          ]
+        })
+
+      source = %Formentation.SourceFixture{
+        params: %{"address" => %{"street" => "Elm"}},
+        submitted?: true,
+        issues:
+          {:ok,
+           [%StateView.Issue{path: InstancePath.new!(["address"]), message: "is incomplete"}]}
+      }
+
+      doc =
+        render_component(&Formentation.Phoenix.fields/1,
+          definition: definition,
+          form: FormData.to_form(source, as: "payload"),
+          dom_namespace: "asset_payload"
+        )
+        |> parse!()
+
+      target = DOMIdentity.object("asset_payload", InstancePath.new!(["address"]), :container)
+      link = find_one(doc, ~s(a[href="##{target}"]))
+      assert Floki.text(link) =~ "is incomplete"
+      find_one(doc, ~s(fieldset[id="#{target}"]))
+
+      # The Phoenix transport name is untouched by the DOM namespace override.
+      assert [_] = Floki.find(doc, ~s(input[name="payload[address][street]"]))
+      assert_all_references_resolve(doc)
+    end
+
+    test "an object issue inside a presentation group links to the object, not the group" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"address",
+             %{
+               kind: :object,
+               properties: [{"street", %{kind: :string}}],
+               groups: [%{id: "details", title: "Details", fields: ["street"]}]
+             }}
+          ]
+        })
+
+      source = %Formentation.SourceFixture{
+        params: %{"address" => %{"street" => "Elm"}},
+        submitted?: true,
+        issues:
+          {:ok,
+           [%StateView.Issue{path: InstancePath.new!(["address"]), message: "is incomplete"}]}
+      }
+
+      doc = parse!(render_fields(definition, FormData.to_form(source, as: "payload")))
+
+      object_target = DOMIdentity.object("payload", InstancePath.new!(["address"]), :container)
+
+      group_target =
+        DOMIdentity.group(
+          "payload",
+          "/address#details",
+          InstancePath.new!(["address"]),
+          :container
+        )
+
+      link = find_one(doc, ~s(a[href="##{object_target}"]))
+      assert Floki.text(link) =~ "is incomplete"
+      assert Floki.find(doc, ~s(a[href="##{group_target}"])) == []
+
+      object_fieldset = find_one(doc, ~s(fieldset[id="#{object_target}"]))
+      assert Floki.attribute(object_fieldset, "tabindex") == ["-1"]
+
+      group_fieldset = find_one(doc, ~s(fieldset[id="#{group_target}"]))
+      assert Floki.attribute(group_fieldset, "tabindex") == []
+
+      assert_all_references_resolve(doc)
+      assert_no_duplicate_ids(doc)
     end
   end
 
