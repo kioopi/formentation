@@ -507,6 +507,7 @@ defmodule Formentation.Phoenix.ReferenceComponentsTest do
           container: group_id("electrical", :container),
           help: group_id("electrical", :help)
         },
+        kind: :presentation_group,
         children: [field_node(), checkbox_node()]
       }
 
@@ -528,7 +529,8 @@ defmodule Formentation.Phoenix.ReferenceComponentsTest do
         dom: %RenderNode.GroupDOM{
           container: group_id("electrical", :container),
           help: group_id("electrical", :help)
-        }
+        },
+        kind: :presentation_group
       }
 
       doc = parse!(render_component(&Reference.node/1, node: group))
@@ -545,7 +547,8 @@ defmodule Formentation.Phoenix.ReferenceComponentsTest do
         dom: %RenderNode.GroupDOM{
           container: group_id("electrical", :container),
           help: group_id("electrical", :help)
-        }
+        },
+        kind: :presentation_group
       }
 
       doc = parse!(render_component(&Reference.node/1, node: group))
@@ -563,7 +566,8 @@ defmodule Formentation.Phoenix.ReferenceComponentsTest do
         dom: %RenderNode.GroupDOM{
           container: group_id("electrical", :container),
           help: group_id("electrical", :help)
-        }
+        },
+        kind: :presentation_group
       }
 
       doc = parse!(render_component(&Reference.node/1, node: group))
@@ -580,6 +584,7 @@ defmodule Formentation.Phoenix.ReferenceComponentsTest do
           container: group_id("inner", :container),
           help: group_id("inner", :help)
         },
+        kind: :presentation_group,
         children: [field_node()]
       }
 
@@ -590,6 +595,7 @@ defmodule Formentation.Phoenix.ReferenceComponentsTest do
           container: group_id("outer", :container),
           help: group_id("outer", :help)
         },
+        kind: :presentation_group,
         children: [inner]
       }
 

@@ -120,6 +120,8 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
       assert %RenderPlan{root: %RenderNode.Group{} = root, summary: [], diagnostics: []} = plan
       assert root.legend == "/"
+      assert root.kind == :object
+      assert root.occurrence_path == InstancePath.new!([])
 
       assert [%RenderNode.Field{} = serial, %RenderNode.Field{}, %RenderNode.Field{} = notes] =
                root.children
@@ -822,6 +824,11 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
                DOMIdentity.object("payload", InstancePath.new!(["address"]), :container)
 
       assert Projector.project_at(definition, form, ["address"]) == address
+
+      assert address.kind == :object
+      assert address.occurrence_path == InstancePath.new!(["address"])
+      assert presentation_group.kind == :presentation_group
+      assert presentation_group.occurrence_path == nil
     end
 
     test "a nested object inside a presentation group still descends semantically" do

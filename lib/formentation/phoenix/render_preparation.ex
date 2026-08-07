@@ -267,15 +267,25 @@ defmodule Formentation.Phoenix.RenderPreparation do
     {form, ctx} = object_context(object, path.segments, form, ctx)
     {children, diagnostics} = project_children(object.children, form, ctx)
 
+    # The aligned cursor, not the descriptor's static semantic_path: today
+    # they always agree (Phase 1 has no collections), but occurrence is
+    # what a future collection item's runtime integer segment would live
+    # on, and it must be the single source for both the DOM identity and
+    # the occurrence_path key summary linking indexes by — so the two can
+    # never drift apart from each other.
+    occurrence = InstancePath.new!(ctx.path)
+
     dom = %RenderNode.GroupDOM{
-      container: DOMIdentity.object(ctx.dom_namespace, path, :container),
-      help: DOMIdentity.object(ctx.dom_namespace, path, :help)
+      container: DOMIdentity.object(ctx.dom_namespace, occurrence, :container),
+      help: DOMIdentity.object(ctx.dom_namespace, occurrence, :help)
     }
 
     {%RenderNode.Group{
        legend: object_legend(object),
        help: object.help,
        dom: dom,
+       kind: :object,
+       occurrence_path: occurrence,
        children: children
      }, diagnostics}
   end
@@ -293,6 +303,8 @@ defmodule Formentation.Phoenix.RenderPreparation do
        legend: group_legend(group),
        help: group.help,
        dom: dom,
+       kind: :presentation_group,
+       occurrence_path: nil,
        children: children
      }, diagnostics}
   end
