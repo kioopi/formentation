@@ -12,24 +12,35 @@ status: current
 
 # Declaring a form with JSON Schema
 
-*Covers Formentation as of 2026-07-26.*
+*Covers Formentation as of 2026-08-07.*
 
 `Formentation.JSONSchema` compiles a **decoded** draft 2020-12 schema
 document — the map you get from `JSON.decode!/1`, with string keys — into
 the same kind of definition the
 [[declaring-with-the-map-source|map source]] produces. Presentation intent
 that JSON Schema has no vocabulary for is supplied separately, as a
-**UI-hints** document.
+**UI-hints** document. Its stable selector is `:json_schema` when passed to
+`compile/2` or `form/2`.
 
 ```elixir
 schema = "schema.json" |> File.read!() |> JSON.decode!()
 ui     = "ui.json"     |> File.read!() |> JSON.decode!()
 
 {:ok, definition, diagnostics} =
-  Formentation.compile(schema, adapter: Formentation.JSONSchema, ui: ui)
+  Formentation.compile(schema, adapter: :json_schema, ui: ui)
 ```
 
-The `:ui` option is optional; without it you get structure only.
+Or, to compile and initialize a form in one step:
+
+```elixir
+{:ok, form, diagnostics} =
+  Formentation.form(schema, adapter: :json_schema, ui: ui, data: existing_data)
+```
+
+The `:ui` option is optional; without it you get structure only. It is an
+**adapter option** — unlike `:data` and `:defaults`, which handle form
+initialization — so it is the same whether you use `compile/2` or
+`form/2`.
 
 Use this source when the schema already exists — it is the case
 Formentation was built for. Its one substantive advantage over the map
@@ -112,7 +123,9 @@ for now.
 
 A non-object root, a `$schema` that is not 2020-12, or a document that
 fails the metaschema are **errors**: `compile/2` returns
-`{:error, diagnostics}` and there is no definition.
+`{:error, diagnostics}` and there is no definition. (Note: this is
+different from a **bad adapter**, which raises `ArgumentError` — see
+[[getting-started#2 · Compile and initialize|Getting started]] for the distinction.)
 
 > [!important] Unsupported declarations are preserve-only, not editable
 > A property using an unsupported keyword compiles to

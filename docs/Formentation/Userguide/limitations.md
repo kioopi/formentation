@@ -12,7 +12,7 @@ status: current
 
 # What isn't supported yet
 
-*Accurate as of 2026-07-26. Formentation is pre-release; this page is the
+*Accurate as of 2026-08-07. Formentation is pre-release; this page is the
 one to re-read after every upgrade.*
 
 Formentation is being built as a walking skeleton — a thin slice through
@@ -85,9 +85,13 @@ its class names; you cannot swap the markup.
 ### No extension points
 
 No custom node kinds, no custom codecs or per-field codec overrides, no
-custom source adapters beyond the two shipped, no compiler passes, no
-widget registration. The `Formentation.Source` behaviour exists and is
-implemented twice, but it is not yet a supported public extension point.
+compiler passes, no widget registration. Third-party adapters can be
+passed to `compile/2` and `form/2` as modules, and the adapter-selection
+mechanism is public and supported. However, the `Formentation.Definition`
+type and the `Formentation.Source` behaviour are not documented public
+surfaces: the contracts for building a `Definition` are unstable, so
+writing a third-party adapter remains an unsupported activity that may
+break across versions.
 
 ## By area
 
@@ -136,7 +140,8 @@ into confusing type errors — but it means you cannot get a partial
 result out of a partly-invalid form.
 
 **Defaults are opt-in and initialization-only.** They apply at
-`Form.new/3` with `defaults: :apply`, never on a transition, and never
+`Form.new/3` with `defaults: :apply` (or via `Formentation.form/2` with
+the same `defaults: :apply` option), never on a transition, and never
 over a value you provided.
 
 ### Rendering
@@ -179,6 +184,9 @@ For balance, the complete list of what you can rely on today:
 
 - compiling from plain Elixir maps or JSON Schema 2020-12, with both
   proven to produce identical definitions by a differential test;
+- compiling and initializing in one step with `Formentation.form/2`, or
+  compiling once with `compile/2` and reusing that definition across many
+  forms through `Form.new/3`;
 - querying the result through `Formentation.Info`, including full
   provenance for every resolved value;
 - nested objects and presentation groups;

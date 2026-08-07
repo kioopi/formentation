@@ -25,8 +25,9 @@ how do I *do* a thing. The internal counterpart is [[Techdocs]].
 ## Contents
 
 1. [[getting-started|Getting started]] — the whole loop in one page:
-   declare a form, render it, handle the submission, read the decoded
-   result.
+   declare a form, compile and initialize it with `Formentation.form/2` or
+   the two-step `compile/2` + `Form.new/3` path, render it, handle the
+   submission, read the decoded result.
 2. [[declaring-with-the-map-source|Declaring a form with the map source]] —
    the plain-Elixir declaration vocabulary, in full.
 3. [[declaring-with-json-schema|Declaring a form with JSON Schema]] — the
@@ -42,7 +43,7 @@ how do I *do* a thing. The internal counterpart is [[Techdocs]].
 
 Fine-grained API detail — every function, every option — lives in the
 moduledocs rather than here; run `mix docs` or read them in IEx with
-`h Formentation.Form`.
+`h Formentation` (entry points and adapter contract) or `h Formentation.Form` (form operations).
 
 ## Related
 
