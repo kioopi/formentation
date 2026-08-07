@@ -50,6 +50,7 @@ Icon[]
 **/.obsidian/graph.json
 **/.obsidian/workspace.json
 **/.obsidian/workspace-mobile.json
+**/.obsidian/hotkeys.json
 
 # Obsidian plugins are stored under .obsidian/plugins/$plugin_name. They
 # contain metadata (manifest.json), application code (main.js), stylesheets
