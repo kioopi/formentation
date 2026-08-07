@@ -36,6 +36,7 @@ defmodule Formentation do
   end
 
   defp resolve_adapter!(:map), do: Formentation.Source.Map
+  defp resolve_adapter!(:json_schema), do: Formentation.JSONSchema
   defp resolve_adapter!(adapter), do: adapter
 
   defp take_adapter!(opts) do
