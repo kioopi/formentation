@@ -1026,13 +1026,16 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       assert form.source == source_before
     end
 
-    test "object-level schema issues enrich the submit summary unlinked" do
+    test "object-level schema issues link to the rendered object fieldset" do
       # `address` is a plain supported `"type": "object"`. Under D-026
       # (issue #1) a required nested object with no content stays genuinely
-      # absent from the candidate, so JSV files the `:required` issue at the
-      # object's own path, ["address"]. That path resolves to a Semantic.Object,
-      # not a Semantic.Field and not a Semantic.Unsupported, so the state view's
-      # normalized issue folds into the summary unlinked and unlabelled.
+      # absent from the *candidate*, so JSV files the `:required` issue at the
+      # object's own path, ["address"] — but rendering is declaration-driven,
+      # not candidate-driven, so `address` still projects a fieldset
+      # regardless of whether its data is present. That path resolves to a
+      # Semantic.Object, not a Semantic.Field and not a Semantic.Unsupported,
+      # so the state view's normalized issue links to that rendered fieldset
+      # (#34), using its legend as the label.
       schema = %{
         "type" => "object",
         "required" => ["address"],
@@ -1054,7 +1057,12 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       form_state = submitted_form(Form.new(definition), %{"title" => "t"})
       plan = Projector.project(definition, FormData.to_form(form_state, as: "payload"))
 
-      assert [%{id: nil, label: nil, message: message}] = plan.summary
+      assert %RenderNode.Group{} =
+               address_group =
+               Enum.find(plan.root.children, &match?(%RenderNode.Group{}, &1))
+
+      assert [%{id: id, label: "Address", message: message}] = plan.summary
+      assert id == address_group.dom.container
       assert message =~ "required"
     end
   end
@@ -1213,16 +1221,28 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
       # Root-of-form and sibling entries are gone; self and descendant remain,
       # in adapter order — the filter never reorders.
-      address_summary = RenderPreparation.prepare(address).summary
+      address_plan = RenderPreparation.prepare(address)
+      address_summary = address_plan.summary
 
       assert Enum.map(address_summary, & &1.message) == [
                "value must have at least 3 properties, got 1",
                "property 'geo' is required"
              ]
 
-      # Both nested entries are unlinked and unlabelled: they name objects, so
-      # summary_label/2 returns nil and there is no focusable control to target.
-      assert Enum.all?(address_summary, &(&1.label == nil))
+      # The self entry names address's own projection root — fields/1 never
+      # renders that fieldset, so it stays unlinked (#34). The descendant geo
+      # entry links to geo's rendered fieldset, one level down.
+      assert [%{id: nil, label: nil} = self_entry, %{id: geo_id, label: "Geo"} = geo_entry] =
+               address_summary
+
+      assert self_entry.message == "value must have at least 3 properties, got 1"
+      assert geo_entry.message == "property 'geo' is required"
+
+      assert %RenderNode.Group{} =
+               geo_group =
+               Enum.find(address_plan.root.children, &match?(%RenderNode.Group{}, &1))
+
+      assert geo_id == geo_group.dom.container
     end
 
     test "a root issue appears once, unlinked, and never enters a field's errors" do
@@ -1240,10 +1260,10 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
     # elsewhere in this file runs through %Formentation.Form{}, which owns
     # both the group node and the issue. Here the definition is the only
     # thing the source shares with the projector — an Ash- or Ecto-style
-    # adapter hands over a group-level issue through issues/2 alone, and
-    # it must still be rendered once, unlinked, without reaching the
-    # group's fields.
-    test "a nested-object issue appears once, unlinked, and leaves the group's fields alone" do
+    # adapter hands over a group-level issue through issues/2 alone, and it
+    # must still be rendered once, linked to the rendered fieldset (#34),
+    # without reaching the group's fields.
+    test "a nested-object issue appears once, linked to its fieldset, and leaves the group's fields alone" do
       definition =
         compile!(%{
           kind: :object,
@@ -1259,11 +1279,85 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
       plan = Projector.project(definition, form)
 
-      assert [%{id: nil, label: nil, message: "is incomplete"}] = plan.summary
-      assert [%RenderNode.Group{children: [street]}] = plan.root.children
+      assert [%RenderNode.Group{children: [street]} = address_group] = plan.root.children
+
+      assert [%{id: id, label: "Address", message: "is incomplete"}] = plan.summary
+      assert id == address_group.dom.container
+
       assert %RenderNode.Field{errors: [], show_errors?: false} = street
       assert street.field.name == "payload[address][street]"
       assert street.field.value == "Main"
+    end
+
+    # #34: the target index is keyed by exact occurrence path with no
+    # prefix/ancestor matching, so an issue below a rendered object but with
+    # no rendered node of its own must not fall back to that object's
+    # fieldset — "address" is rendered, but ["address", "zipcode"] names no
+    # node the definition declares.
+    test "an issue at an unrendered path does not fall back to a rendered ancestor's fieldset" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"address", %{kind: :object, properties: [{"street", %{kind: :string}}]}}
+          ]
+        })
+
+      form =
+        summary_form([issue(["address", "zipcode"], "is invalid")],
+          params: %{"address" => %{"street" => "Main"}}
+        )
+
+      plan = Projector.project(definition, form)
+
+      assert [%{id: nil, label: nil, message: "is invalid"}] = plan.summary
+    end
+
+    # D-033 guarantees each supported occurrence renders exactly once, so
+    # this shape cannot arise from real preparation — it is exercised
+    # directly against `Summary.build/2` to prove the invariant fails loudly
+    # instead of one group's target silently winning over the other's.
+    test "two prepared object groups claiming the same occurrence path is an invariant failure" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"address", %{kind: :object, properties: [{"street", %{kind: :string}}]}}
+          ]
+        })
+
+      occurrence = InstancePath.new!(["address"])
+
+      duplicate_group = fn container ->
+        %RenderNode.Group{
+          legend: "Address",
+          dom: %RenderNode.GroupDOM{container: container, help: container <> "-help"},
+          kind: :object,
+          occurrence_path: occurrence,
+          children: []
+        }
+      end
+
+      root = %RenderNode.Group{
+        legend: "/",
+        dom: %RenderNode.GroupDOM{container: "root", help: "root-help"},
+        kind: :object,
+        occurrence_path: InstancePath.new!([]),
+        children: [duplicate_group.("address-a"), duplicate_group.("address-b")]
+      }
+
+      form = summary_form([issue(["address"], "is incomplete")])
+
+      ctx = %{
+        source: form.source,
+        root_form: form,
+        root_instance_path: InstancePath.new!([]),
+        definition: definition
+      }
+
+      assert_raise ArgumentError, ~r/two rendered object groups claim/, fn ->
+        Formentation.Phoenix.RenderPreparation.Summary.build(root, ctx)
+      end
     end
 
     # D-027: an unsupported node carries a name a reader can recognize, so

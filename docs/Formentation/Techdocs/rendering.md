@@ -12,14 +12,14 @@ status: current
 
 # Rendering
 
-*As of 2026-08-07 (`RenderNode.Group` carries explicit `kind`/`occurrence_path`
-provenance so semantic objects and presentation groups stay distinguishable —
-groundwork for linking object-level error-summary entries to their rendered
-fieldset, [GitHub issue #34](https://github.com/kioopi/formentation/issues/34),
-not yet implemented; summary construction extracted to `RenderPreparation.Summary`
-with entries promoted to `RenderPlan.SummaryEntry` structs — an internal
-refactor, no behaviour change; validated projection roots, projected native
-Phoenix forms, nested subtree summaries,
+*As of 2026-08-07 (object-level error-summary entries link to their rendered
+fieldset, keyed off `RenderNode.Group`'s `kind`/`occurrence_path` provenance,
+[GitHub issue #34](https://github.com/kioopi/formentation/issues/34) —
+fieldset focusability (`tabindex="-1"` on the target) not yet implemented;
+summary construction extracted to `RenderPreparation.Summary` with entries
+promoted to `RenderPlan.SummaryEntry` structs — an internal refactor, no
+behaviour change; validated projection roots, projected native Phoenix
+forms, nested subtree summaries,
 and explicit generic FormData route, [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]; native presentation traversal and semantic-index-backed
 projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]; DOM identity, [[18-decisions#D-034 — Phoenix renderer DOM identities are typed and injective|D-034]]; group help, [[18-decisions#D-036 — Group help uses prepared Phoenix identities|D-036]]; prepared `role`/`required?` on `RenderNode.Field`, [[18-decisions#D-043 — Semantic `role` and schema `required?` join `value_type` as flat prepared facts|D-043]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
 
@@ -182,12 +182,25 @@ It combines two sources:
 - **Object entries** — root and object-level issues never appear in
   Phoenix's per-field `field.errors` convention. The projector asks the
   source's `StateView.issues/2` for the complete, normalized, adapter-ordered
-  list and keeps the entries with no matching field node (`id: nil`, no
-  link target), filtered by `issue_visibility/3`. `Formentation.Form`
-  answers `{:ok, issues}`; a source with no enumeration capability answers
+  list, filtered by `issue_visibility/3`. `Formentation.Form` answers
+  `{:ok, issues}`; a source with no enumeration capability answers
   `:unavailable` and the summary degrades honestly to the field entries
   only — the degradation is keyed on what `issues/2` reports, not on the
-  source's module.
+  source's module. An issue whose path names a rendered `:object` group
+  links to that group's fieldset, using the group's `legend` as the label
+  ([GitHub issue #34](https://github.com/kioopi/formentation/issues/34)).
+  `Summary` builds this occurrence-path → target index once per `build/2`
+  call by walking `root.children` (never `root` itself — `fields/1` never
+  renders the projection root's own fieldset, native or nested, so a
+  root-of-form or nested-projection-root issue always stays unlinked) and
+  indexing every rendered `:object` group by its exact `occurrence_path`,
+  reading the id from the group's already-prepared `dom.container` rather
+  than reconstructing one from the issue's path. The lookup is an exact
+  match with no ancestor fallback: an issue below a rendered object but
+  with no rendered node of its own stays unlinked rather than targeting an
+  enclosing fieldset. A `:presentation_group` is walked for its descendant
+  objects but is never a link target itself, since it owns no semantic
+  occurrence.
 
 A nested projected form's plan carries a summary scoped to its own subtree,
 but `fields/1` does not render it by default: the summary is owned by the

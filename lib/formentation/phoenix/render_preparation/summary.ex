@@ -9,6 +9,15 @@ defmodule Formentation.Phoenix.RenderPreparation.Summary do
   together: field-level entries are read off the already-prepared `RenderNode`
   tree, and root/object/unsupported-node entries are read from `StateView.issues/2`,
   since those never enter Phoenix's per-field error convention.
+
+  An object-level issue links to its rendered fieldset when one exists (#34):
+  `object_targets/1` indexes every `:object` group in `root.children` by its
+  `occurrence_path`, and a non-field issue whose path matches links to that
+  group's `dom.container`, labelled with its `legend`. `root` itself is never
+  indexed — `fields/1` never renders the projection root's own fieldset,
+  native or nested — so a root-of-form or nested-projection-root issue always
+  stays unlinked, and a `:presentation_group` is never a link target since it
+  owns no semantic occurrence.
   """
 
   alias Formentation.{Definition, Info, InstancePath}
@@ -41,7 +50,7 @@ defmodule Formentation.Phoenix.RenderPreparation.Summary do
   @spec build(RenderNode.Group.t(), ctx()) :: [RenderPlan.SummaryEntry.t()]
   def build(root, ctx) do
     if submitted?(ctx) do
-      field_entries(root) ++ non_field_entries(ctx)
+      field_entries(root) ++ non_field_entries(root, ctx)
     else
       []
     end
@@ -88,22 +97,66 @@ defmodule Formentation.Phoenix.RenderPreparation.Summary do
             ],
        do: :control
 
-  defp non_field_entries(ctx) do
+  defp non_field_entries(root, ctx) do
     case StateView.issues(ctx.source, ctx.root_form) do
       :unavailable ->
         []
 
       {:ok, issues} ->
+        targets = object_targets(root)
+
         issues
         |> Enum.filter(&(inside_projection?(ctx, &1) and non_field_visible?(ctx, &1)))
-        |> Enum.map(
-          &RenderPlan.SummaryEntry.from_target(
-            %{id: nil, label: summary_label(ctx, &1.path)},
-            &1.message
-          )
-        )
+        |> Enum.map(&non_field_entry(&1, ctx, targets))
     end
   end
+
+  defp non_field_entry(%StateView.Issue{path: path, message: message}, ctx, targets) do
+    case Map.fetch(targets, path) do
+      {:ok, target} ->
+        RenderPlan.SummaryEntry.from_target(target, message)
+
+      :error ->
+        RenderPlan.SummaryEntry.from_target(%{id: nil, label: summary_label(ctx, path)}, message)
+    end
+  end
+
+  # Indexes every rendered `:object` group under `root` (never `root` itself
+  # — see moduledoc) by its exact occurrence path, so `non_field_entry/3` can
+  # look a matching issue's target up directly instead of reconstructing a
+  # DOM id from the issue's path. A `:presentation_group` is skipped but its
+  # children are still walked, since a semantic object can render inside a
+  # presentation-only wrapper.
+  defp object_targets(%RenderNode.Group{children: children}) do
+    Enum.reduce(children, %{}, &index_object_target/2)
+  end
+
+  defp index_object_target(%RenderNode.Field{}, index), do: index
+
+  defp index_object_target(%RenderNode.Group{kind: :presentation_group} = group, index) do
+    Enum.reduce(group.children, index, &index_object_target/2)
+  end
+
+  defp index_object_target(%RenderNode.Group{kind: :object} = group, index) do
+    target = %{id: group.dom.container, label: group.legend}
+
+    index
+    |> put_object_target(group.occurrence_path, target)
+    |> then(fn index -> Enum.reduce(group.children, index, &index_object_target/2) end)
+  end
+
+  # D-033 guarantees each supported occurrence renders exactly once, so two
+  # `:object` groups claiming the same path is an internal invariant failure,
+  # not a case for the theme or a source to trigger.
+  defp put_object_target(index, path, target) do
+    if Map.has_key?(index, path) do
+      invariant!("two rendered object groups claim the same occurrence #{inspect(path)}")
+    end
+
+    Map.put(index, path, target)
+  end
+
+  defp invariant!(message), do: raise(ArgumentError, "invalid prepared tree: " <> message)
 
   # Unlike show_errors?/3 (used for fields), :default counts as visible here:
   # non_field_entries/1 only runs from build/2 once submitted?(ctx) is
