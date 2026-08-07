@@ -12,7 +12,9 @@ status: current
 
 # Rendering
 
-*As of 2026-08-07 (validated projection roots, projected native Phoenix forms, nested subtree summaries,
+*As of 2026-08-07 (summary construction extracted to `RenderPreparation.Summary` with entries
+promoted to `RenderPlan.SummaryEntry` structs — an internal refactor, no behaviour change;
+validated projection roots, projected native Phoenix forms, nested subtree summaries,
 and explicit generic FormData route, [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]; native presentation traversal and semantic-index-backed
 projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]; DOM identity, [[18-decisions#D-034 — Phoenix renderer DOM identities are typed and injective|D-034]]; group help, [[18-decisions#D-036 — Group help uses prepared Phoenix identities|D-036]]; prepared `role`/`required?` on `RenderNode.Field`, [[18-decisions#D-043 — Semantic `role` and schema `required?` join `value_type` as flat prepared facts|D-043]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
 
@@ -64,11 +66,17 @@ are both presentation-hidden and semantically read-only project to nothing.
 One struct per render node shape:
 
 - `Formentation.Phoenix.RenderPlan` — `root` (a `RenderNode.Group`),
-  `summary` (the submit-gated error-summary entries, `%{id, label,
-  message}`), `diagnostics` (projection-time `Diagnostic`s, e.g.
-  `:widget_fallback`). Planning-note fields with no Phase 1 behavior
-  (fingerprint, active branches, item identities) are omitted, not
-  stubbed.
+  `summary` (the submit-gated error-summary entries, each a
+  `RenderPlan.SummaryEntry{id, label, message}`), `diagnostics`
+  (projection-time `Diagnostic`s, e.g. `:widget_fallback`). Planning-note
+  fields with no Phase 1 behavior (fingerprint, active branches, item
+  identities) are omitted, not stubbed.
+- `Formentation.Phoenix.RenderPlan.SummaryEntry` — `message` (enforced) plus
+  a nilable `id` and `label`. `id` is the DOM id to link to, `nil` for an
+  entry with no rendered target; `label` is the prefix the message carries,
+  `nil` when the message stands alone. Both entry sources below build
+  entries through `SummaryEntry.from_target/2`, which takes the `%{id, label}`
+  pair a source resolves and the message it carries.
 - `Formentation.Phoenix.RenderNode.Group` — `legend`, `help`, `dom`, `children`.
   `dom` is a `GroupDOM{container, help}` prepared even for the structural root.
   Semantic objects and presentation groups both project to this one render shape.
@@ -140,6 +148,14 @@ unvalidated map source), or a `:checkbox` hint on a non-boolean field
 diagnostic on the plan.
 
 ## Error summary
+
+`Formentation.Phoenix.RenderPreparation.Summary` owns this construction —
+`prepare/2` hands it the finished render tree and the four context facts it
+reads (`source`, `root_form`, `root_instance_path`, `definition`), and nothing
+else. The narrowed parameter is the boundary: summary construction works from
+an already-prepared tree and the source's `StateView`, never from the
+namespace or traversal state the projection walk carries, so it cannot grow a
+dependency on either.
 
 `plan.summary` is populated only when `StateView.submitted?/2` answers
 `true` for `form.source`; otherwise it is `[]`. For a `%Formentation.Form{}`
