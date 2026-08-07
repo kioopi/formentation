@@ -143,6 +143,22 @@ defmodule Formentation.FacadeTest do
     end
   end
 
+  describe "form/2 option partitioning" do
+    test "strips data: and defaults: while forwarding other options in order" do
+      Formentation.form(form_declaration(),
+        adapter: SpyAdapter,
+        max_depth: 5,
+        data: %{"priority" => "high"},
+        notify: self(),
+        defaults: :apply,
+        max_nodes: 100
+      )
+
+      assert_received {:spy_adapter_opts, opts}
+      assert opts == [max_depth: 5, notify: self(), max_nodes: 100]
+    end
+  end
+
   describe "compile/2 custom module adapters" do
     test "accepts a custom module exporting compile/2" do
       declaration = %{kind: :object, properties: [{"name", %{kind: :string}}]}
