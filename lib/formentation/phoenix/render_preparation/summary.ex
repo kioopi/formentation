@@ -43,8 +43,10 @@ defmodule Formentation.Phoenix.RenderPreparation.Summary do
   defp field_entries(%RenderNode.Field{widget: :hidden_input}), do: []
 
   defp field_entries(%RenderNode.Field{show_errors?: true} = node) do
+    target = %{id: summary_target(node), label: node.label}
+
     for {message, _opts} <- node.errors do
-      summary_entry(summary_target(node), node.label, message)
+      RenderPlan.SummaryEntry.from_target(target, message)
     end
   end
 
@@ -79,7 +81,12 @@ defmodule Formentation.Phoenix.RenderPreparation.Summary do
       {:ok, issues} ->
         issues
         |> Enum.filter(&(inside_projection?(ctx, &1) and non_field_visible?(ctx, &1)))
-        |> Enum.map(&summary_entry(nil, summary_label(ctx, &1.path), &1.message))
+        |> Enum.map(
+          &RenderPlan.SummaryEntry.from_target(
+            %{id: nil, label: summary_label(ctx, &1.path)},
+            &1.message
+          )
+        )
     end
   end
 
@@ -121,9 +128,6 @@ defmodule Formentation.Phoenix.RenderPreparation.Summary do
       _root_object_or_unknown -> nil
     end
   end
-
-  defp summary_entry(id, label, message),
-    do: %RenderPlan.SummaryEntry{id: id, label: label, message: message}
 
   defp humanize(name) do
     name |> String.replace("_", " ") |> String.capitalize()
