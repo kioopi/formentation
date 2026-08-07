@@ -5,7 +5,10 @@ defmodule Formentation do
   `Formentation.Info`.
   """
 
-  alias Formentation.{Definition, Diagnostic}
+  alias Formentation.{Definition, Diagnostic, Form}
+
+  @form_initialization_options [:defaults]
+  @form_owned_options [:data | @form_initialization_options]
 
   @doc """
   Compiles a declaration using the source adapter given as `adapter:`;
@@ -33,6 +36,34 @@ defmodule Formentation do
     {selection, opts} = take_adapter!(opts)
     adapter = resolve_adapter!(selection)
     adapter.compile(source, opts)
+  end
+
+  @doc """
+  Compiles a declaration and initializes a `Formentation.Form` in one step.
+
+  `adapter:` selects the source adapter as in `compile/2`. `data:` is the
+  initial instance (defaults to `%{}`); `defaults:` passes through to
+  `Formentation.Form.new/3`. All remaining options pass through to the
+  adapter unchanged.
+
+  Returns `{:ok, form, diagnostics}` on successful compilation, or
+  `{:error, diagnostics}` without initializing a form when compilation
+  fails.
+  """
+  @spec form(term(), keyword()) ::
+          {:ok, Form.t(), [Diagnostic.t()]} | {:error, [Diagnostic.t()]}
+  def form(source, opts) do
+    data = Keyword.get(opts, :data, %{})
+    initialization_opts = Keyword.take(opts, @form_initialization_options)
+    compiler_opts = Keyword.drop(opts, @form_owned_options)
+
+    case compile(source, compiler_opts) do
+      {:ok, definition, diagnostics} ->
+        {:ok, Form.new(definition, data, initialization_opts), diagnostics}
+
+      {:error, diagnostics} ->
+        {:error, diagnostics}
+    end
   end
 
   defp resolve_adapter!(:map), do: Formentation.Source.Map

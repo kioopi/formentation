@@ -1,6 +1,8 @@
 defmodule Formentation.FacadeTest do
   use ExUnit.Case, async: true
 
+  alias Formentation.Form
+
   defmodule SpyAdapter do
     @moduledoc false
     @behaviour Formentation.Source
@@ -92,6 +94,34 @@ defmodule Formentation.FacadeTest do
 
       assert error.message =~ inspect(Enum)
       assert error.message =~ "compile/2"
+    end
+  end
+
+  describe "form/2 success path" do
+    defp form_declaration do
+      %{
+        kind: :object,
+        properties: [{"priority", %{kind: :string, default: "normal"}}]
+      }
+    end
+
+    test "delegates to compile/2 then Form.new/3, matching a manual call" do
+      {:ok, definition, diagnostics} = Formentation.compile(form_declaration(), adapter: :map)
+      expected_form = Form.new(definition, %{"priority" => "high"}, defaults: :apply)
+
+      assert Formentation.form(form_declaration(),
+               adapter: :map,
+               data: %{"priority" => "high"},
+               defaults: :apply
+             ) == {:ok, expected_form, diagnostics}
+    end
+
+    test "defaults :data to %{} when omitted" do
+      {:ok, definition, diagnostics} = Formentation.compile(form_declaration(), adapter: :map)
+      expected_form = Form.new(definition)
+
+      assert Formentation.form(form_declaration(), adapter: :map) ==
+               {:ok, expected_form, diagnostics}
     end
   end
 
