@@ -22,6 +22,7 @@ defmodule Formentation.Phoenix.RenderPreparation.Context do
 
   alias Formentation.{Definition, Info, InstancePath}
   alias Formentation.Phoenix.{ProjectedForm, StateView}
+  alias Formentation.Phoenix.RenderPreparation.Summary
 
   @missing_namespace ~S"""
                      Formentation cannot mint DOM ids without a namespace. Give the form a name or an id
@@ -94,6 +95,120 @@ defmodule Formentation.Phoenix.RenderPreparation.Context do
               "Phoenix form is not a valid Formentation projection (#{inspect(reason)}); " <>
                 "rebuild it through Phoenix.HTML.FormData.to_form/2 or inputs_for"
     end
+  end
+
+  @doc """
+  Moves the cursor to `parent` and returns the segments the caller must
+  descend its form through to match it.
+
+  A descriptor reachable from this context sits either at the projection root
+  — its own parent is at or above the root, so the cursor stays put and
+  nothing is descended — or strictly below it, where the cursor moves and the
+  caller descends the segments between the root and `parent`. The root path
+  was already validated by `resolve/2`, so there is no malformed-root case
+  left for traversal to handle.
+
+  ## Example
+
+      iex> {:ok, definition, []} =
+      ...>   Formentation.compile(
+      ...>     %{kind: :object, properties: [{"address", %{kind: :object, properties: [{"street", %{kind: :string}}]}}]},
+      ...>     adapter: Formentation.Source.Map
+      ...>   )
+      iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
+      iex> ctx = Formentation.Phoenix.RenderPreparation.Context.resolve(form, definition: definition)
+      iex> {descent, moved} = Formentation.Phoenix.RenderPreparation.Context.cursor_to(ctx, ["address"])
+      iex> {descent, moved.path}
+      {["address"], ["address"]}
+  """
+  @spec cursor_to(t(), [InstancePath.segment()]) :: {[InstancePath.segment()], t()}
+  def cursor_to(%__MODULE__{} = ctx, parent) when is_list(parent) do
+    if below_root?(ctx, parent) do
+      {Enum.drop(parent, length(ctx.root_path)), %__MODULE__{ctx | path: parent}}
+    else
+      {[], %__MODULE__{ctx | path: ctx.root_path}}
+    end
+  end
+
+  defp below_root?(ctx, parent),
+    do: InstancePath.ancestor_or_self?(ctx.root_instance_path, InstancePath.new!(parent))
+
+  @doc """
+  Decides whether the cursor may move to `path` while projecting an object.
+
+  Returns `:self` when `path` is where the cursor already sits, `{:child,
+  segment, ctx}` when `path` is a direct child — `segment` being the one the
+  caller must descend its form into — and `:error` for anything else. What an
+  `:error` *means* is the caller's to say: only `RenderPreparation` knows that
+  a non-child object descriptor is an internal invariant failure rather than a
+  user-reachable condition, so this function reports the fact and leaves the
+  error vocabulary on the traversal side.
+
+  ## Example
+
+      iex> {:ok, definition, []} =
+      ...>   Formentation.compile(
+      ...>     %{kind: :object, properties: [{"address", %{kind: :object, properties: [{"street", %{kind: :string}}]}}]},
+      ...>     adapter: Formentation.Source.Map
+      ...>   )
+      iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
+      iex> ctx = Formentation.Phoenix.RenderPreparation.Context.resolve(form, definition: definition)
+      iex> {:child, segment, moved} = Formentation.Phoenix.RenderPreparation.Context.enter(ctx, ["address"])
+      iex> {segment, moved.path}
+      {"address", ["address"]}
+
+      iex> {:ok, definition, []} =
+      ...>   Formentation.compile(
+      ...>     %{kind: :object, properties: [{"address", %{kind: :object, properties: [{"street", %{kind: :string}}]}}]},
+      ...>     adapter: Formentation.Source.Map
+      ...>   )
+      iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
+      iex> ctx = Formentation.Phoenix.RenderPreparation.Context.resolve(form, definition: definition)
+      iex> Formentation.Phoenix.RenderPreparation.Context.enter(ctx, ["address", "street"])
+      :error
+  """
+  @spec enter(t(), [InstancePath.segment()]) ::
+          :self | {:child, InstancePath.segment(), t()} | :error
+  def enter(%__MODULE__{path: path} = _ctx, path), do: :self
+
+  def enter(%__MODULE__{} = ctx, path) when is_list(path) do
+    if Enum.drop(path, -1) == ctx.path and length(path) == length(ctx.path) + 1 do
+      {:child, List.last(path), %__MODULE__{ctx | path: path}}
+    else
+      :error
+    end
+  end
+
+  @doc """
+  Returns the narrower slice of this context that `Summary.build/2` reads.
+
+  `Summary` owns the shape — see its `t:Formentation.Phoenix.RenderPreparation.Summary.ctx/0`
+  — because summary construction works only from the already-prepared render
+  tree and the source's `StateView`, never from namespace or traversal state.
+  Naming the slice here rather than taking it at the call site means renaming a
+  context field breaks this function instead of silently handing `Summary` a
+  map with a key missing.
+
+  ## Example
+
+      iex> {:ok, definition, []} =
+      ...>   Formentation.compile(
+      ...>     %{kind: :object, properties: [{"email", %{kind: :string}}]},
+      ...>     adapter: Formentation.Source.Map
+      ...>   )
+      iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
+      iex> ctx = Formentation.Phoenix.RenderPreparation.Context.resolve(form, definition: definition)
+      iex> ctx |> Formentation.Phoenix.RenderPreparation.Context.summary_view() |> Map.keys() |> Enum.sort()
+      [:definition, :root_form, :root_instance_path, :source]
+  """
+  @spec summary_view(t()) :: Summary.ctx()
+  def summary_view(%__MODULE__{} = ctx) do
+    %{
+      source: ctx.source,
+      root_form: ctx.root_form,
+      root_instance_path: ctx.root_instance_path,
+      definition: ctx.definition
+    }
   end
 
   defp build(definition, form, root_path, opts) do

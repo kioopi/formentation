@@ -111,11 +111,10 @@ defmodule Formentation.Phoenix.RenderPreparation do
         raise_path_error!("the node is unsupported and cannot render", segments, ctx.root_path)
 
       {:ok, descriptor} ->
-        parent = descriptor_parent_path(descriptor)
-        {starting_form, cursor} = subtree_cursor(parent, form, ctx)
+        {descent, ctx} = Context.cursor_to(ctx, descriptor_parent_path(descriptor))
 
         {render, _diagnostics} =
-          project_descriptor(descriptor, starting_form, %{ctx | path: cursor})
+          project_descriptor(descriptor, descend(form, descent), ctx)
 
         render
     end
@@ -150,18 +149,6 @@ defmodule Formentation.Phoenix.RenderPreparation do
       [nested] = Phoenix.HTML.FormData.to_form(form.source, form, segment, [])
       nested
     end)
-  end
-
-  # A descriptor reachable from this context sits either at the projection
-  # root (its own parent is above the root) or strictly below it. The root
-  # path has already been validated by resolve_context/2, so there is
-  # no malformed-root case left for traversal to handle.
-  defp subtree_cursor(parent, form, ctx) do
-    if InstancePath.ancestor_or_self?(ctx.root_instance_path, InstancePath.new!(parent)) do
-      {descend(form, Enum.drop(parent, length(ctx.root_path))), parent}
-    else
-      {form, ctx.root_path}
-    end
   end
 
   defp project_descriptor(%Presentation.Object{semantic_path: path} = object, form, ctx) do
@@ -218,17 +205,20 @@ defmodule Formentation.Phoenix.RenderPreparation do
     end
   end
 
-  defp object_context(_object, path, form, %{path: path} = ctx), do: {form, ctx}
-
   defp object_context(_object, path, form, ctx) do
-    if Enum.drop(path, -1) == ctx.path and length(path) == length(ctx.path) + 1 do
-      [nested] = Phoenix.HTML.FormData.to_form(form.source, form, List.last(path), [])
-      {nested, %{ctx | path: path}}
-    else
-      invariant!(
-        "object descriptor path #{inspect(path)} is not a direct child of " <>
-          "projection path #{inspect(ctx.path)}"
-      )
+    case Context.enter(ctx, path) do
+      :self ->
+        {form, ctx}
+
+      {:child, segment, ctx} ->
+        [nested] = Phoenix.HTML.FormData.to_form(form.source, form, segment, [])
+        {nested, ctx}
+
+      :error ->
+        invariant!(
+          "object descriptor path #{inspect(path)} is not a direct child of " <>
+            "projection path #{inspect(ctx.path)}"
+        )
     end
   end
 
@@ -336,7 +326,5 @@ defmodule Formentation.Phoenix.RenderPreparation do
 
   defp submitted?(ctx), do: StateView.submitted?(ctx.source, ctx.root_form)
 
-  defp summary(root, ctx),
-    do:
-      Summary.build(root, Map.take(ctx, [:source, :root_form, :root_instance_path, :definition]))
+  defp summary(root, ctx), do: Summary.build(root, Context.summary_view(ctx))
 end

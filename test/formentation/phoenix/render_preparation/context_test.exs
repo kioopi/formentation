@@ -165,4 +165,112 @@ defmodule Formentation.Phoenix.RenderPreparation.ContextTest do
       assert native.root_path == generic.root_path
     end
   end
+
+  defp root_context, do: Context.resolve(native_form(nested_definition()), [])
+
+  defp nested_context do
+    definition = nested_definition()
+    state = Form.new(definition, %{"address" => %{"street" => "Elm"}})
+    root = FormData.to_form(state, as: "asset[payload]", id: "asset_payload")
+    [address] = FormData.to_form(state, root, :address, [])
+
+    Context.resolve(address, [])
+  end
+
+  describe "cursor_to/2" do
+    test "a path below the root moves the cursor and reports the descent" do
+      {descent, moved} = Context.cursor_to(root_context(), ["address"])
+
+      assert descent == ["address"]
+      assert moved.path == ["address"]
+    end
+
+    test "the root itself descends nothing and leaves the cursor at the root" do
+      ctx = root_context()
+      {descent, moved} = Context.cursor_to(ctx, [])
+
+      assert descent == []
+      assert moved.path == ctx.root_path
+    end
+
+    test "a nested projection reports the descent relative to its own root" do
+      ctx = nested_context()
+      assert ctx.root_path == ["address"]
+
+      {descent, moved} = Context.cursor_to(ctx, ["address"])
+
+      assert descent == []
+      assert moved.path == ["address"]
+    end
+
+    test "a path above the nested root parks the cursor at the root" do
+      ctx = nested_context()
+      {descent, moved} = Context.cursor_to(ctx, [])
+
+      assert descent == []
+      assert moved.path == ["address"]
+    end
+
+    test "a sibling of the nested root parks the cursor at the root" do
+      ctx = nested_context()
+      {descent, moved} = Context.cursor_to(ctx, ["title"])
+
+      assert descent == []
+      assert moved.path == ["address"]
+    end
+
+    test "never rewrites root_path or root_instance_path" do
+      ctx = root_context()
+      {_descent, moved} = Context.cursor_to(ctx, ["address"])
+
+      assert moved.root_path == ctx.root_path
+      assert moved.root_instance_path == ctx.root_instance_path
+    end
+  end
+
+  describe "enter/2" do
+    test "the current path is :self" do
+      ctx = root_context()
+
+      assert Context.enter(ctx, ctx.path) == :self
+    end
+
+    test "a direct child reports its segment and moves the cursor" do
+      assert {:child, "address", moved} = Context.enter(root_context(), ["address"])
+      assert moved.path == ["address"]
+    end
+
+    test "a grandchild is rejected" do
+      assert Context.enter(root_context(), ["address", "street"]) == :error
+    end
+
+    test "a same-length sibling is rejected" do
+      {:child, _segment, at_address} = Context.enter(root_context(), ["address"])
+
+      assert Context.enter(at_address, ["title"]) == :error
+    end
+
+    test "an unrelated path is rejected" do
+      assert Context.enter(root_context(), ["nope", "deeper"]) == :error
+    end
+  end
+
+  describe "summary_view/1" do
+    test "returns exactly the keys Summary declares" do
+      view = Context.summary_view(root_context())
+
+      assert Map.keys(view) |> Enum.sort() ==
+               [:definition, :root_form, :root_instance_path, :source] |> Enum.sort()
+    end
+
+    test "carries the context's own values" do
+      ctx = root_context()
+      view = Context.summary_view(ctx)
+
+      assert view.definition == ctx.definition
+      assert view.root_form == ctx.root_form
+      assert view.root_instance_path == ctx.root_instance_path
+      assert view.source == ctx.source
+    end
+  end
 end
