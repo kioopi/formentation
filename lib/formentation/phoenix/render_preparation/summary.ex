@@ -22,6 +22,7 @@ defmodule Formentation.Phoenix.RenderPreparation.Summary do
 
   alias Formentation.{Definition, Info, InstancePath}
   alias Formentation.Phoenix.{RenderNode, RenderPlan, StateView}
+  alias Formentation.Phoenix.RenderPreparation.Visibility
 
   @typedoc """
   The slice of `RenderPreparation`'s projection context this module reads.
@@ -49,14 +50,12 @@ defmodule Formentation.Phoenix.RenderPreparation.Summary do
   """
   @spec build(RenderNode.Group.t(), ctx()) :: [RenderPlan.SummaryEntry.t()]
   def build(root, ctx) do
-    if submitted?(ctx) do
+    if Visibility.submitted?(%{source: ctx.source, root_form: ctx.root_form}) do
       field_entries(root) ++ non_field_entries(root, ctx)
     else
       []
     end
   end
-
-  defp submitted?(ctx), do: StateView.submitted?(ctx.source, ctx.root_form)
 
   defp field_entries(%RenderNode.Group{children: children}) do
     Enum.flat_map(children, &field_entries/1)
