@@ -1314,6 +1314,21 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
              ] = plan.summary
     end
 
+    # The rest of this file matches summary entries with plain map patterns,
+    # which a bare map satisfies just as well as the struct. This is the one
+    # assertion that pins the type itself, and it covers both entry sources
+    # in one plan: a field entry and a normalized non-field entry.
+    test "entries of both kinds are SummaryEntry structs" do
+      form =
+        summary_form([issue([], "root problem")],
+          errors: [operating_hours: {"is invalid", []}]
+        )
+
+      plan = Projector.project(scalar_definition(), form)
+
+      assert [%RenderPlan.SummaryEntry{}, %RenderPlan.SummaryEntry{}] = plan.summary
+    end
+
     test "a :hide answer omits a non-field issue from a submitted summary" do
       form =
         summary_form([issue(["b"], "hidden problem")], visibility: %{["b"] => :hide})

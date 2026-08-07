@@ -119,8 +119,9 @@ defmodule Formentation.MixProject do
     # and the RenderNode.* structs keep their moduledocs on purpose
     # (`h Formentation.Phoenix.RenderPlan` in IEx is supported), so this filter
     # is the only thing keeping them out of the published docs. The string
-    # prefix, rather than a list, covers RenderNode.FieldDOM/GroupDOM and any
-    # future sibling without a list edit.
+    # prefixes, rather than a list, cover the documented structs nested under
+    # an already-excluded parent — RenderNode.FieldDOM/GroupDOM,
+    # RenderPlan.SummaryEntry — and any future sibling without a list edit.
     module in [
       Formentation.Phoenix.ProjectedForm,
       Formentation.Phoenix.RenderPreparation,
@@ -128,7 +129,11 @@ defmodule Formentation.MixProject do
       Formentation.Phoenix.ReferenceComponents,
       Formentation.Phoenix.RenderPlan,
       Formentation.Phoenix.RenderNode
-    ] or String.starts_with?(Atom.to_string(module), "Elixir.Formentation.Phoenix.RenderNode.")
+    ] or
+      String.starts_with?(Atom.to_string(module), [
+        "Elixir.Formentation.Phoenix.RenderNode.",
+        "Elixir.Formentation.Phoenix.RenderPlan."
+      ])
   end
 
   defp package do

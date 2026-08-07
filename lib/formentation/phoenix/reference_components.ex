@@ -46,7 +46,7 @@ defmodule Formentation.Phoenix.ReferenceComponents do
       iex> import Phoenix.LiveViewTest
       iex> html =
       ...>   render_component(&Formentation.Phoenix.ReferenceComponents.error_summary/1,
-      ...>     summary: [%{id: "email", label: "Email", message: "is required"}]
+      ...>     summary: [%Formentation.Phoenix.RenderPlan.SummaryEntry{id: "email", label: "Email", message: "is required"}]
       ...>   )
       iex> html =~ ~s(role="alert") and html =~ ~s(href="#email")
       true

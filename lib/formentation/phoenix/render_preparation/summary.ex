@@ -12,7 +12,7 @@ defmodule Formentation.Phoenix.RenderPreparation.Summary do
   """
 
   alias Formentation.{Info, InstancePath}
-  alias Formentation.Phoenix.{RenderNode, StateView}
+  alias Formentation.Phoenix.{RenderNode, RenderPlan, StateView}
 
   @doc """
   Returns the summary entries for `root`, or `[]` when `ctx` is not submitted.
@@ -23,7 +23,7 @@ defmodule Formentation.Phoenix.RenderPreparation.Summary do
   `definition` are read here). Entry order is: field entries in tree order,
   then non-field entries in the state view's authoritative order.
   """
-  @spec build(RenderNode.Group.t(), map()) :: [Formentation.Phoenix.RenderPlan.summary_entry()]
+  @spec build(RenderNode.Group.t(), map()) :: [Formentation.Phoenix.RenderPlan.SummaryEntry.t()]
   def build(root, ctx) do
     if submitted?(ctx) do
       field_entries(root) ++ non_field_entries(ctx)
@@ -122,7 +122,8 @@ defmodule Formentation.Phoenix.RenderPreparation.Summary do
     end
   end
 
-  defp summary_entry(id, label, message), do: %{id: id, label: label, message: message}
+  defp summary_entry(id, label, message),
+    do: %RenderPlan.SummaryEntry{id: id, label: label, message: message}
 
   defp humanize(name) do
     name |> String.replace("_", " ") |> String.capitalize()

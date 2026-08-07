@@ -12,6 +12,7 @@ defmodule Formentation.Phoenix.RenderPlan do
   second time.
   """
 
+  alias __MODULE__.SummaryEntry
   alias Formentation.Diagnostic
   alias Formentation.InstancePath
   alias Formentation.Phoenix.RenderNode
@@ -19,16 +20,10 @@ defmodule Formentation.Phoenix.RenderPlan do
   @enforce_keys [:root]
   defstruct [:root, root_path: [], summary: [], diagnostics: []]
 
-  @type summary_entry :: %{
-          id: String.t() | nil,
-          label: String.t() | nil,
-          message: String.t()
-        }
-
   @type t :: %__MODULE__{
           root: RenderNode.Group.t(),
           root_path: [InstancePath.segment()],
-          summary: [summary_entry()],
+          summary: [SummaryEntry.t()],
           diagnostics: [Diagnostic.t()]
         }
 end
