@@ -343,6 +343,17 @@ defmodule Formentation.Phoenix.ReferenceComponentsTest do
 
       assert Floki.attribute(find_one(doc, "input[type=checkbox]"), "required") == []
     end
+
+    test "schema required? never becomes the HTML required attribute by itself" do
+      # D-010: a required string field with a schema-valid empty value gets no
+      # HTML required attribute. required? carries the schema fact for
+      # presentation (e.g. an asterisk) only — the theme must not derive the
+      # native constraint from it. See D-043.
+      doc = render_field(required?: true, validations: [])
+
+      input = find_one(doc, "input[type=text]")
+      assert Floki.attribute(input, "required") == []
+    end
   end
 
   describe "select" do
