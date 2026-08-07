@@ -362,7 +362,8 @@ defmodule Formentation.Phoenix.RenderPreparation do
        validations: Phoenix.HTML.Form.input_validations(form, field.field),
        errors: field.errors,
        show_errors?: show_errors?(field, ctx, path),
-       read_only?: node.read_only?
+       read_only?: node.read_only?,
+       required?: node.required?
      }, diagnostics}
   end
 
