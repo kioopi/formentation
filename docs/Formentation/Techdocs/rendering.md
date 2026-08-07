@@ -12,9 +12,9 @@ status: current
 
 # Rendering
 
-*As of 2026-08-05 (validated projection roots, projected native Phoenix forms, nested subtree summaries,
+*As of 2026-08-07 (validated projection roots, projected native Phoenix forms, nested subtree summaries,
 and explicit generic FormData route, [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]; native presentation traversal and semantic-index-backed
-projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]; DOM identity, [[18-decisions#D-034 — Phoenix renderer DOM identities are typed and injective|D-034]]; group help, [[18-decisions#D-036 — Group help uses prepared Phoenix identities|D-036]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
+projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]; DOM identity, [[18-decisions#D-034 — Phoenix renderer DOM identities are typed and injective|D-034]]; group help, [[18-decisions#D-036 — Group help uses prepared Phoenix identities|D-036]]; prepared `role`/`required?` on `RenderNode.Field`, [[18-decisions#D-043 — Semantic `role` and schema `required?` join `value_type` as flat prepared facts|D-043]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
 
 ## Render preparation data flow
 
@@ -80,14 +80,20 @@ One struct per render node shape:
   the object's own fieldset is rendered.
 - `Formentation.Phoenix.RenderNode.Field` — `widget`, `field` (the
   `%Phoenix.HTML.FormField{}`, carrying Phoenix id/name/value), `label`, `dom`,
-  normalized semantic `value_type`, `help`,
+  normalized semantic `value_type`, source `role` (an atom hint like `:email`
+  or `:date`, or `nil`), schema `required?`, `help`,
   `options`, `validations` (`Phoenix.HTML.Form.input_validations/2`,
   precomputed so the theme never calls back), `errors`, `show_errors?`,
   `read_only?`. `dom` is a `FieldDOM{control, container, help, errors,
   options}`. `control` names scalar controls (and hidden inputs); `container`
   names a composite widget's container, currently a radio group's fieldset.
   Options retain source scalar values (`String.t() | number() | boolean()`),
-  and option ids are positionally parallel to them.
+  and option ids are positionally parallel to them. `role` and `required?`
+  are prepared meaning facts (D-043): a theme reads them directly, without
+  consulting a `Definition` or source adapter. `required?` is the schema fact
+  only — it is presentation/accessibility-only and never becomes the native
+  HTML `required` attribute, which continues to come solely from
+  `validations[:required]` under D-010's policy.
 
 `show_errors?` is computed once during render preparation, so components never
 inspect `_unused_` markers or `form.action` (D-014, D-027). The source's

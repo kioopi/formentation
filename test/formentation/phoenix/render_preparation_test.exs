@@ -460,6 +460,41 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
                single_field_plan(%{kind: :number, hidden: true}).root.children
     end
 
+    test "threads semantic role onto the prepared field" do
+      assert [%RenderNode.Field{role: :email}] =
+               single_field_plan(%{kind: :string, role: :email}).root.children
+
+      assert [%RenderNode.Field{role: :date}] =
+               single_field_plan(%{kind: :string, role: :date}).root.children
+    end
+
+    test "threads the inferred semantic role when the source field omits a role" do
+      assert [%RenderNode.Field{role: :text}] =
+               single_field_plan(%{kind: :string}).root.children
+    end
+
+    test "required? defaults to false when the field is not schema-required" do
+      assert [%RenderNode.Field{required?: false}] =
+               single_field_plan(%{kind: :string}).root.children
+    end
+
+    test "threads schema requiredness onto the prepared field, independent of the HTML required attribute" do
+      definition =
+        compile!(%{
+          kind: :object,
+          required: ["f"],
+          properties: [{"f", %{kind: :string}}]
+        })
+
+      form = FormData.to_form(Form.new(definition), as: "payload")
+      plan = Projector.project(definition, form)
+
+      # Required string fields keep the empty value schema-valid (D-010), so
+      # the compiler intentionally omits the HTML `required` attribute here.
+      assert [%RenderNode.Field{required?: true, validations: validations}] = plan.root.children
+      refute Keyword.has_key?(validations, :required)
+    end
+
     test "infers from options, value type, and role" do
       assert {:text_input, []} = single_widget(%{kind: :string})
       assert {:select, []} = single_widget(%{kind: :string, one_of: ["a", "b"]})
