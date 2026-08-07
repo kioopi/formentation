@@ -12,7 +12,8 @@ status: current
 
 # Rendering
 
-*As of 2026-08-07 (object-level error-summary entries link to their rendered,
+*As of 2026-08-07 (projection-context resolution and cursor ownership extracted
+to `RenderPreparation.Context`; object-level error-summary entries link to their rendered,
 focusable fieldset, keyed off `RenderNode.Group`'s `kind`/`occurrence_path`
 provenance, [GitHub issue #34](https://github.com/kioopi/formentation/issues/34);
 summary construction extracted to `RenderPreparation.Summary` with entries
@@ -38,6 +39,15 @@ group), returning `nil` when the node deliberately renders nothing, and
 raising for an unknown or unsupported path. `prepare/1,2` and `prepare_at/2,3`
 accept an explicit `dom_namespace`; otherwise they use `form.id || form.name` and
 raise with an actionable error when neither exists.
+
+`RenderPreparation.Context` owns the projection-context boundary: it selects
+the native or generic entry branch, validates the projection root, selects the
+DOM namespace, and owns the traversal cursor. It never depends on
+`Phoenix.HTML.FormData`; `cursor_to/2` returns the relative segment descent
+distance and the moved context, while `RenderPreparation` performs the actual
+form descent and traverses the descriptors. `enter/2` similarly reports the
+direct child segment without coupling context resolution to Phoenix form
+construction.
 
 The walk consumes `Formentation.Info.presentation_root/1` and
 `presentation_at/2`. Those queries read the native `Definition.presentation`

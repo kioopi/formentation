@@ -953,6 +953,34 @@ fields are additive and internal, gated out of published docs the same way
 [[#D-035 — Phoenix rendering prepares and consumes DOM identities|D-035]]'s
 `FieldDOM`/`GroupDOM` are.
 
+## D-045 — Render preparation context owns identity and cursor movement
+
+*2026-08-07*
+
+**Context.** `RenderPreparation` had accumulated two separate concerns: resolving
+whether a Phoenix form was native or generic, and moving the traversal cursor
+while walking presentation descriptors. Keeping those writes in the projector
+made it possible for `path`, `root_path`, and `root_instance_path` to drift,
+and extracting resolution alone would leave the cursor's ownership split.
+
+**Decision.** `RenderPreparation.Context` owns projection-context resolution,
+root validation, namespace selection, and every cursor write. It deliberately
+does not depend on `Phoenix.HTML.FormData`: `cursor_to/2` returns the relative
+segments that the traversal must descend, and `enter/2` returns the direct
+child segment. `RenderPreparation` remains responsible for descriptor traversal
+and the actual Phoenix form descent.
+
+`InstancePath` deliberately gains no `parent/1`. The root descriptor has empty
+segments, and `cursor_to/2` relies on `Enum.drop([], -1) == []` reaching the
+at-or-above-root branch; a parent helper would either lie about the root or
+introduce a `nil` case into a cursor operation that already has the right
+boundary semantics.
+
+**Consequences.** Context state is a struct with one authoritative cursor path;
+the native and generic branches share the same downstream context shape, and
+the Phoenix dependency stays on the traversal side of the boundary. This is an
+internal extraction with no rendering or public API behaviour change.
+
 ## Related notes
 
 - [[19-north-star-architecture|North-star architecture]]
