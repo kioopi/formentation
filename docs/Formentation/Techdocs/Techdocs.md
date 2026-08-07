@@ -24,9 +24,9 @@ status: draft
 Start with [[end-to-end-data-flow|End-to-end data flow]] for the shape of the whole system; the notes after it are layer-by-layer deep dives.
 
 0. [[end-to-end-data-flow|End-to-end data flow]] — one form followed through every layer that exists, and what crosses each boundary. **Written.**
-1. [[compile-pipeline|Compile pipeline]] — architecture overview: how a declaration becomes a queryable `Definition`, and where that pipeline ends. **Written.**
+1. [[compile-pipeline|Compile pipeline]] — architecture overview: how a declaration becomes a queryable `Definition`, and where that pipeline ends; includes the compile-and-initialize façade (`form/2`). **Written.**
 2. [[definition-and-node|Definition and Node]] — the static `Definition` container and the semantic `Node` tree. **Written.**
-3. [[source-adapters|Source adapters]] — the `Formentation.Source` behaviour, its two implementations, and the differential property that keeps them equivalent. **Written.**
+3. [[source-adapters|Source adapters]] — how adapters are selected (built-in selectors and module extension), the `Formentation.Source` behaviour and its two implementations, and the differential property that keeps them equivalent. **Written.**
 4. [[paths-and-identity|Paths and identity]] — `TemplatePath` · `InstancePath` · `NodeId` · `JSONPointer`, the four coordinate spaces a node lives in. **Written.**
 5. [[diagnostics-and-origins|Diagnostics and origins]] — the `Diagnostic`/`Issue` split, what produces diagnostics, and the simplified provenance model. **Written.**
 6. [[form-state-and-transitions|Form state and transitions]] — the runtime state model, transport normalization, and the decode policy. **Written.**

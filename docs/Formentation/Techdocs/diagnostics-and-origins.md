@@ -11,7 +11,7 @@ status: current
 
 # Diagnostics and origins
 
-> [!note] As of 2026-07-25 · source-neutral validation dispatch
+> [!note] As of 2026-08-07 · adapter selection and diagnostics
 > Describes the explainability model as built: the `Diagnostic` struct,
 > the origin tags nodes carry, the guards, and the one *projection*-time
 > diagnostic that now exists. The full `Decision` / `Info.explain/3`
@@ -80,6 +80,14 @@ The two severities are not a rendering hint; they determine what
 This is what makes the "degrade, don't crash" principle checkable rather
 than aspirational: adversarial or partially-unsupported input must land
 in the second row.
+
+Adapter-*selection* failures — a missing, unknown, or invalid `adapter:` —
+sit deliberately outside this model. They raise `ArgumentError` instead of
+producing a diagnostic, because no adapter has run: there is no
+declaration position or provenance to attach one to, and folding a
+configuration mistake into `{:error, diagnostics}` would make it
+indistinguishable from a declaration that genuinely failed to compile
+([[18-decisions#D-046 — Adapter resolution failures raise; compilation failures stay diagnostics|D-046]]).
 
 ## What produces diagnostics
 
