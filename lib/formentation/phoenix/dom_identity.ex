@@ -34,6 +34,30 @@ defmodule Formentation.Phoenix.DOMIdentity do
   end
 
   @doc """
+  Returns one `{:option, index}` field id per entry in `options`, in order.
+
+  Only the number of options is read — their values never reach the id, which
+  is what keeps option ids stable when a source relabels a choice. `nil` and
+  `[]` both yield `[]`, so a caller can pass a field's `options` straight
+  through without unwrapping the no-options case.
+
+      iex> path = Formentation.InstancePath.new!(["color"])
+      iex> Formentation.Phoenix.DOMIdentity.field_options("asset_payload", path, ["red", "blue"])
+      ["ftn--asset_payload--field--option_0--color", "ftn--asset_payload--field--option_1--color"]
+
+      iex> path = Formentation.InstancePath.new!(["color"])
+      iex> Formentation.Phoenix.DOMIdentity.field_options("asset_payload", path, nil)
+      []
+  """
+  @spec field_options(String.t(), InstancePath.t(), [term()] | nil) :: [String.t()]
+  def field_options(_namespace, %InstancePath{}, nil), do: []
+  def field_options(_namespace, %InstancePath{}, []), do: []
+
+  def field_options(namespace, %InstancePath{} = path, options) when is_list(options) do
+    Enum.with_index(options, fn _option, index -> field(namespace, path, {:option, index}) end)
+  end
+
+  @doc """
   Returns the DOM id of an object container or help element.
 
       iex> path = Formentation.InstancePath.new!(["address"])

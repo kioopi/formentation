@@ -17,8 +17,9 @@ focusable fieldset, keyed off `RenderNode.Group`'s `kind`/`occurrence_path`
 provenance, [GitHub issue #34](https://github.com/kioopi/formentation/issues/34);
 summary construction extracted to `RenderPreparation.Summary` with entries
 promoted to `RenderPlan.SummaryEntry` structs, and widget resolution extracted
-to `RenderPreparation.Widget` behind a typed `resolve/2` — internal refactors,
-no behaviour change; validated projection roots, projected native Phoenix
+to `RenderPreparation.Widget` behind a typed `resolve/2`, with field option ids
+consolidated into `DOMIdentity.field_options/3` — internal refactors, no
+behaviour change; validated projection roots, projected native Phoenix
 forms, nested subtree summaries,
 and explicit generic FormData route, [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]; native presentation traversal and semantic-index-backed
 projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]; DOM identity, [[18-decisions#D-034 — Phoenix renderer DOM identities are typed and injective|D-034]]; group help, [[18-decisions#D-036 — Group help uses prepared Phoenix identities|D-036]]; prepared `role`/`required?` on `RenderNode.Field`, [[18-decisions#D-043 — Semantic `role` and schema `required?` join `value_type` as flat prepared facts|D-043]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
@@ -308,6 +309,11 @@ enclosing occurrence path distinguishes repeated collection items. `part` is
 fieldset), and `option_<index>` names one radio input. These are separate token
 positions, so a field called `notes_help` and the help for `notes` cannot share
 an id.
+
+`DOMIdentity.field_options/3` mints a field's whole option-id list in one call,
+so every renderer-owned field id comes from `DOMIdentity`. It indexes positions
+only — option *values* never reach the id, so relabelling a choice in place
+leaves the ids its controls already carry untouched.
 
 The namespace moves when you render a subtree from its own form.
 `dom_namespace!/2` resolves `form.id || form.name`, and a nested form's id is

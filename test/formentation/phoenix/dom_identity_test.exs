@@ -109,6 +109,42 @@ defmodule Formentation.Phoenix.DOMIdentityTest do
     end
   end
 
+  describe "field_options/3" do
+    test "yields one id per option, indexed in order" do
+      assert DOMIdentity.field_options(@namespace, path(["condition"]), ["new", "used", "spares"]) ==
+               [
+                 "ftn--asset_payload--field--option_0--condition",
+                 "ftn--asset_payload--field--option_1--condition",
+                 "ftn--asset_payload--field--option_2--condition"
+               ]
+    end
+
+    test "treats no options and an empty option list alike" do
+      assert DOMIdentity.field_options(@namespace, path(["condition"]), nil) == []
+      assert DOMIdentity.field_options(@namespace, path(["condition"]), []) == []
+    end
+
+    test "agrees with field/3 called per index" do
+      options = ["a", "b", "c", "d"]
+      expected = for i <- 0..3, do: DOMIdentity.field(@namespace, path(["x"]), {:option, i})
+
+      assert DOMIdentity.field_options(@namespace, path(["x"]), options) == expected
+    end
+
+    # Option ids index positions, not values — a source relabelling a choice
+    # in place must not move the id its control already carries.
+    property "ids depend only on how many options there are, never on their values" do
+      check all(
+              count <- StreamData.integer(0..8),
+              options <- StreamData.list_of(StreamData.term(), length: count),
+              others <- StreamData.list_of(StreamData.term(), length: count)
+            ) do
+        assert DOMIdentity.field_options(@namespace, path(["x"]), options) ==
+                 DOMIdentity.field_options(@namespace, path(["x"]), others)
+      end
+    end
+  end
+
   describe "test decoder" do
     test "funnels malformed ids through one actionable error" do
       for id <- [

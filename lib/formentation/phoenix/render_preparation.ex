@@ -360,7 +360,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
       container: DOMIdentity.field(ctx.dom_namespace, instance_path, :container),
       help: DOMIdentity.field(ctx.dom_namespace, instance_path, :help),
       errors: DOMIdentity.field(ctx.dom_namespace, instance_path, :errors),
-      options: option_ids(node.options, ctx.dom_namespace, instance_path)
+      options: DOMIdentity.field_options(ctx.dom_namespace, instance_path, node.options)
     }
 
     {%RenderNode.Field{
@@ -378,15 +378,6 @@ defmodule Formentation.Phoenix.RenderPreparation do
        read_only?: node.read_only?,
        required?: node.required?
      }, diagnostics}
-  end
-
-  defp option_ids(nil, _namespace, _path), do: []
-  defp option_ids([], _namespace, _path), do: []
-
-  defp option_ids(options, namespace, path) do
-    Enum.map(Enum.with_index(options), fn {_option, index} ->
-      DOMIdentity.field(namespace, path, {:option, index})
-    end)
   end
 
   defp object_legend(%Presentation.Object{label: label, semantic_path: %{segments: []}}) do
