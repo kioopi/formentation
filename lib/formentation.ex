@@ -3,6 +3,23 @@ defmodule Formentation do
   Compile form declarations from pluggable sources into a static,
   source-independent `Formentation.Definition`, and query it through
   `Formentation.Info`.
+
+  Two entry points:
+
+    * `compile/2` — compile a declaration to a `Formentation.Definition` you
+      can cache, inspect, and reuse across many forms.
+    * `form/2` — compile and initialize a `Formentation.Form` in one step,
+      for callers that do not need the intermediate definition.
+
+  Both select their source with `adapter:`, which takes a built-in selector
+  (`:map`, `:json_schema`) or any module exporting `compile/2`. Selecting an
+  adapter is always explicit: a plain map may be either a map declaration or a
+  decoded JSON Schema, so the source is never inferred.
+
+  Adapter-selection mistakes — a missing, unknown, or invalid `adapter:` —
+  raise `ArgumentError`, because no adapter has run and there is no
+  declaration to attach a diagnostic to. Failures *compiling* a declaration
+  are ordinary `{:error, diagnostics}` results.
   """
 
   alias Formentation.{Definition, Diagnostic, Form}
@@ -48,11 +65,16 @@ defmodule Formentation do
   `adapter:` selects the source adapter as in `compile/2`. `data:` is the
   initial instance (defaults to `%{}`); `defaults:` passes through to
   `Formentation.Form.new/3`. All remaining options pass through to the
-  adapter unchanged.
+  adapter unchanged, keeping their order.
 
-  Returns `{:ok, form, diagnostics}` on successful compilation, or
-  `{:error, diagnostics}` without initializing a form when compilation
-  fails.
+  `:data` and `:defaults` are an explicit allowlist owned by initialization,
+  so an adapter that happens to take options by those names cannot receive
+  them here — use `compile/2` followed by `Formentation.Form.new/3` for that
+  case.
+
+  Returns `{:ok, form, diagnostics}` on successful compilation — including any
+  warnings, unchanged — or `{:error, diagnostics}` when compilation fails, in
+  which case no form is initialized.
 
       iex> declaration = %{
       ...>   kind: :object,

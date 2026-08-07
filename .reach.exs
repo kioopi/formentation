@@ -66,12 +66,20 @@
       {:core, :phoenix},
       {:source, :phoenix},
       {:json_schema, :phoenix},
-      # Core never selects a source adapter; Formentation.compile/2 receives
-      # one via the :adapter option.
+      # Core does not call into a source adapter; Formentation.compile/2
+      # receives one via the :adapter option.
+      #
+      # Sanctioned exception (D-046): Formentation.compile/2's resolver maps
+      # the built-in selectors :map and :json_schema onto adapter modules, so
+      # core does *name* both adapters. Those names are returned as values and
+      # dispatched dynamically, so no call edge exists and this rule stays
+      # green — the rule constrains calls, not literals. Keep it that way:
+      # core must never invoke an adapter function directly.
       {:core, :source},
-      # Core never names an adapter: instance validation dispatches through
+      # Core never calls an adapter: instance validation dispatches through
       # the Formentation.Validation behaviour (D-025), so there is no
-      # sanctioned core->json_schema edge.
+      # sanctioned core->json_schema call edge. See the D-046 note above for
+      # the name-only selector exception.
       {:core, :json_schema},
       # The source layer stays adapter-generic.
       {:source, :json_schema},

@@ -1010,9 +1010,14 @@ Symbolic selection is a closed, explicit mapping (`:map` →
 registry or source-shape inference — plain maps are inherently ambiguous
 between a map declaration and a decoded JSON Schema, so the adapter stays
 mandatory. Any other atom is accepted as a custom adapter module only when
-`Code.ensure_loaded?/1` and `function_exported?(adapter, :compile, 2)` both
-hold; this is a callable-contract check, not a `@behaviour` metadata check,
+`Code.ensure_compiled/1` succeeds and `function_exported?(adapter, :compile, 2)`
+holds; this is a callable-contract check, not a `@behaviour` metadata check,
 so third-party modules need not retain behaviour metadata at runtime.
+`Code.ensure_compiled/1` is used instead of `ensure_loaded?/1` because it
+waits for a module still being produced by the same `Kernel.ParallelCompiler`
+run — an adapter defined in the caller's own project would be intermittently
+rejected by `ensure_loaded?/1`, a silent regression against the compile-once-and-cache
+pattern the project encourages.
 
 `Formentation.form/2` treats `data:` and `defaults:` as an explicit
 initialization-owned allowlist, stripped before compiler options reach the
@@ -1032,6 +1037,33 @@ gives single-shot callers a compile-once-and-initialize path without
 duplicating `Form.new/3`'s default/apply/revalidate logic; callers who need
 compile-once/reuse continue to use `compile/2` followed by `Form.new/3`
 directly. No change to validation, decoding, submission, or persistence.
+
+Two consequences worth naming explicitly, because neither is visible from the
+public surface:
+
+*Core now names both built-in adapters.* `.reach.exs` forbids `{:core, :source}`
+and `{:core, :json_schema}`, and its comments previously read as "core never
+names an adapter" — the boundary
+[[#D-018 — Reach is the architecture gate|D-018]] and
+[[#D-025 — Instance validation dispatches through a source-neutral behaviour|D-025]]
+established. The closed selector mapping lives in core and therefore mentions
+`Formentation.Source.Map` and `Formentation.JSONSchema` literally. The gate
+still passes, but only because a module literal returned as a value is not a
+call edge that Reach can see — not because the invariant is untouched. The
+rule's comments were corrected to record this as a deliberate, name-only
+exception; the substantive prohibition (core must never *invoke* an adapter
+function directly) is unchanged, and no cycle is introduced.
+
+*The accepted adapter set is wider than "modules that look like adapters".*
+Because the check is `exports compile/2` rather than `implements
+Formentation.Source`, unrelated modules that happen to export `compile/2` —
+`Regex` and `:re` among them — resolve successfully and then return a shape
+that violates the documented three-element contract, surfacing as a
+`MatchError`/`CaseClauseError` at the call site rather than a clear rejection.
+This is accepted: the adapter is developer-supplied and never user input, and
+validating adapter return shapes is adapter-totality work belonging to
+[GitHub issue #6](https://github.com/kioopi/formentation/issues/6), not to
+selection.
 
 ## Related notes
 
