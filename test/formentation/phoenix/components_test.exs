@@ -7,7 +7,7 @@ defmodule Formentation.Phoenix.ComponentsTest do
   import Phoenix.LiveViewTest, only: [render_component: 2]
 
   alias Formentation.{Form, InstancePath, Params}
-  alias Formentation.Phoenix.DOMIdentity
+  alias Formentation.Phoenix.{DOMIdentity, StateView}
   alias Phoenix.HTML.FormData
 
   defp compile!(declaration) do
@@ -198,6 +198,59 @@ defmodule Formentation.Phoenix.ComponentsTest do
       find_one(doc, ~s(a[href="##{target}"]))
       find_one(doc, ~s(fieldset[id="#{target}"]))
       assert_all_references_resolve(doc)
+    end
+
+    # #34: the summary link and the focus target are two different
+    # concerns proved together — the href must resolve to exactly one
+    # fieldset, and that fieldset must be a valid, non-tab-stop focus
+    # target for the anchor to actually move focus somewhere meaningful.
+    test "an object-level issue links to a focusable fieldset" do
+      definition = nested_definition()
+
+      source = %Formentation.SourceFixture{
+        params: %{"serial_number" => "PX-01", "address" => %{"street" => "Elm"}},
+        submitted?: true,
+        issues:
+          {:ok,
+           [%StateView.Issue{path: InstancePath.new!(["address"]), message: "is incomplete"}]}
+      }
+
+      doc = parse!(render_fields(definition, FormData.to_form(source, as: "payload")))
+      target = DOMIdentity.object("payload", InstancePath.new!(["address"]), :container)
+
+      link = find_one(doc, ~s(a[href="##{target}"]))
+      assert Floki.text(link) =~ "Address"
+      assert Floki.text(link) =~ "is incomplete"
+
+      fieldset = find_one(doc, ~s(fieldset[id="#{target}"]))
+      assert Floki.attribute(fieldset, "tabindex") == ["-1"]
+
+      assert_all_references_resolve(doc)
+      assert_no_duplicate_ids(doc)
+    end
+
+    # A presentation-only group is never a summary target (#34), so it must
+    # not carry the same focus-target contract an `:object` fieldset does.
+    test "a presentation group's fieldset carries no tabindex" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [{"a", %{kind: :string}}, {"b", %{kind: :string}}],
+          groups: [%{id: "late", title: "Late", fields: ["a", "b"]}]
+        })
+
+      doc =
+        definition
+        |> Form.new()
+        |> FormData.to_form(as: "payload", id: "payload")
+        |> then(&render_fields(definition, &1))
+        |> parse!()
+
+      group_target =
+        DOMIdentity.group("payload", "/#late", InstancePath.new!([]), :container)
+
+      fieldset = find_one(doc, ~s(fieldset[id="#{group_target}"]))
+      assert Floki.attribute(fieldset, "tabindex") == []
     end
 
     test "a hidden field error does not produce an unusable summary link" do
