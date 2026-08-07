@@ -1,5 +1,6 @@
 defmodule Formentation.Phoenix.RenderPreparation.ContextTest do
   use ExUnit.Case, async: true
+  use ExUnitProperties
 
   doctest Formentation.Phoenix.RenderPreparation.Context
 
@@ -271,6 +272,119 @@ defmodule Formentation.Phoenix.RenderPreparation.ContextTest do
       assert view.root_form == ctx.root_form
       assert view.root_instance_path == ctx.root_instance_path
       assert view.source == ctx.source
+    end
+  end
+
+  # A definition deep enough that generated paths can be above, at, and below
+  # a nested projection root. Paths are drawn from its real segment names so
+  # every generated case is one traversal could actually produce.
+  defp deep_definition do
+    compile!(%{
+      kind: :object,
+      properties: [
+        {"title", %{kind: :string}},
+        {"address",
+         %{
+           kind: :object,
+           properties: [
+             {"street", %{kind: :string}},
+             {"geo", %{kind: :object, properties: [{"lat", %{kind: :string}}]}}
+           ]
+         }}
+      ]
+    })
+  end
+
+  defp deep_context(root_segments) do
+    definition = deep_definition()
+    state = Form.new(definition, %{"address" => %{"geo" => %{"lat" => "51.5"}}})
+    root = FormData.to_form(state, as: "payload", id: "payload")
+
+    Enum.reduce(root_segments, root, fn segment, form ->
+      key = %{"address" => :address, "geo" => :geo}[segment]
+      [nested] = FormData.to_form(state, form, key, [])
+      nested
+    end)
+    |> Context.resolve([])
+  end
+
+  @object_paths [[], ["address"], ["address", "geo"]]
+  @nested_object_paths [["address"], ["address", "geo"]]
+  @all_paths @object_paths ++ [["title"], ["address", "street"], ["address", "geo", "lat"]]
+
+  # Precomputed rather than filtered inside the property: the outside-the-
+  # projection space is six pairs, and drawing root and target from separate
+  # generators would need either a nested `check all` (100 x 100 runs over
+  # those six cases, each recompiling the definition) or a filter that
+  # discards most of what it draws. One generator over the real space also
+  # shrinks to a counterexample you can read.
+  @outside_pairs for root <- @nested_object_paths,
+                     target <- @all_paths,
+                     not List.starts_with?(target, root),
+                     do: {root, target}
+
+  describe "cursor properties" do
+    property "a resolved context starts on its own root" do
+      check all(root <- member_of(@object_paths)) do
+        ctx = deep_context(root)
+
+        assert ctx.path == ctx.root_path
+        assert ctx.root_path == ctx.root_instance_path.segments
+      end
+    end
+
+    property "descent always reconstructs the moved cursor from the root" do
+      check all(
+              root <- member_of(@object_paths),
+              target <- member_of(@all_paths)
+            ) do
+        ctx = deep_context(root)
+        {descent, moved} = Context.cursor_to(ctx, target)
+
+        assert ctx.root_path ++ descent == moved.path
+      end
+    end
+
+    property "a path outside the projection parks the cursor at the root" do
+      check all({root, target} <- member_of(@outside_pairs)) do
+        ctx = deep_context(root)
+
+        assert {[], moved} = Context.cursor_to(ctx, target)
+        assert moved.path == ctx.root_path
+      end
+    end
+
+    property "cursor_to never disturbs the root fields" do
+      check all(
+              root <- member_of(@object_paths),
+              target <- member_of(@all_paths)
+            ) do
+        ctx = deep_context(root)
+        {_descent, moved} = Context.cursor_to(ctx, target)
+
+        assert moved.root_path == ctx.root_path
+        assert moved.root_instance_path == ctx.root_instance_path
+        assert moved.definition == ctx.definition
+        assert moved.dom_namespace == ctx.dom_namespace
+      end
+    end
+
+    property "enter accepts exactly the direct children of the cursor" do
+      check all(
+              root <- member_of(@object_paths),
+              target <- member_of(@all_paths)
+            ) do
+        ctx = deep_context(root)
+
+        direct_child? =
+          Enum.drop(target, -1) == ctx.path and length(target) == length(ctx.path) + 1
+
+        case Context.enter(ctx, target) do
+          :self -> assert target == ctx.path
+          {:child, segment, _moved} -> assert direct_child? and segment == List.last(target)
+          :error -> refute direct_child? or target == ctx.path
+        end
+      end
     end
   end
 end
