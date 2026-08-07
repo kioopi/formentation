@@ -125,6 +125,7 @@ defmodule Formentation.MixProject do
     module in [
       Formentation.Phoenix.ProjectedForm,
       Formentation.Phoenix.RenderPreparation,
+      Formentation.Phoenix.RenderPreparation.Context,
       Formentation.Phoenix.RenderPreparation.Summary,
       Formentation.Phoenix.RenderPreparation.Widget,
       Formentation.Phoenix.ReferenceComponents,

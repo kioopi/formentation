@@ -1,17 +1,10 @@
 defmodule Formentation.Phoenix.RenderPreparation do
   @moduledoc false
 
-  alias Formentation.{Definition, Info, InstancePath, Semantic}
+  alias Formentation.{Info, InstancePath, Semantic}
   alias Formentation.Info.Presentation
-  alias Formentation.Phoenix.{DOMIdentity, ProjectedForm, RenderNode, RenderPlan, StateView}
-  alias Formentation.Phoenix.RenderPreparation.{Summary, Widget}
-
-  @missing_namespace ~S"""
-                     Formentation cannot mint DOM ids without a namespace. Give the form a name or an id
-                     (`to_form(state, as: "payload")` or `to_form(state, id: "payload")`), or pass
-                     `dom_namespace:` to Formentation.Phoenix.fields/1 or Formentation.Phoenix.field/1.
-                     """
-                     |> String.trim()
+  alias Formentation.Phoenix.{DOMIdentity, RenderNode, RenderPlan, StateView}
+  alias Formentation.Phoenix.RenderPreparation.{Context, Summary, Widget}
 
   @doc """
   Projects the whole definition against `form` into a render plan.
@@ -62,7 +55,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
   """
   @spec prepare(Phoenix.HTML.Form.t(), keyword()) :: RenderPlan.t()
   def prepare(%Phoenix.HTML.Form{} = form, opts) when is_list(opts) do
-    ctx = resolve_context(form, opts)
+    ctx = Context.resolve(form, opts)
     descriptor = presentation_root_at(ctx.definition, ctx.root_path)
     {root, diagnostics} = project_descriptor(descriptor, form, ctx)
 
@@ -107,7 +100,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
   def prepare_at(%Phoenix.HTML.Form{} = form, segments, opts)
       when is_list(segments) do
     %InstancePath{segments: segments} = InstancePath.new!(segments)
-    ctx = resolve_context(form, opts)
+    ctx = Context.resolve(form, opts)
     absolute_path = ctx.root_path ++ segments
 
     case Info.presentation_at(ctx.definition, absolute_path) do
@@ -128,98 +121,6 @@ defmodule Formentation.Phoenix.RenderPreparation do
     end
   end
 
-  # The projection cursor. `path` holds raw segments — an %InstancePath{}
-  # is built only where a path crosses into StateView — and `root_form`
-  # and `source` stay pinned to the form handed to prepare/2 or
-  # prepare_at/3, never a nested form built during traversal. Preparation
-  # always starts with the cursor on the projection root, so `path` and
-  # `root_path` are the same segments here; only traversal moves `path`.
-  defp context(definition, form, root_path, semantic_nodes, dom_namespace) do
-    validate_projection_root!(definition, root_path)
-
-    %{
-      definition: definition,
-      root_form: form,
-      source: form.source,
-      path: root_path,
-      root_path: root_path,
-      root_instance_path: InstancePath.new!(root_path),
-      semantic_nodes: semantic_nodes,
-      dom_namespace: dom_namespace
-    }
-  end
-
-  # Validating the root is not the same as building it. semantic_kind/2 is a
-  # single index lookup; presentation_root_at/2 materializes the descriptor
-  # tree recursively, and only prepare/2 consumes that. Building it here made
-  # every prepare_at/3 call — that is, every field/1 render — pay for
-  # whole-body presentation traversal to answer a question about one node.
-  defp validate_projection_root!(definition, root_path) do
-    case Info.semantic_kind(definition, root_path) do
-      :object ->
-        :ok
-
-      nil ->
-        raise ArgumentError, "projected form root #{inspect(root_path)} does not exist"
-
-      :unsupported ->
-        raise ArgumentError, "projected form root #{inspect(root_path)} is unsupported"
-
-      _field ->
-        raise ArgumentError, "projected form root #{inspect(root_path)} is not an object"
-    end
-  end
-
-  defp resolve_context(form, opts) do
-    case ProjectedForm.native_context(form) do
-      {:ok, %{definition: definition, root_path: %{segments: root_path}}} ->
-        validate_native_definition!(definition, Keyword.get(opts, :definition))
-
-        context(
-          definition,
-          form,
-          root_path,
-          Info.semantic_node_index(definition),
-          dom_namespace!(form, opts)
-        )
-
-      :not_native ->
-        definition = generic_definition!(opts)
-
-        context(
-          definition,
-          form,
-          [],
-          Info.semantic_node_index(definition),
-          dom_namespace!(form, opts)
-        )
-
-      {:error, reason} ->
-        raise ArgumentError,
-              "Phoenix form is not a valid Formentation projection (#{inspect(reason)}); " <>
-                "rebuild it through Phoenix.HTML.FormData.to_form/2 or inputs_for"
-    end
-  end
-
-  defp validate_native_definition!(_native, nil), do: :ok
-  defp validate_native_definition!(native, native), do: :ok
-
-  defp validate_native_definition!(_native, _provided) do
-    raise ArgumentError,
-          "the native form source definition is authoritative; remove the redundant definition assign"
-  end
-
-  defp generic_definition!(opts) do
-    case Keyword.get(opts, :definition) do
-      %Definition{} = definition ->
-        definition
-
-      _other ->
-        raise ArgumentError,
-              "render preparation requires a native projected form or a generic form plus definition:"
-    end
-  end
-
   defp presentation_root_at(definition, []), do: Info.presentation_root(definition)
 
   defp presentation_root_at(definition, root_path) do
@@ -230,7 +131,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
       other ->
         invariant!(
           "projection root #{inspect(root_path)} resolved to #{inspect(other)} " <>
-            "after validate_projection_root!/2 accepted it"
+            "after Context.resolve/2 accepted it as a projection root"
         )
     end
   end
@@ -438,9 +339,4 @@ defmodule Formentation.Phoenix.RenderPreparation do
   defp summary(root, ctx),
     do:
       Summary.build(root, Map.take(ctx, [:source, :root_form, :root_instance_path, :definition]))
-
-  defp dom_namespace!(form, opts) do
-    Keyword.get(opts, :dom_namespace) || form.id || form.name ||
-      raise ArgumentError, @missing_namespace
-  end
 end

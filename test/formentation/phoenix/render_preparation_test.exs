@@ -1694,6 +1694,19 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
     # incidental, so the pin can never validate a stale snapshot.
     @external_resource "lib/formentation/phoenix/render_preparation.ex"
 
+    # Preparation's source lives in two files since context resolution moved
+    # to RenderPreparation.Context. The obligations below are about the
+    # preparation *layer*, not about one file, so they scan both: a pin that
+    # names only render_preparation.ex keeps passing while the code it was
+    # written to constrain moves next door.
+    @context_source File.read!("lib/formentation/phoenix/render_preparation/context.ex")
+    @external_resource "lib/formentation/phoenix/render_preparation/context.ex"
+
+    @preparation_sources [
+      {"render_preparation.ex", @projector_source},
+      {"render_preparation/context.ex", @context_source}
+    ]
+
     # #28 requires one authoritative decoder of the private projection key.
     # Reach cannot express "no module but these two mentions this atom" — it
     # is a literal, not a call — so a source-text pin states it directly.
@@ -1727,22 +1740,31 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       refute source =~ ~r/\bIssue\b/
     end
 
-    test "the projector names no concrete runtime-state struct" do
-      refute @projector_source =~ "Formentation.Form"
-      refute @projector_source =~ "%Form{"
-      refute @projector_source =~ "SubmissionBlocker"
+    test "the preparation layer names no concrete runtime-state struct" do
+      for {file, source} <- @preparation_sources do
+        refute source =~ "Formentation.Form", "#{file} names Formentation.Form"
+        refute source =~ "%Form{", "#{file} matches on %Form{}"
+        refute source =~ "SubmissionBlocker", "#{file} names SubmissionBlocker"
+      end
     end
 
-    test "the projector never interprets the Phoenix action itself" do
-      refute @projector_source =~ "form.action"
-      refute @projector_source =~ "action: :submit"
+    test "the preparation layer never interprets the Phoenix action itself" do
+      for {file, source} <- @preparation_sources do
+        refute source =~ "form.action", "#{file} reads form.action"
+        refute source =~ "action: :submit", "#{file} interprets the submit action"
+      end
     end
 
-    test "the projector does not discover presentation from mixed storage" do
-      refute @projector_source =~ "Info.root("
-      refute @projector_source =~ ~r/\bdefinition\.root\b|%Definition\{root:/
-      refute @projector_source =~ "nests_data?"
-      refute @projector_source =~ "%Node.Group"
+    test "the preparation layer does not discover presentation from mixed storage" do
+      for {file, source} <- @preparation_sources do
+        refute source =~ "Info.root(", "#{file} calls Info.root/1"
+
+        refute source =~ ~r/\bdefinition\.root\b|%Definition\{root:/,
+               "#{file} reads mixed definition storage"
+
+        refute source =~ "nests_data?", "#{file} branches on nests_data?"
+        refute source =~ "%Node.Group", "#{file} names %Node.Group{}"
+      end
     end
 
     test "the preparation context validates the projection root without building it" do
@@ -1751,20 +1773,34 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       # field/1 render — materialize the whole presentation tree to answer a
       # question about one node. A wall-clock assertion would be flaky, so pin
       # the seam instead, in the idiom this block already uses.
-      assert @projector_source =~ "defp context(", "expected defp context/5 in the source"
-      [_head, after_head] = String.split(@projector_source, "defp context(", parts: 2)
-      [context_body, _rest] = String.split(after_head, "\n  end\n", parts: 2)
+      # Pin the constructor, not the validator: build/4 is what every
+      # resolve/2 call runs, so "the context validates its root" is a claim
+      # about build/4's body. Asserting inside validate_projection_root!/2
+      # instead would prove nothing about whether anything calls it.
+      assert @context_source =~ "defp build(", "expected defp build/4 in Context"
 
-      assert context_body =~ "validate_projection_root!"
-      refute context_body =~ "presentation_root_at"
+      [_head, after_head] = String.split(@context_source, "defp build(", parts: 2)
+      [build_body, _rest] = String.split(after_head, "\n  end\n", parts: 2)
 
-      # The claim above is narrower than it looks: it only pins that
-      # context/5's own body doesn't call presentation_root_at/2. Someone
-      # could move the eager build one level down, into
-      # validate_projection_root!/2 (still called from context/5), and
-      # reinstate the exact performance regression with the assertions
-      # above still green. Pin the real claim instead: presentation_root_at
-      # is called only from prepare/2. It appears three times in the source
+      assert build_body =~ "validate_projection_root!"
+
+      # The refute is module-wide rather than scoped to build/4's body:
+      # presentation_root_at/2 is private to RenderPreparation, so Context
+      # cannot call it under any circumstance and a scoped refute would be
+      # vacuous. The reachable regression is Context reaching for the same
+      # Info queries directly, anywhere in the file. Context resolution
+      # answers every question from the semantic index, never the
+      # presentation tree, so no Info.presentation query belongs here at all.
+      refute @context_source =~ "Info.presentation",
+             "Context materializes presentation descriptors"
+
+      # The claims above cover Context. The regression could also come back
+      # from the other side: RenderPreparation itself calling
+      # presentation_root_at/2 outside prepare/2 — from prepare_at/3, say,
+      # which would put whole-body traversal back on the field/1 path without
+      # Context being involved at all. So pin that too: presentation_root_at
+      # is called only from prepare/2. It appears three times in the projector
+      # source
       # by construction — its two `defp` clause heads plus exactly one call
       # site — and that one call site must be inside prepare/2's body.
       prepare_marker =
