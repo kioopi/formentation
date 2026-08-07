@@ -898,6 +898,61 @@ unless `summary={true}`/`summary={false}` says otherwise, so composing under
 
 **Consequences.** Custom themes can read semantic role and schema requiredness directly off the prepared node, matching D-038's promise for `value_type`, without consulting a definition or source adapter. D-010's invariant is preserved project-wide: no theme, reference or custom, can regress "required string with schema-valid empty value blocks submission" by conflating the two `required` facts, because the presentational fact and the HTML-constraint fact keep separate names and a test backstops the boundary. Explicitly deferred, and recorded as open questions in [[20-renderer-ui-model|Renderer and UI model]]: grouping `value_type`/`role`/`required?` into a dedicated "prepared meaning" sub-struct once a second UI implementation exists to pressure-test the shape, and a separate presentational override (e.g. `mark_as_required?`) that would let a theme mark a field as required in the UI independent of both `required?` and `validations[:required]`. No codec grammar, HTML constraint policy, or D-010 change is made by this decision.
 
+## D-044 — Object-level error-summary entries link to their prepared fieldset
+
+*2026-08-07*
+
+**Context.** [[#D-036 — Group help uses prepared Phoenix identities|D-036]] left
+group-level error-summary linking as explicitly separate work. Since then, root
+and object-level issues have reached the summary through
+[[#D-027 — Projection reads semantic state through a StateView protocol|D-027]]'s
+`StateView.issues/2`, but every one rendered as a plain, unlinked line —
+`id: nil` regardless of whether a fieldset existed to link to. [GitHub issue
+#34](https://github.com/kioopi/formentation/issues/34) reopened that gap: an
+`InstancePath` alone cannot say whether a fieldset was actually rendered at
+that path, or what DOM namespace it used, because
+[[#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]
+makes that depend on which projected form rendered it — the same absolute
+object path can carry different correct DOM ids, or none, depending on
+whether it is reached through the root form, a nested projected form, or an
+explicit `dom_namespace:` override.
+
+**Decision.** `RenderNode.Group` carries explicit provenance: `kind`
+(`:object` | `:presentation_group`, always set during preparation, never
+inferred from DOM-id text, legend content, or child shape) and
+`occurrence_path` (the occurrence's exact `InstancePath` for an `:object`
+group, `nil` for a presentation group). `RenderPreparation.Summary` builds an
+occurrence-path → `%{id, label}` target index once per plan by walking the
+*prepared* tree's `root.children` — never `root` itself, since `fields/1`
+never renders the projection root's own fieldset, native or nested — indexing
+every `:object` group by its exact `occurrence_path` and reading the id from
+its already-prepared `dom.container` rather than reconstructing one from the
+issue's path. A non-field issue whose path matches links to that target,
+labelled with the group's `legend`; a `:presentation_group` is walked for its
+descendant objects but is never a link target itself. The lookup is an exact
+match with no ancestor fallback, matching
+[[#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]'s
+existing `InstancePath.ancestor_or_self?/2` precedent of deciding
+path relationships in one shared place rather than approximating them per
+call site. An `:object` group's fieldset carries `tabindex="-1"`, the same
+non-tab-stop focus-target convention
+[[#D-034 — Phoenix renderer DOM identities are typed and injective|D-034]]'s
+radio-group container already used, so a linked anchor always resolves to a
+focusable target; a `:presentation_group` fieldset carries no `tabindex`.
+
+**Consequences.** An object-level issue is now indistinguishable in kind from
+a field-level one from the theme's perspective: both are `RenderPlan.SummaryEntry`
+structs with an `id`/`label`/`message`, both resolve to exactly one rendered,
+focusable element. A root-of-form or nested-projection-root issue, and an
+issue for an object with no rendered node of its own, remain unlinked — that
+degradation is intentional, not a gap. Presentation-only groups stay outside
+the summary-target surface entirely, since they own no semantic occurrence to
+key an index on. No change to `StateView.Issue`, issue ordering, visibility,
+or submission semantics; no new public API. `RenderNode.Group`'s two new
+fields are additive and internal, gated out of published docs the same way
+[[#D-035 — Phoenix rendering prepares and consumes DOM identities|D-035]]'s
+`FieldDOM`/`GroupDOM` are.
+
 ## Related notes
 
 - [[19-north-star-architecture|North-star architecture]]

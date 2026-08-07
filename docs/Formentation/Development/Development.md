@@ -123,6 +123,23 @@ As of 2026-07-26, the project direction is additionally frozen in
 These are target/planning documents; they deliberately do not
 rewrite current-state `Techdocs` or `Userguide` ahead of implementation.
 
+✅ Done (2026-08-07) — also supplementary, an accessibility feature orthogonal
+to the numbered steps: object-level error-summary entries now link to their
+rendered fieldset instead of always rendering unlinked ([GitHub issue
+#34](https://github.com/kioopi/formentation/issues/34)). `RenderNode.Group`
+carries explicit `kind`/`occurrence_path` provenance so semantic objects and
+presentation groups stay distinguishable even though both render as
+fieldsets; `RenderPreparation.Summary` builds an occurrence-path → target
+index from the prepared tree (never the plan's own root, so a root-of-form or
+nested-projection-root issue stays unlinked by design) and links a matching
+issue using the group's already-prepared container id and legend, with no
+ancestor fallback. An `:object` fieldset now carries `tabindex="-1"`, the
+radio-group convention, so a linked anchor always resolves to a focusable
+target; a presentation-only group carries none, since it owns no semantic
+occurrence to link. See
+[[18-decisions#D-044 — Object-level error-summary entries link to their prepared fieldset|D-044]]
+and the refreshed [[rendering|Rendering]] note.
+
 ## Related
 
 - [[13-roadmap|Planning/13 — Roadmap]]
