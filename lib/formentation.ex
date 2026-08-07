@@ -37,7 +37,20 @@ defmodule Formentation do
 
   defp resolve_adapter!(:map), do: Formentation.Source.Map
   defp resolve_adapter!(:json_schema), do: Formentation.JSONSchema
-  defp resolve_adapter!(adapter), do: adapter
+
+  defp resolve_adapter!(adapter) when is_atom(adapter) do
+    if Code.ensure_loaded?(adapter) and function_exported?(adapter, :compile, 2) do
+      adapter
+    else
+      raise ArgumentError, adapter_error_message(adapter)
+    end
+  end
+
+  defp resolve_adapter!(other), do: raise(ArgumentError, adapter_error_message(other))
+
+  defp adapter_error_message(value) do
+    "unsupported adapter #{inspect(value)}; use :map, :json_schema, or a module exporting compile/2"
+  end
 
   defp take_adapter!(opts) do
     missing = make_ref()
