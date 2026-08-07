@@ -12,10 +12,9 @@ status: current
 
 # Rendering
 
-*As of 2026-08-07 (object-level error-summary entries link to their rendered
-fieldset, keyed off `RenderNode.Group`'s `kind`/`occurrence_path` provenance,
-[GitHub issue #34](https://github.com/kioopi/formentation/issues/34) —
-fieldset focusability (`tabindex="-1"` on the target) not yet implemented;
+*As of 2026-08-07 (object-level error-summary entries link to their rendered,
+focusable fieldset, keyed off `RenderNode.Group`'s `kind`/`occurrence_path`
+provenance, [GitHub issue #34](https://github.com/kioopi/formentation/issues/34);
 summary construction extracted to `RenderPreparation.Summary` with entries
 promoted to `RenderPlan.SummaryEntry` structs — an internal refactor, no
 behaviour change; validated projection roots, projected native Phoenix
@@ -200,7 +199,10 @@ It combines two sources:
   with no rendered node of its own stays unlinked rather than targeting an
   enclosing fieldset. A `:presentation_group` is walked for its descendant
   objects but is never a link target itself, since it owns no semantic
-  occurrence.
+  occurrence. An `:object` group's fieldset carries `tabindex="-1"`, the
+  same convention a radio group's fieldset uses, so a linked entry's anchor
+  always resolves to a focusable, non-tab-stop target; a `:presentation_group`
+  fieldset carries no `tabindex`.
 
 A nested projected form's plan carries a summary scoped to its own subtree,
 but `fields/1` does not render it by default: the summary is owned by the

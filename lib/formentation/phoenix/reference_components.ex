@@ -9,7 +9,11 @@ defmodule Formentation.Phoenix.ReferenceComponents do
   @doc """
   Dispatches one render node: a `RenderNode.Group` becomes a
   `fieldset.ftn-group` with a legend, optional associated help, and recursive children, a
-  `RenderNode.Field` delegates to `field/1`.
+  `RenderNode.Field` delegates to `field/1`. An `:object` group's fieldset
+  carries `tabindex="-1"`, the same non-tab-stop focus-target convention a
+  radio group's fieldset uses, so a linked error-summary entry (#34) moves
+  focus somewhere meaningful. A `:presentation_group` carries no `tabindex`
+  — it owns no semantic occurrence, so it is never a summary target.
 
   ```heex
   <ReferenceComponents.node :for={child <- @plan.root.children} node={child} />
@@ -23,6 +27,7 @@ defmodule Formentation.Phoenix.ReferenceComponents do
     ~H"""
     <fieldset
       id={@node.dom.container}
+      tabindex={@node.kind == :object && "-1"}
       class="ftn-group"
       aria-describedby={@node.help && @node.dom.help}
     >
