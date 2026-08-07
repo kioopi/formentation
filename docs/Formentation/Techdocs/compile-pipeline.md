@@ -10,7 +10,7 @@ status: draft
 
 # Compile pipeline
 
-> [!note] As of 2026-07-23 · step 6 complete
+> [!note] As of 2026-08-07 · Wave 3 façade (A3) complete
 > Describes the compile pipeline as built. The `Node` representation uses one struct per kind ([[18-decisions#D-015 — One struct per node kind|D-015]]); this note stays at pipeline altitude and defers `Node` internals to [[definition-and-node|Definition and Node]].
 
 The **compile pipeline** turns a declarative form description into a static, source-independent [[definition-and-node|`Definition`]] that can be cached, inspected, and queried — with no runtime state attached. It is the first half of Formentation: everything here runs once, ahead of any user interaction. The runtime half consumes the `Definition` and is documented in [[form-state-and-transitions|Form state and transitions]], [[phoenix-form-data|the FormData projection]], and [[rendering|Rendering]]; [[end-to-end-data-flow|End-to-end data flow]] joins both halves into one walk.
@@ -36,6 +36,7 @@ flowchart TD
 	Ui --> Compile
 	Map --> Compile
     Def -. handoff .-> Runtime
+    Declaration -.->|"form/2 façade"| Runtime
 
     Paths["Paths and identity"]
     Diag["Diagnostics and origins"]
@@ -47,18 +48,23 @@ flowchart TD
 
 ## Stages
 
-### 1. Entry — `Formentation.compile/2`
+### 1. Entry — `Formentation.compile/2` and `Formentation.form/2`
 
-`compile(declaration, adapter: MyAdapter)` is the single public entry point. It pops the `:adapter` option, passes the rest through, and delegates to that adapter. It carries no logic of its own — source selection is the only decision made here.
+`compile(declaration, adapter: :map)` is one public entry point. It resolves `:adapter` — a stable built-in selector (`:map` for `Formentation.Source.Map`, `:json_schema` for `Formentation.JSONSchema`), or any module exporting `compile/2` (the extension route for third-party adapters) — passes the rest through, and delegates to that adapter. Resolution failures (a missing, unsupported, or invalid `:adapter`) raise `ArgumentError` at this boundary rather than producing a diagnostic, since no adapter has run yet. Beyond that resolution, it carries no logic of its own — source selection is the only decision made here. ([[18-decisions#D-046 — Adapter resolution failures raise; compilation failures stay diagnostics|D-046]])
 
-Contract:
+`Formentation.form/2` is the second public entry point: a compile-and-initialize façade. It extracts `data:` (defaulting to `%{}`) and `defaults:` from the option list for `Formentation.Form.new/3`, partitions them so an adapter can never receive `:data` or `:defaults` even if it takes options by those names (the escape hatch for that case is `compile/2` + `Form.new/3`), and forwards every other option to `compile/2` in original order. It only initializes a form after successful compilation; if compilation fails, the form is never built and `Form.new/3` is not called.
+
+Entry contract:
 
 ```elixir
 @spec compile(term(), keyword()) ::
         {:ok, Definition.t(), [Diagnostic.t()]} | {:error, [Diagnostic.t()]}
+
+@spec form(term(), keyword()) ::
+        {:ok, Form.t(), [Diagnostic.t()]} | {:error, [Diagnostic.t()]}
 ```
 
-A successful compile still returns diagnostics (warnings, unsupported constructs); `:error` is reserved for a declaration too malformed to yield a definition at all.
+A successful `compile/2` still returns diagnostics (warnings, unsupported constructs); `:error` is reserved for a declaration too malformed to yield a definition at all. A successful `form/2` returns a form (never a definition) and the same diagnostics; a compilation failure propagates unchanged and skips form initialization.
 
 ### 2. Source adapter — declaration → `Definition`
 
@@ -97,10 +103,10 @@ Two subsystems run through every stage rather than sitting at one:
 
 ## Where the pipeline ends
 
-The pipeline stops at `Info`. It produces meaning, not markup: no projection, no components, no HTML. The compiled `Definition` is the **handoff point** to the runtime layer (`Formentation.Form`, `Formentation.Codec`, `Formentation.Transport`), which combines it with values, params, and usage; the projection and rendering layers then turn that pairing into HTML.
+The pipeline stops at `Info`. It produces meaning, not markup: no projection, no components, no HTML. The compiled `Definition` is the **handoff point** to the runtime layer (`Formentation.Form`, `Formentation.Codec`, `Formentation.Transport`), which combines it with values, params, and usage; the projection and rendering layers then turn that pairing into HTML. The `form/2` façade composes both halves for callers who never need the intermediate definition; it calls `compile/2` first and reaches `Form.new/3` only once compilation has succeeded, so the handoff semantics are unchanged — the definition still crosses to the runtime exactly once, and never travels back.
 
 > [!info] Why the halves stay apart
-> A `Definition` never learns anything from a submission, and the runtime never rewrites one. That is what lets a definition be compiled once and shared across every request, user, and form instance that uses it — and what lets each layer be tested without the next. The full chain is drawn in [[end-to-end-data-flow|End-to-end data flow]].
+> A `Definition` never learns anything from a submission, and the runtime never rewrites one. That is what lets a definition be compiled once and shared across every request, user, and form instance that uses it — and what lets each layer be tested without the next. The full chain is drawn in [[end-to-end-data-flow|End-to-end data flow]]. `form/2` is single-shot for callers who compile and use once; `compile/2` + `Form.new/3` is the right choice when the definition is reused.
 
 ## Code map
 

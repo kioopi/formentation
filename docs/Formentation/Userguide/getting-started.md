@@ -10,7 +10,7 @@ status: current
 
 # Getting started
 
-*Covers Formentation as of 2026-08-03. Every snippet below was run
+*Covers Formentation as of 2026-08-07. Every snippet below was run
 against that version.*
 
 This page walks the whole loop once: declare a form, compile it, render
@@ -56,31 +56,62 @@ The full vocabulary is on [[declaring-with-the-map-source|the map source page]].
 [[declaring-with-json-schema|that adapter]] instead — everything from
 step 2 on is identical.
 
-## 2 · Compile it
+## 2 · Compile and initialize
+
+The simplest path: compile the declaration and create a form in one call.
 
 ```elixir
-{:ok, definition, diagnostics} =
-  Formentation.compile(declaration, adapter: Formentation.Source.Map)
+{:ok, form, diagnostics} =
+  Formentation.form(declaration, adapter: :map, data: %{"email" => "ada@example.com"})
 
 diagnostics
 #=> []
 ```
 
-The result is a `Formentation.Definition`: a static, inert description of
-the form. It holds no values, no errors, and no DOM ids, which means you
-can **compile it once and reuse it** — at application boot, in a module
-attribute, or behind a cache. Compiling per request works too, but it is
-never necessary.
+`Formentation.form/2` returns `{:ok, form, diagnostics}` on successful
+compilation — `diagnostics` may carry warnings even on success — or
+`{:error, diagnostics}` when the declaration cannot be compiled, in which
+case no form is created.
 
-`diagnostics` is a list of `Formentation.Diagnostic` structs — warnings
-that did not prevent compilation, such as a construct outside the
-supported subset. A successful compile can still return them, so it is
-worth logging them rather than matching on `[]`. A declaration too broken
-to compile at all returns `{:error, diagnostics}` instead.
+The `adapter:` option is mandatory and selects your source:
+- `:map` for `Formentation.Source.Map` — plain Elixir declarations
+- `:json_schema` for `Formentation.JSONSchema` — JSON Schema 2020-12 documents
+- Any module exporting `compile/2` for third-party sources
 
-### Look at what you got
+A **bad `adapter:`** — one that is missing, unknown, or invalid — raises
+`ArgumentError` immediately. This is different from a declaration that
+fails to compile, which returns `{:error, diagnostics}` instead.
 
-Never pattern-match a definition's internals — ask `Formentation.Info`:
+The `data:` option is the existing form data (defaults to `%{}` for a
+blank form). To fill in declared defaults for absent keys, pass
+`defaults: :apply` — see [[declaring-with-the-map-source#Defaults|the note on defaults]] before you do.
+
+`data:` and `defaults:` are the initialization options; every other
+option passes straight through to the adapter unchanged, so `:ui` for
+JSON Schema, `:max_depth`, and `:max_nodes` all work through `form/2`
+too.
+
+`Formentation.Form` is the runtime state: the definition paired with the
+data this particular form opened on. It is immutable and pure — no
+process, no connection, no Phoenix. You can drive an entire interaction
+from IEx.
+
+### Two steps instead: compile once, reuse
+
+If you compile a form declaration once and use it across many forms — at
+application boot, in a module attribute, or behind a cache — split the
+work in two steps:
+
+```elixir
+{:ok, definition, diagnostics} =
+  Formentation.compile(declaration, adapter: :map)
+
+form = Formentation.Form.new(definition, %{"email" => "ada@example.com"})
+```
+
+`Formentation.compile/2` returns the `Formentation.Definition` — a static,
+inert description of the form that holds no values, no errors, and no DOM
+ids. Query it through `Formentation.Info`:
 
 ```elixir
 Formentation.Info.fields(definition) |> Enum.map(& &1.name)
@@ -108,22 +139,13 @@ The label came from your `title`; the role was *inferred* from the kind.
 Anything tagged `{:inference, _}` is a decision Formentation made for
 you.
 
-## 3 · Create form state
+Because the definition is inert, one compiled definition can back any
+number of forms: pair it with data through `Formentation.Form.new/3` as
+often as you need. Its second argument is the existing data (defaults to
+`%{}` for a blank form), and its `defaults: :apply` is the same option
+`form/2` forwards.
 
-```elixir
-form = Formentation.Form.new(definition, %{"email" => "ada@example.com"})
-```
-
-`Formentation.Form` is the runtime state: the definition paired with the
-data this particular form opened on. It is immutable and pure — no
-process, no connection, no Phoenix. You can drive an entire interaction
-from IEx.
-
-The second argument is the existing data (defaults to `%{}` for a blank
-form). To fill in declared defaults for absent keys, pass
-`defaults: :apply` — see [[declaring-with-the-map-source#Defaults|the note on defaults]] before you do.
-
-## 4 · Render it
+## 3 · Render it
 
 Convert the state into a Phoenix form and hand it to the `fields` component:
 
@@ -183,7 +205,7 @@ coincidences:
 only — they are never a substitute for the server-side decoding and
 validation in the next step.
 
-## 5 · Handle the submission
+## 4 · Handle the submission
 
 Submitted params go through `Formentation.Form.submit/2`. It runs the
 submit transition, then answers the application question directly:
@@ -270,8 +292,8 @@ have to do anything to get this.
 ## What you now have
 
 A complete round trip: declaration → definition → state → HTML →
-params → decoded JSON. Everything except step 4 is plain Elixir with no
-Phoenix involvement, which is why you can test each part on its own.
+params → decoded JSON. Everything except step 3 is plain Elixir with no
+Phoenix involvement, which is why you can test steps 1–2 on their own from IEx.
 
 ## Where to go next
 

@@ -12,17 +12,18 @@ status: current
 
 # Declaring a form with the map source
 
-*Covers Formentation as of 2026-07-26.*
+*Covers Formentation as of 2026-08-07.*
 
 `Formentation.Source.Map` takes a plain Elixir map. It has no
 dependencies, no separate hints document, and no schema validation — you
 write structure and presentation together, inline. It is the easiest
 source to start with and the one to use when your form is defined in
-Elixir rather than loaded from a JSON document.
+Elixir rather than loaded from a JSON document. Its stable selector is
+`:map` when passed to `compile/2` or `form/2`.
 
 ```elixir
 {:ok, definition, diagnostics} =
-  Formentation.compile(declaration, adapter: Formentation.Source.Map)
+  Formentation.compile(declaration, adapter: :map)
 ```
 
 If your forms come from JSON Schema documents, use
@@ -205,9 +206,11 @@ Formentation.Form.new(definition, %{}, defaults: :apply)
 Without `defaults: :apply` the candidate is `%{}` — the default is
 declared, and rendered as a hint to you, but not written into data.
 
-Defaults apply **only at `Form.new/3`**, never on a transition, and never
-over a provided value. That is what lets a user clear a field and have it
-stay cleared; a default that reasserted itself on every change would be
+Defaults apply **only at initialization** — at `Form.new/3` with
+`defaults: :apply`, or via `Formentation.form/2` with the same
+`defaults: :apply` option — never on a transition, and never over a
+provided value. That is what lets a user clear a field and have it stay
+cleared; a default that reasserted itself on every change would be
 impossible to override.
 
 ### Hidden and read-only
@@ -288,7 +291,7 @@ create renderable group members.
 Compilation reports what it could not do rather than failing:
 
 ```elixir
-{:ok, definition, diagnostics} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+{:ok, definition, diagnostics} = Formentation.compile(declaration, adapter: :map)
 
 Enum.map(diagnostics, &{&1.severity, &1.code, &1.message})
 #=> [
@@ -313,7 +316,8 @@ Warnings worth knowing about:
 An `:error` diagnostic means `compile/2` returned `{:error, diagnostics}`
 and there is no definition — a malformed declaration, a missing `:kind`,
 or an exhausted depth/node budget (defaults: depth 16, 1 000 nodes,
-overridable with `:max_depth` and `:max_nodes`).
+overridable with `:max_depth` and `:max_nodes`). These are **adapter
+options**, so they pass through `form/2` unchanged.
 
 ## Related
 

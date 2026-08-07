@@ -79,6 +79,12 @@ only addition is doing it once in `mount/3` too, so the first render
 already has a `Phoenix.HTML.Form` to hand to
 `Formentation.Phoenix.fields/1`.
 
+A LiveView that compiles on every mount rather than once at boot could
+use `Formentation.form/2` instead of the `compile/2` + `Form.new/3`
+pattern above — it combines both steps and is simpler when you don't need
+the intermediate definition to cache or inspect. See
+[[getting-started|Getting started]] for an example.
+
 ## Handlers: `validate/2` on change, `submit/2` on submit
 
 ```elixir

@@ -12,7 +12,7 @@ status: current
 
 # Form state and transitions
 
-> [!note] As of 2026-07-26 · content-derived nested-object presence (D-026); derived submission status (D-028); submit decision result (D-032)
+> [!note] As of 2026-08-07 · content-derived nested-object presence (D-026); derived submission status (D-028); submit decision result (D-032); form/2 façade (D-046)
 > Describes the runtime state layer as built: `Formentation.Form`,
 > `Formentation.Transport`, and `Formentation.Codec` — now including the
 > `validate/2`/`submit/2` LiveView entry points and the derived
@@ -235,6 +235,8 @@ into absent keys, and only there:
 Opting in is deliberate. A default that re-asserted itself on every
 transition would be indistinguishable from the user's own input and
 would make clearing a field impossible.
+
+`Formentation.form/2` forwards `data:` and `defaults:` here unchanged, so the same opt-in rule holds whichever entry point (`compile/2` + `Form.new/3` or the `form/2` façade) built the form. Currently `Form.new/3` takes exactly one option (`:defaults`), so the façade's allowlist is complete — a coupling to revisit whenever `Form.new/3` grows an option.
 
 ### LiveView entry points
 

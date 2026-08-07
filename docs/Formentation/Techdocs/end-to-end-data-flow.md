@@ -12,7 +12,7 @@ status: current
 
 # End-to-end data flow
 
-> [!note] As of 2026-08-05 · projected Phoenix forms and three-source rendering join (D-041), submit decision result (D-032), prepared DOM identities (D-035)
+> [!note] As of 2026-08-07 · projected Phoenix forms and three-source rendering join (D-041), submit decision result (D-032), prepared DOM identities (D-035), form/2 façade (D-046)
 > Follows one form through every layer that exists today, and stops
 > where the built system stops. Each layer has its own deep-dive note;
 > this one is about the **joins between them** — what crosses each
@@ -39,6 +39,7 @@ flowchart TD
     Cand["candidate<br/>JSON instance"]
 
     Decl -->|"compile/2"| Def
+    Decl -.->|"form/2"| State
     Def -->|"Form.new/3"| State
     State -->|"to_form/2"| PForm
     PForm -->|"native context or definition:"| Plan
@@ -58,7 +59,8 @@ Two things about the shape of that graph are the whole architecture:
 - **The `Definition` is on the left of every arrow and the right of
   none** (after compilation). Nothing downstream writes to it, which is
   what lets one definition be compiled once and shared by every request
-  and every user.
+  and every user. `Formentation.form/2` preserves this invariant — it
+  adds no reverse arrow.
 - **The loop closes through `Form`, not through HTML.** Params re-enter
   the state layer directly; the render is a pure function of state, never
   a source of it.
@@ -102,7 +104,10 @@ invalid data knows it immediately, even though nothing will be
 
 This is the first join where the layering earns its keep: the state
 layer imports `Definition` and knows nothing about Phoenix, so the entire
-interaction model is exercisable from IEx.
+interaction model is exercisable from IEx. The `Formentation.form/2` façade
+combines steps 1 and 2 for callers who never need the intermediate
+definition; it still goes through this join — `Form.new/3` receives the same
+call shape — so the join's semantics are unchanged.
 
 ## 3 · `Form` → `%Phoenix.HTML.Form{}`
 
@@ -248,7 +253,9 @@ hand-built plan.
 
 **The definition and the state are separately cacheable.** Compilation is
 per-form-type and could be done once at boot; state is per-request. The
-graph has no arrow that would force them into the same lifetime.
+graph has no arrow that would force them into the same lifetime. Choose
+`Formentation.form/2` for single-shot compile-and-initialize; choose
+`compile/2` + `Form.new/3` when the definition is reused across many forms.
 
 **The Phoenix-shaped part is the last two steps and the projection.**
 Everything from the declaration to the candidate is plain Elixir data.

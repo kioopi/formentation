@@ -10,7 +10,7 @@ status: current
 
 # Source adapters
 
-> [!note] As of 2026-07-25 · source-neutral validation dispatch
+> [!note] As of 2026-08-07 · source-neutral validation dispatch; adapter selection (D-046)
 > Describes the two adapters as built. Node shapes are deferred to
 > [[definition-and-node|Definition and Node]], the origin model to
 > [[diagnostics-and-origins|Diagnostics and origins]], and the addressing
@@ -27,23 +27,18 @@ beneath the [[compile-pipeline|Compile pipeline]] overview.
 
 ## The `Formentation.Source` behaviour
 
-Every adapter implements one callback:
+The behaviour declares one callback:
 
 ```elixir
 @callback compile(source :: term(), opts :: keyword()) ::
             {:ok, Definition.t(), [Diagnostic.t()]} | {:error, [Diagnostic.t()]}
 ```
 
-This is the *same* contract as the public `Formentation.compile/2`, which
-carries no logic of its own — it pops `:adapter` and delegates, so source
-selection is the only decision made at the entry point:
+This is the **documented contract** and the dialyzer surface. In practice, adapter *acceptance* uses a **callable-contract check**: a module is accepted if it exports `compile/2`, without requiring `@behaviour Formentation.Source`. This means the accepted set is deliberately wider than the declaring set — which is fine, since adapters are developer-supplied code, never user input.
 
-```elixir
-def compile(source, opts) do
-  {adapter, opts} = Keyword.pop!(opts, :adapter)
-  adapter.compile(source, opts)
-end
-```
+This is the *same* contract as the public `Formentation.compile/2`. The public
+entry point takes the adapter option, resolves it to an adapter (built-in selector or module),
+and delegates to that adapter — source selection is the only decision made at this stage.
 
 A successful compile still returns diagnostics (warnings, unsupported
 constructs); `:error` is reserved for input too malformed to yield a
@@ -58,6 +53,40 @@ structural fact rather than a slogan ([[18-decisions#D-004 — Two declaration s
 > lower — at the walk context and node constructors below — not at an
 > intermediate representation. Whether a third source justifies one is
 > still open ([[08-extension-model|Extension model]]).
+
+## Selecting an adapter
+
+Adapters are resolved by `Formentation.compile/2` and `Formentation.form/2` from the mandatory `:adapter` option. The selection is **explicit and closed**: pass `:map` for `Formentation.Source.Map`, `:json_schema` for `Formentation.JSONSchema`, or a module to use as an adapter. A plain map is ambiguous — it could be either a map-source form declaration or a decoded JSON Schema — so the source is never inferred; adapter selection is always required.
+
+Third-party adapters are reachable by module. A module is accepted as an
+adapter if `Code.ensure_compiled!/1` obtains it and it exports `compile/2` —
+a callable-contract check, not a behaviour requirement. The contract is the
+same as `Formentation.Source`, so modules implementing the behaviour are
+valid, but the acceptance rule is wider: any module exporting a `compile/2`
+will be **accepted by the resolver**, even if it never declared
+`@behaviour Formentation.Source`.
+
+Accepted is not the same as working. The resolver checks obtainability and
+function name/arity — nothing about what `compile/2` returns. Unrelated
+modules that happen to export `compile/2` (`Regex` and `:re` among them) pass
+the check and then violate the three-element result contract, surfacing as a
+`MatchError` at the call site rather than a clear rejection. That width is
+intentional and accepted: adapters are developer-supplied, never user input,
+and validating adapter *return shapes* is adapter-totality work belonging to
+[GitHub issue #6](https://github.com/kioopi/formentation/issues/6), not to
+selection.
+
+Adapter-*selection* failures — a missing, unknown, or invalid `:adapter` — raise `ArgumentError` at the boundary, deliberately outside the diagnostic model ([[18-decisions#D-046 — Adapter resolution failures raise; compilation failures stay diagnostics|D-046]]). This distinction matters: no adapter has run, so there is no declaration position or provenance to attach a diagnostic to. Failures *compiling* a declaration remain ordinary `{:error, diagnostics}` results; only selection mistakes raise.
+
+The primitive is `Code.ensure_compiled!/1`, and the bang carries weight.
+Resolution cannot continue without the adapter, and only the bang variant
+signals that to the compiler, marking the module a *required* dependency so
+one still in flight in the same parallel-compiler run is waited for.
+`ensure_loaded?/1` does not wait at all; `ensure_compiled/1` marks the module
+optional and reports `{:error, :unavailable}` for one that is merely not
+available yet, which inside a compile cycle would reject a valid in-project
+adapter outright
+([[18-decisions#D-046 — Adapter resolution failures raise; compilation failures stay diagnostics|D-046]]).
 
 ## The shared walk
 
@@ -113,6 +142,7 @@ build every node through these, so node shape never diverges by source.
 | Presentation hints | inline (`:widget`, `:help`, `:hidden`, `:read_only`, `:groups`, `:title`) | separate `:ui` map, applied post-walk |
 | Dependencies | none — lives in core | JSV |
 | Instance validator | none (`validation: nil`) | built from the schema, wrapped in a `ValidationPlan` ([[18-decisions#D-008 — JSV is the JSON Schema validator|D-008]]) |
+| Selector | `:map` | `:json_schema` |
 
 **`Source.Map`** is the reference adapter and the cheapest fixture format:
 plain Elixir, zero dependencies. Because properties are an ordered list of
@@ -229,5 +259,6 @@ Each adapter additionally carries its own property tests
 - [[diagnostics-and-origins|Diagnostics and origins]] — origins and diagnostics
 - [[paths-and-identity|Paths and identity]] — `template_path`, `source_path`, ids
 - [[test-and-verification-architecture|Test and verification architecture]] — the differential test among the suite's other mechanisms
+- Design / decisions: [[18-decisions#D-046 — Adapter resolution failures raise; compilation failures stay diagnostics|D-046]]
 - Design / future (Planning): [[05-compiler-pipeline|Compiler pipeline]] · [[08-extension-model|Extension model]]
 - [[Techdocs]] · [[Formentation|Vault entry note]]

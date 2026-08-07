@@ -981,6 +981,102 @@ the native and generic branches share the same downstream context shape, and
 the Phoenix dependency stays on the traversal side of the boundary. This is an
 internal extraction with no rendering or public API behaviour change.
 
+## D-046 — Adapter resolution failures raise; compilation failures stay diagnostics
+
+*2026-08-07*
+
+**Context.** [GitHub issue #27](https://github.com/kioopi/formentation/issues/27)
+(Wave 3, North-star node A3) asked for stable symbolic adapter selectors
+(`:map`, `:json_schema`) on `Formentation.compile/2` and a compile-and-initialize
+façade, `Formentation.form/2`. Before this, a missing `:adapter` failed through
+an incidental `KeyError` (`Keyword.pop!/2`), and an unsupported value failed
+through an incidental `UndefinedFunctionError` once dispatch was attempted —
+neither was an intentional public contract.
+
+**Decision.** Adapter *selection* failures — a missing `:adapter`, an
+unsupported bare atom, a non-atom term, or a module that cannot be loaded or
+does not export `compile/2` — raise `ArgumentError` at the `compile/2`
+boundary rather than producing a `Formentation.Diagnostic.t()`. No adapter has
+run yet in these cases, so there is no declaration location or source
+provenance to attach a diagnostic to, and folding configuration mistakes into
+`{:error, diagnostics}` would make them indistinguishable from genuine
+declaration-compilation failures. Once an adapter is accepted, its `compile/2`
+result — success or `{:error, diagnostics}` — is authoritative and
+unrescued; adapter exception totality remains a separate contract (see
+[GitHub issue #6](https://github.com/kioopi/formentation/issues/6)).
+
+Symbolic selection is a closed, explicit mapping (`:map` →
+`Formentation.Source.Map`, `:json_schema` → `Formentation.JSONSchema`), not a
+registry or source-shape inference — plain maps are inherently ambiguous
+between a map declaration and a decoded JSON Schema, so the adapter stays
+mandatory. Any other atom is accepted as a custom adapter module only when
+`Code.ensure_compiled!/1` obtains it and `function_exported?(adapter, :compile, 2)`
+holds; this is a callable-contract check, not a `@behaviour` metadata check,
+so third-party modules need not retain behaviour metadata at runtime.
+
+The resolution primitive is `Code.ensure_compiled!/1`, and the bang matters.
+Resolution cannot continue without the adapter, and only the bang variant
+tells the compiler so: it marks the module a **required** dependency, so one
+still being produced by the same `Kernel.ParallelCompiler` run is waited for.
+The two non-bang alternatives are both wrong here, in different ways.
+`ensure_loaded?/1` does not wait at all, so an adapter defined in the caller's
+own project is rejected intermittently. `ensure_compiled/1` marks the module
+*optional* and is documented to answer `{:error, :unavailable}` for one that
+is merely not available **yet** — Elixir's own docs name the
+`ensure_compiled/1` → raise shape as an anti-pattern for exactly this reason.
+The difference is observable, not theoretical: inside a compile cycle,
+`ensure_compiled/1` answers `{:error, :unavailable}` for a module that
+`ensure_compiled!/1` resolves successfully, so a resolver built on the
+non-bang variant turns a transient compiler state into a permanent-looking
+"unsupported adapter" error — the very class of false failure this decision
+exists to remove. Both paths are pinned by regression tests.
+
+`Formentation.form/2` treats `data:` and `defaults:` as an explicit
+initialization-owned allowlist, stripped before compiler options reach the
+adapter, and delegates to `compile/2` (for adapter resolution) and
+`Formentation.Form.new/3` (for initialization) rather than reimplementing
+either. On a compiler error it returns `{:error, diagnostics}` and never
+calls `Form.new/3`; on success it forwards `Form.new/3`'s result — including
+any `FunctionClauseError` from invalid `data:` — unrescued.
+
+**Consequences.** `Formentation.compile/2` and `Formentation.form/2` now fail
+deterministically and legibly on adapter misconfiguration, replacing
+accidental exception types with an intentional one. Built-in adapter usage no
+longer needs to name an implementation module (`adapter: :map` instead of
+`adapter: Formentation.Source.Map`), while module adapters remain fully
+supported for both built-in and third-party sources. `Formentation.form/2`
+gives single-shot callers a compile-once-and-initialize path without
+duplicating `Form.new/3`'s default/apply/revalidate logic; callers who need
+compile-once/reuse continue to use `compile/2` followed by `Form.new/3`
+directly. No change to validation, decoding, submission, or persistence.
+
+Two consequences worth naming explicitly, because neither is visible from the
+public surface:
+
+*Core now names both built-in adapters.* `.reach.exs` forbids `{:core, :source}`
+and `{:core, :json_schema}`, and its comments previously read as "core never
+names an adapter" — the boundary
+[[#D-018 — Reach is the architecture gate|D-018]] and
+[[#D-025 — Instance validation dispatches through a source-neutral behaviour|D-025]]
+established. The closed selector mapping lives in core and therefore mentions
+`Formentation.Source.Map` and `Formentation.JSONSchema` literally. The gate
+still passes, but only because a module literal returned as a value is not a
+call edge that Reach can see — not because the invariant is untouched. The
+rule's comments were corrected to record this as a deliberate, name-only
+exception; the substantive prohibition (core must never *invoke* an adapter
+function directly) is unchanged, and no cycle is introduced.
+
+*The accepted adapter set is wider than "modules that look like adapters".*
+Because the check is `exports compile/2` rather than `implements
+Formentation.Source`, unrelated modules that happen to export `compile/2` —
+`Regex` and `:re` among them — resolve successfully and then return a shape
+that violates the documented three-element contract, surfacing as a
+`MatchError`/`CaseClauseError` at the call site rather than a clear rejection.
+This is accepted: the adapter is developer-supplied and never user input, and
+validating adapter return shapes is adapter-totality work belonging to
+[GitHub issue #6](https://github.com/kioopi/formentation/issues/6), not to
+selection.
+
 ## Related notes
 
 - [[19-north-star-architecture|North-star architecture]]
