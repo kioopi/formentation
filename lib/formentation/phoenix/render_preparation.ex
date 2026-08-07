@@ -476,7 +476,9 @@ defmodule Formentation.Phoenix.RenderPreparation do
 
   defp submitted?(ctx), do: StateView.submitted?(ctx.source, ctx.root_form)
 
-  defp summary(root, ctx), do: Summary.build(root, ctx)
+  defp summary(root, ctx),
+    do:
+      Summary.build(root, Map.take(ctx, [:source, :root_form, :root_instance_path, :definition]))
 
   defp dom_namespace!(form, opts) do
     Keyword.get(opts, :dom_namespace) || form.id || form.name ||

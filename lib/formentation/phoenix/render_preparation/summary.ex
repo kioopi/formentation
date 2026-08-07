@@ -11,19 +11,34 @@ defmodule Formentation.Phoenix.RenderPreparation.Summary do
   since those never enter Phoenix's per-field error convention.
   """
 
-  alias Formentation.{Info, InstancePath}
+  alias Formentation.{Definition, Info, InstancePath}
   alias Formentation.Phoenix.{RenderNode, RenderPlan, StateView}
+
+  @typedoc """
+  The slice of `RenderPreparation`'s projection context this module reads.
+  Deliberately narrower than the full context passed around during
+  projection (which also carries `path`, `root_path`, `semantic_nodes` and
+  `dom_namespace`) — summary construction works only from the already-prepared
+  render tree and the source's `StateView`, never from namespace/traversal
+  state, so those fields have no way in here. The projection root reaches
+  here as `root_instance_path`, the form the `InstancePath` comparisons in
+  `inside_projection?/2` need; the raw `root_path` segments do not.
+  """
+  @type ctx :: %{
+          source: StateView.t(),
+          root_form: Phoenix.HTML.Form.t(),
+          root_instance_path: InstancePath.t(),
+          definition: Definition.t()
+        }
 
   @doc """
   Returns the summary entries for `root`, or `[]` when `ctx` is not submitted.
 
   `root` is the `RenderNode.Group` `RenderPreparation` just finished
-  projecting; `ctx` is the same projection context passed throughout
-  `RenderPreparation` (only `source`, `root_form`, `root_instance_path` and
-  `definition` are read here). Entry order is: field entries in tree order,
-  then non-field entries in the state view's authoritative order.
+  projecting. Entry order is: field entries in tree order, then non-field
+  entries in the state view's authoritative order.
   """
-  @spec build(RenderNode.Group.t(), map()) :: [Formentation.Phoenix.RenderPlan.SummaryEntry.t()]
+  @spec build(RenderNode.Group.t(), ctx()) :: [RenderPlan.SummaryEntry.t()]
   def build(root, ctx) do
     if submitted?(ctx) do
       field_entries(root) ++ non_field_entries(ctx)
