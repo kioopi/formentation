@@ -58,11 +58,35 @@ structural fact rather than a slogan ([[18-decisions#D-004 — Two declaration s
 
 Adapters are resolved by `Formentation.compile/2` and `Formentation.form/2` from the mandatory `:adapter` option. The selection is **explicit and closed**: pass `:map` for `Formentation.Source.Map`, `:json_schema` for `Formentation.JSONSchema`, or a module to use as an adapter. A plain map is ambiguous — it could be either a map-source form declaration or a decoded JSON Schema — so the source is never inferred; adapter selection is always required.
 
-Third-party adapters are reachable by module. A module is accepted as an adapter if `Code.ensure_compiled/1` succeeds and it exports `compile/2` — a callable-contract check, not a behaviour requirement. The contract is the same as `Formentation.Source`, so modules implementing the behaviour are valid, but the acceptance rule is wider: any module with a matching `compile/2` signature will work, even if it never declared `@behaviour Formentation.Source`. (This width is intentional and accepted — adapters are developer-supplied, never user input, so the tradeoff favours practical extension over strict type safety.)
+Third-party adapters are reachable by module. A module is accepted as an
+adapter if `Code.ensure_compiled!/1` obtains it and it exports `compile/2` —
+a callable-contract check, not a behaviour requirement. The contract is the
+same as `Formentation.Source`, so modules implementing the behaviour are
+valid, but the acceptance rule is wider: any module exporting a `compile/2`
+will be **accepted by the resolver**, even if it never declared
+`@behaviour Formentation.Source`.
+
+Accepted is not the same as working. The resolver checks obtainability and
+function name/arity — nothing about what `compile/2` returns. Unrelated
+modules that happen to export `compile/2` (`Regex` and `:re` among them) pass
+the check and then violate the three-element result contract, surfacing as a
+`MatchError` at the call site rather than a clear rejection. That width is
+intentional and accepted: adapters are developer-supplied, never user input,
+and validating adapter *return shapes* is adapter-totality work belonging to
+[GitHub issue #6](https://github.com/kioopi/formentation/issues/6), not to
+selection.
 
 Adapter-*selection* failures — a missing, unknown, or invalid `:adapter` — raise `ArgumentError` at the boundary, deliberately outside the diagnostic model ([[18-decisions#D-046 — Adapter resolution failures raise; compilation failures stay diagnostics|D-046]]). This distinction matters: no adapter has run, so there is no declaration position or provenance to attach a diagnostic to. Failures *compiling* a declaration remain ordinary `{:error, diagnostics}` results; only selection mistakes raise.
 
-`Code.ensure_compiled/1` is used instead of `ensure_loaded?/1` because it waits for the parallel compiler: an adapter defined in the caller's own project may still be in flight when a definition is compiled at compile time, and `ensure_loaded?/1` would reject it intermittently.
+The primitive is `Code.ensure_compiled!/1`, and the bang carries weight.
+Resolution cannot continue without the adapter, and only the bang variant
+signals that to the compiler, marking the module a *required* dependency so
+one still in flight in the same parallel-compiler run is waited for.
+`ensure_loaded?/1` does not wait at all; `ensure_compiled/1` marks the module
+optional and reports `{:error, :unavailable}` for one that is merely not
+available yet, which inside a compile cycle would reject a valid in-project
+adapter outright
+([[18-decisions#D-046 — Adapter resolution failures raise; compilation failures stay diagnostics|D-046]]).
 
 ## The shared walk
 

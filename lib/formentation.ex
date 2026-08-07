@@ -105,12 +105,7 @@ defmodule Formentation do
   defp resolve_adapter!(:json_schema), do: Formentation.JSONSchema
 
   defp resolve_adapter!(adapter) when is_atom(adapter) do
-    # `ensure_compiled/1`, not `ensure_loaded?/1`: an adapter defined in the
-    # caller's own project may still be in flight in the same parallel-compiler
-    # run when a definition is compiled at compile time. `ensure_loaded?/1` does
-    # not wait for it and would reject a perfectly valid adapter, intermittently.
-    if match?({:module, _}, Code.ensure_compiled(adapter)) and
-         function_exported?(adapter, :compile, 2) do
+    if adapter_obtainable?(adapter) and function_exported?(adapter, :compile, 2) do
       adapter
     else
       raise ArgumentError, adapter_error_message(adapter)
@@ -118,6 +113,23 @@ defmodule Formentation do
   end
 
   defp resolve_adapter!(other), do: raise(ArgumentError, adapter_error_message(other))
+
+  # `ensure_compiled!/1`, not `ensure_compiled/1` or `ensure_loaded?/1`.
+  # Resolution cannot continue without the adapter, and only the bang variant
+  # says so to the compiler: it marks the module a *required* dependency, so a
+  # module still being produced by the same `Kernel.ParallelCompiler` run is
+  # waited for. `ensure_compiled/1` marks it optional and is documented to
+  # answer `{:error, :unavailable}` for a module that is merely not available
+  # *yet* — inside a compile cycle that would reject a valid in-project adapter
+  # outright. `ensure_loaded?/1` does not wait at all.
+  defp adapter_obtainable?(adapter) do
+    Code.ensure_compiled!(adapter)
+    true
+  rescue
+    # Raised by `ensure_compiled!/1` only once the module is genuinely
+    # unobtainable; translated so callers see one consistent façade error.
+    ArgumentError -> false
+  end
 
   defp adapter_error_message(value) do
     "unsupported adapter #{inspect(value)}; use :map, :json_schema, or a module exporting compile/2"

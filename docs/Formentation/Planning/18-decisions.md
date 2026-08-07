@@ -1010,14 +1010,26 @@ Symbolic selection is a closed, explicit mapping (`:map` →
 registry or source-shape inference — plain maps are inherently ambiguous
 between a map declaration and a decoded JSON Schema, so the adapter stays
 mandatory. Any other atom is accepted as a custom adapter module only when
-`Code.ensure_compiled/1` succeeds and `function_exported?(adapter, :compile, 2)`
+`Code.ensure_compiled!/1` obtains it and `function_exported?(adapter, :compile, 2)`
 holds; this is a callable-contract check, not a `@behaviour` metadata check,
 so third-party modules need not retain behaviour metadata at runtime.
-`Code.ensure_compiled/1` is used instead of `ensure_loaded?/1` because it
-waits for a module still being produced by the same `Kernel.ParallelCompiler`
-run — an adapter defined in the caller's own project would be intermittently
-rejected by `ensure_loaded?/1`, a silent regression against the compile-once-and-cache
-pattern the project encourages.
+
+The resolution primitive is `Code.ensure_compiled!/1`, and the bang matters.
+Resolution cannot continue without the adapter, and only the bang variant
+tells the compiler so: it marks the module a **required** dependency, so one
+still being produced by the same `Kernel.ParallelCompiler` run is waited for.
+The two non-bang alternatives are both wrong here, in different ways.
+`ensure_loaded?/1` does not wait at all, so an adapter defined in the caller's
+own project is rejected intermittently. `ensure_compiled/1` marks the module
+*optional* and is documented to answer `{:error, :unavailable}` for one that
+is merely not available **yet** — Elixir's own docs name the
+`ensure_compiled/1` → raise shape as an anti-pattern for exactly this reason.
+The difference is observable, not theoretical: inside a compile cycle,
+`ensure_compiled/1` answers `{:error, :unavailable}` for a module that
+`ensure_compiled!/1` resolves successfully, so a resolver built on the
+non-bang variant turns a transient compiler state into a permanent-looking
+"unsupported adapter" error — the very class of false failure this decision
+exists to remove. Both paths are pinned by regression tests.
 
 `Formentation.form/2` treats `data:` and `defaults:` as an explicit
 initialization-owned allowlist, stripped before compiler options reach the

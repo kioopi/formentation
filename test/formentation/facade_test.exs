@@ -204,6 +204,46 @@ defmodule Formentation.FacadeTest do
       assert caller = Enum.find(modules, &(&1 == LateCaller))
       assert caller.compiled() == {:ok, :late_adapter_ran, []}
     end
+
+    test "accepts an adapter the compiler reports as merely unavailable", %{tmp_dir: tmp_dir} do
+      adapter_file = Path.join(tmp_dir, "cycle_adapter.ex")
+      caller_file = Path.join(tmp_dir, "cycle_caller.ex")
+
+      # The adapter waits on its own caller, so while the caller resolves the
+      # adapter the pair is in a compiler cycle. `Code.ensure_compiled/1`
+      # reports `{:error, :unavailable}` there — which means "not available
+      # yet", not "absent" — so a resolver built on it would reject a valid
+      # in-project adapter.
+      File.write!(adapter_file, """
+      defmodule CycleAdapter do
+        Code.ensure_compiled(CycleCaller)
+
+        def compile(_source, _opts), do: {:ok, :cycle_adapter_ran, []}
+      end
+      """)
+
+      File.write!(caller_file, """
+      defmodule CycleCaller do
+        @compiled Formentation.compile(%{kind: :object, properties: []}, adapter: CycleAdapter)
+        def compiled, do: @compiled
+      end
+      """)
+
+      on_exit(fn ->
+        for module <- [CycleCaller, CycleAdapter] do
+          :code.purge(module)
+          :code.delete(module)
+        end
+      end)
+
+      assert {:ok, modules, _diagnostics} =
+               Kernel.ParallelCompiler.compile([caller_file, adapter_file],
+                 return_diagnostics: true
+               )
+
+      assert caller = Enum.find(modules, &(&1 == CycleCaller))
+      assert caller.compiled() == {:ok, :cycle_adapter_ran, []}
+    end
   end
 
   describe "form/2 success path" do
