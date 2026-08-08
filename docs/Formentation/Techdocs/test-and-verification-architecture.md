@@ -12,7 +12,7 @@ status: current
 
 # Test and verification architecture
 
-> [!note] As of 2026-08-07 · step 7 + browser-testing suite + vault link and docs gates + the test.dev inner loop + adapter resolution (D-046)
+> [!note] As of 2026-08-08 · step 7 + browser-testing suite + vault link and docs gates + the test.dev inner loop + adapter resolution (D-046) + the invariants suite moved into `test/formentation/invariants/`
 > Describes the verification setup as built: the kinds of test in the
 > suite, what each one pins, and the static gates in `mix ci` — including
 > the demo's `Phoenix.LiveViewTest` suite and, now, the opt-in browser-real
@@ -293,12 +293,12 @@ pinned against accidental renaming by any registry.
 
 | Concern | File |
 | --- | --- |
-| Differential property | `test/formentation/differential_test.exs` |
+| Differential property | `test/formentation/invariants/differential_test.exs` |
 | Fixture behaviour | `test/support/fixture.ex` |
 | Shared fixtures | `test/support/fixtures/` |
 | Accessibility helpers | `test/support/html_assertions.ex` |
 | Reviewed snapshot | `test/support/fixtures/pump_inspection/static_render.html` |
-| Phoenix boundary (AST) | `test/formentation/phoenix/boundary_test.exs` |
+| Phoenix boundary (AST) | `test/formentation/invariants/boundary_test.exs` |
 | Architecture policy | `.reach.exs` |
 | CI pipeline | `mix.exs` — the `ci` alias |
 | LiveView demo suite | `test/formentation_demo/`, `demo/formentation_demo/` |
