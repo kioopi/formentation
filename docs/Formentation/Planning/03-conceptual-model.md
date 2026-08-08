@@ -106,7 +106,7 @@ They may share path and message conventions but should remain distinct types. Us
 
 `Formentation.Definition` is static. `Formentation.Form` owns one dynamic
 interaction lifecycle. Renderer preparation derives a dynamic prepared view
-for concrete visible occurrences; the current Phase 1 `RenderPlan` is an
+for concrete visible occurrences; the current Phase 1 `Render.Plan` is an
 internal implementation of that responsibility, not an ordinary public noun.
 
 The prepared view is produced from:

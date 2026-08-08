@@ -4,13 +4,16 @@ defmodule Formentation.Phoenix.FormDataTest do
   import Formentation.Test.FormHelpers
 
   alias Formentation.Fixtures.PumpInspection
-  alias Formentation.{Form, Params}
+  alias Formentation.Form
+  alias Formentation.Form.Params
   alias Formentation.Phoenix.ProjectedForm
   alias Phoenix.HTML.FormData
 
   defp pump_definition do
     {:ok, definition, []} =
-      Formentation.compile(PumpInspection.map_source(), adapter: Formentation.Source.Map)
+      Formentation.compile(PumpInspection.map_source(),
+        adapter: Formentation.Source.Map
+      )
 
     definition
   end
@@ -42,7 +45,9 @@ defmodule Formentation.Phoenix.FormDataTest do
       ]
     }
 
-    {:ok, definition, []} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    {:ok, definition, []} =
+      Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
     definition
   end
 
@@ -247,7 +252,7 @@ defmodule Formentation.Phoenix.FormDataTest do
   defp json_pump_form(data \\ %{}) do
     {:ok, definition, []} =
       Formentation.compile(PumpInspection.json_schema(),
-        adapter: Formentation.JSONSchema,
+        adapter: Formentation.Source.JSONSchema,
         ui: PumpInspection.ui_hints()
       )
 
@@ -340,7 +345,8 @@ defmodule Formentation.Phoenix.FormDataTest do
         }
       }
 
-      {:ok, definition, []} = Formentation.compile(schema, adapter: Formentation.JSONSchema)
+      {:ok, definition, []} =
+        Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
       form_state = submitted_form(Form.new(definition), %{"title" => "t"})
       form = FormData.to_form(form_state, [])

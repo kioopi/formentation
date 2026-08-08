@@ -72,7 +72,7 @@ defprotocol Formentation.Phoenix.StateView do
   deterministic — the projector preserves it after filtering.
 
   Scalar-field issues may appear here; the projector drops the ones whose
-  path resolves to a `Formentation.Semantic.Field` because Phoenix already
+  path resolves to a `Formentation.Definition.Semantic.Field` because Phoenix already
   carries them as `field.errors`.
 
       iex> form = Phoenix.HTML.FormData.to_form(%{"a" => "1"}, as: "payload")

@@ -4,10 +4,10 @@ defmodule Formentation.Definition.Finalizer do
   alias Formentation.{
     Definition,
     Diagnostic,
-    Presentation,
-    Semantic,
     TemplatePath
   }
+
+  alias Formentation.Definition.{Presentation, Semantic}
 
   defmodule Seen do
     @moduledoc false

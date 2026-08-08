@@ -6,7 +6,8 @@ defmodule Formentation.Phoenix.ComponentsTest do
   import Formentation.HTMLAssertions
   import Phoenix.LiveViewTest, only: [render_component: 2]
 
-  alias Formentation.{Form, InstancePath, Params}
+  alias Formentation.{Form, InstancePath}
+  alias Formentation.Form.Params
   alias Formentation.Phoenix.{DOMIdentity, StateView}
   alias Phoenix.HTML.FormData
 
@@ -19,7 +20,7 @@ defmodule Formentation.Phoenix.ComponentsTest do
 
   defp compile_json!(schema) do
     {:ok, definition, _diagnostics} =
-      Formentation.compile(schema, adapter: Formentation.JSONSchema)
+      Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
     definition
   end
@@ -277,7 +278,7 @@ defmodule Formentation.Phoenix.ComponentsTest do
       assert_all_references_resolve(doc)
     end
 
-    test "every reference-theme widget with an error has one resolvable summary target" do
+    test "every reference-UI widget with an error has one resolvable summary target" do
       widgets = [
         {"text", :text, %{kind: :string}, :control},
         {"textarea", :textarea, %{kind: :string, widget: :textarea}, :control},
@@ -683,7 +684,9 @@ defmodule Formentation.Phoenix.ComponentsTest do
 
       form =
         FormData.to_form(
-          %Formentation.SourceFixture{params: %{"serial_number" => "PX-1", "address" => %{}}},
+          %Formentation.SourceFixture{
+            params: %{"serial_number" => "PX-1", "address" => %{}}
+          },
           as: "payload"
         )
 

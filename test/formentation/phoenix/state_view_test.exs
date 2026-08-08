@@ -5,7 +5,8 @@ defmodule Formentation.Phoenix.StateViewTest do
 
   doctest Formentation.Phoenix.StateView
 
-  alias Formentation.{Form, Params, SubmissionBlocker}
+  alias Formentation.Form
+  alias Formentation.Form.{Params, SubmissionBlocker}
   alias Formentation.InstancePath
   alias Formentation.Phoenix.StateView
 
@@ -61,7 +62,7 @@ defmodule Formentation.Phoenix.StateViewTest do
       }
 
       {:ok, definition, _diagnostics} =
-        Formentation.compile(schema, adapter: Formentation.JSONSchema)
+        Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
       definition
     end
@@ -167,7 +168,7 @@ defmodule Formentation.Phoenix.StateViewTest do
       }
 
       {:ok, definition, _diagnostics} =
-        Formentation.compile(schema, adapter: Formentation.JSONSchema)
+        Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
       definition
     end
@@ -208,7 +209,7 @@ defmodule Formentation.Phoenix.StateViewTest do
   describe "Formentation.Form submission blockers in issues/2" do
     defp blocked_pair(schema, data, params) do
       {:ok, definition, _diagnostics} =
-        Formentation.compile(schema, adapter: Formentation.JSONSchema)
+        Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
       form_state = definition |> Form.new(data) |> submitted_form(params)
       {form_state, Phoenix.HTML.FormData.to_form(form_state, [])}
@@ -381,7 +382,10 @@ defmodule Formentation.Phoenix.StateViewTest do
     end
 
     test "nests wherever its params hold a map" do
-      source = %Formentation.SourceFixture{params: %{"address" => %{"street" => "Main"}}}
+      source = %Formentation.SourceFixture{
+        params: %{"address" => %{"street" => "Main"}}
+      }
+
       form = Phoenix.HTML.FormData.to_form(source, as: "payload")
 
       assert [nested] = Phoenix.HTML.FormData.to_form(source, form, :address, [])

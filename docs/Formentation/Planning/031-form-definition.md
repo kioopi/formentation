@@ -328,7 +328,7 @@ The implemented outer shape today is deliberately smaller — `root` holds the n
   format_version: 2,
   root: %Formentation.Node.Group{...},
   diagnostics: [%Formentation.Diagnostic{...}],
-  validation: %Formentation.ValidationPlan{} | nil
+  validation: %Formentation.Definition.ValidationPlan{} | nil
 }
 ```
 

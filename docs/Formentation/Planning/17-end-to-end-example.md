@@ -81,7 +81,7 @@ Two instructive differences from JSON Schema: the property list is *natively ord
 
 ```elixir
 {:ok, definition, _diagnostics} =
-  Formentation.compile(schema, adapter: Formentation.JSONSchema, ui: ui_hints)
+  Formentation.compile(schema, adapter: Formentation.Source.JSONSchema, ui: ui_hints)
 
 Info.fields(definition) |> Enum.map(& &1.name)
 #=> ["serial_number", "condition", "mounting", "last_service", "operating_hours",

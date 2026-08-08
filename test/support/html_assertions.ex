@@ -1,7 +1,7 @@
 defmodule Formentation.HTMLAssertions do
   @moduledoc """
   Floki helpers asserting the step-6 accessibility contract (spec
-  section "Accessibility contract"). Shared by theme, component, and
+  section "Accessibility contract"). Shared by UI, component, and
   snapshot tests.
   """
 

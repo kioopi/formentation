@@ -1,8 +1,8 @@
 defmodule Formentation.InfoTest do
   use ExUnit.Case, async: true
 
-  alias Formentation.Definition.Finalizer
-  alias Formentation.{Info, NodeId, Presentation, Semantic, TemplatePath}
+  alias Formentation.Definition.{Finalizer, Presentation, Semantic}
+  alias Formentation.{Info, NodeId, TemplatePath}
 
   doctest Formentation.Info
 
@@ -275,13 +275,13 @@ defmodule Formentation.InfoTest do
         ])
       )
 
-    assert %Formentation.Info.Presentation.Object{
+    assert %Formentation.Info.Layout.Object{
              children: [
-               %Formentation.Info.Presentation.Group{
+               %Formentation.Info.Layout.Group{
                  id: "/#identity",
                  label: "Identity",
                  children: [
-                   %Formentation.Info.Presentation.Field{
+                   %Formentation.Info.Layout.Field{
                      semantic_path: %{segments: ["name"]},
                      label: "Display name",
                      help: "Shown to technicians.",

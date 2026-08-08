@@ -168,7 +168,7 @@ review and fatal in production, so it is checked mechanically.
 
 No collections (`to_form/4` handles objects only, and the collection
 options raise). No `:patch` or scoped transitions to project. No
-`hidden` entries — the projection sets `hidden: []` and lets the theme
+`hidden` entries — the projection sets `hidden: []` and lets the UI
 emit hidden inputs where the definition asks for them. Object-level and
 root issues are deliberately outside `form.errors` and reachable only
 through `Form.issues/2`.

@@ -215,7 +215,7 @@ All live in `test/browser/pump_inspection_browser_test.exs`, driving
 ## The native-validation finding and its toggle (D-023)
 
 Writing test 2 surfaced a finding that could not have appeared under
-`LiveViewTest`: the reference theme emits native HTML5 constraint
+`LiveViewTest`: the reference UI emits native HTML5 constraint
 attributes (`required`, `minlength`) alongside Formentation's own
 server-side validation. In a real browser, native validation intercepts a
 submit of a blank or invalid form *before* it is ever sent — the click on
@@ -224,7 +224,7 @@ Save never reaches the server at all, so Formentation's decode, its
 `LiveViewTest` has no concept of a browser's constraint-validation UI, so
 this gap is invisible to it entirely.
 
-Rather than drop native validation from the reference theme — treated as a
+Rather than drop native validation from the reference UI — treated as a
 genuine, deliberately-kept feature ([[18-decisions#D-023 — The demo keeps native validation, behind a toggle|D-023]]),
 consistent with the number widget's own earlier trade-off toward
 `type="text"` ([[18-decisions#D-021 — LiveView integration is wrappers plus a demo, not framework machinery|D-021]]) —

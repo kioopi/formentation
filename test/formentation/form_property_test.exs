@@ -6,11 +6,14 @@ defmodule Formentation.FormPropertyTest do
   use ExUnitProperties
 
   alias Formentation.Fixtures.PumpInspection
-  alias Formentation.{Form, Params}
+  alias Formentation.Form
+  alias Formentation.Form.Params
 
   defp pump_definition do
     {:ok, definition, []} =
-      Formentation.compile(PumpInspection.map_source(), adapter: Formentation.Source.Map)
+      Formentation.compile(PumpInspection.map_source(),
+        adapter: Formentation.Source.Map
+      )
 
     definition
   end
@@ -133,7 +136,9 @@ defmodule Formentation.FormPropertyTest do
         ]
       }
 
-      {:ok, definition, []} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      {:ok, definition, []} =
+        Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
       definition
     end
 

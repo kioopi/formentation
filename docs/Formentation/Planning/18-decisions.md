@@ -94,7 +94,7 @@ Running log of architecture decisions, ADR-style but lightweight. Each entry rec
 
 **Context.** [[phase-1-walking-skeleton|Phase 1]] required choosing one validator after evaluating ex_json_schema and JSV against the criteria in [[12-ecosystem-and-dependencies#JSON Schema|Ecosystem and dependencies]]. The fixture pins dialect 2020-12.
 
-**Decision.** JSV (`~> 0.21`). The dialect criterion was dispositive: ex_json_schema supports drafts 4/6/7 only, while JSV has compliance-suite-verified 2020-12 support, ships the metaschema family embedded (offline schema-document validation), returns structured errors with instance and schema locations, has a build-once API, and makes remote `$ref` fetching opt-in behind an allowlist. It sits behind `Formentation.JSONSchema.Validator` — the swap point — with contract tests in `test/formentation/json_schema/validator_test.exs`.
+**Decision.** JSV (`~> 0.21`). The dialect criterion was dispositive: ex_json_schema supports drafts 4/6/7 only, while JSV has compliance-suite-verified 2020-12 support, ships the metaschema family embedded (offline schema-document validation), returns structured errors with instance and schema locations, has a build-once API, and makes remote `$ref` fetching opt-in behind an allowlist. It sits behind `Formentation.Source.JSONSchema.Validator` — the swap point — with contract tests in `test/formentation/json_schema/validator_test.exs`.
 
 **Consequences.** Three extra runtime dependencies (`abnf_parsec`, `texture`, `idna`). `atoms: false` is explicit in the validator module; format enforcement stays at JSV's default (off). Instance validation (implementation strategy step 4 onwards) reuses the same build/validate flow.
 
@@ -204,7 +204,7 @@ Kept deliberately small for Phase 1: the transition envelope grows only `event: 
 
 **Decision.** `.reach.exs` declares four layers mirroring the package-boundaries table in [[04-architecture|Architecture]] — `core`, `source`, `json_schema`, `phoenix` — with forbidden layer edges, call bans keeping `Phoenix.*` inside the projection namespace and `JSV.*` behind the [[#D-008 — JSV is the JSON Schema validator|D-008]] swap point, an effects policy (no real IO anywhere in the library), `Source.Shared` internal to the adapters, and full layer coverage. Smells run strict: a new finding fails `mix ci`, matching `credo --strict` and `ex_dna --max-clones 0`. One known finding is baselined in `.reach-baseline.json`: the core↔json_schema layer cycle created by `Formentation.Form` dispatching the opaque validator slot ([[#D-012 — Schema validation defers while any decode fails|D-012]]) directly through the hard-coded D-008 swap point.
 
-**Consequences.** Boundary violations now fail `mix ci` with concrete call-edge evidence instead of relying on review; the D-017 boundary test remains as the spec-level assertion of the Phoenix rule. The baselined cycle is acknowledged debt that dissolves once the validator slot dispatches through a behaviour — natural when a second validating source appears. Two config exceptions document tool limits rather than policy holes: reach classifies the pure `IO.iodata_to_binary/1` and `Enum.each/2` as `:io` (module-level effect allowances in the path modules), and its behaviour-candidate heuristic cannot see `@behaviour` declarations, so the fixtures implementing the extracted `Formentation.Fixture` contract carry a per-check ignore. *Amended:* the baselined `core↔json_schema` cycle and its `.reach-baseline.json` exception have since been removed — instance validation now dispatches through the `Formentation.Validation` behaviour instead of a hard-coded swap point (see [[#D-025 — Instance validation dispatches through a source-neutral behaviour|D-025]]).
+**Consequences.** Boundary violations now fail `mix ci` with concrete call-edge evidence instead of relying on review; the D-017 boundary test remains as the spec-level assertion of the Phoenix rule. The baselined cycle is acknowledged debt that dissolves once the validator slot dispatches through a behaviour — natural when a second validating source appears. Two config exceptions document tool limits rather than policy holes: reach classifies the pure `IO.iodata_to_binary/1` and `Enum.each/2` as `:io` (module-level effect allowances in the path modules), and its behaviour-candidate heuristic cannot see `@behaviour` declarations, so the fixtures implementing the extracted `Formentation.Fixture` contract carry a per-check ignore. *Amended:* the baselined `core↔json_schema` cycle and its `.reach-baseline.json` exception have since been removed — instance validation now dispatches through the `Formentation.Definition.Validation` behaviour instead of a hard-coded swap point (see [[#D-025 — Instance validation dispatches through a source-neutral behaviour|D-025]]).
 
 ## D-019 — Projection is Phoenix-generic
 
@@ -289,11 +289,11 @@ unproven).
 
 *2026-07-25*
 
-**Context.** `Definition.validator` was an opaque artifact whose executor `Form` hard-coded to `Formentation.JSONSchema.Validator`, creating the core↔json_schema layer cycle that [[#D-018 — Reach is the architecture gate|D-018]] baselined, and blocking any other source from supplying authoritative validation without editing core.
+**Context.** `Definition.validator` was an opaque artifact whose executor `Form` hard-coded to `Formentation.Source.JSONSchema.Validator`, creating the core↔json_schema layer cycle that [[#D-018 — Reach is the architecture gate|D-018]] baselined, and blocking any other source from supplying authoritative validation without editing core.
 
-**Decision.** Introduce the core-owned `Formentation.Validation` behaviour (`@callback validate(artifact :: term(), instance :: map()) :: [Issue.t()]`) plus `Formentation.ValidationPlan{module, artifact}` carried on `Definition.validation`; `Form` dispatches `plan.module.validate(plan.artifact, instance)` and names no adapter; `Issue.source` is now `:decode | :validation`; JSON Schema is just one implementer ([[#D-008 — JSV is the JSON Schema validator|D-008]]); `format_version` bumped 1→2; the D-018 baseline and the `core→json_schema` exception are removed. Links: [[#D-008 — JSV is the JSON Schema validator|D-008]], [[#D-012 — Schema validation defers while any decode fails|D-012]], [[#D-018 — Reach is the architecture gate|D-018]].
+**Decision.** Introduce the core-owned `Formentation.Definition.Validation` behaviour (`@callback validate(artifact :: term(), instance :: map()) :: [Issue.t()]`) plus `Formentation.Definition.ValidationPlan{module, artifact}` carried on `Definition.validation`; `Form` dispatches `plan.module.validate(plan.artifact, instance)` and names no adapter; `Issue.source` is now `:decode | :validation`; JSON Schema is just one implementer ([[#D-008 — JSV is the JSON Schema validator|D-008]]); `format_version` bumped 1→2; the D-018 baseline and the `core→json_schema` exception are removed. Links: [[#D-008 — JSV is the JSON Schema validator|D-008]], [[#D-012 — Schema validation defers while any decode fails|D-012]], [[#D-018 — Reach is the architecture gate|D-018]].
 
-**Consequences.** Core carries zero adapter references; a fake validator outside the JSON Schema namespace proves JSV-free dispatch; future Ash/Ecto-like/custom sources can supply validation without touching `Form`; a future composite validator can itself implement `Formentation.Validation` holding child plans, while core continues to carry exactly zero or one plan.
+**Consequences.** Core carries zero adapter references; a fake validator outside the JSON Schema namespace proves JSV-free dispatch; future Ash/Ecto-like/custom sources can supply validation without touching `Form`; a future composite validator can itself implement `Formentation.Definition.Validation` holding child plans, while core continues to carry exactly zero or one plan.
 
 ## D-026 — Content-derived presence for nested objects
 
@@ -361,7 +361,7 @@ and the projector is unchanged.
 
 **Context.** [[#D-015 — One struct per node kind|D-015]]'s `Node.Unsupported` and its compile-time warning diagnostic only ever answered a *definition*-level question — "which declared constructs can this form never edit?" There was no way to ask the *instance*-level question a form actually needs answered before letting a user submit: is a required preserve-only value currently missing, or does the data the form is preserving currently fail validation? Resolves [GitHub issue #3](https://github.com/kioopi/formentation/issues/3).
 
-**Decision.** Unsupported nodes remain a **preserve-only definition capability** — no struct change, no `format_version` bump. Concrete submission blocking is derived, never stored, from the materialized candidate plus the source-neutral `Issue.source: :validation` issues attached to it ([[#D-025 — Instance validation dispatches through a source-neutral behaviour|D-025]]): `Formentation.Form.submission_blockers/1` and `Formentation.Form.submission_status/1` classify each `Formentation.Node.Unsupported` (enumerated statically by the new `Formentation.Info.unsupported_nodes/1`) against the candidate and `form.issues`, producing a `Formentation.SubmissionBlocker` when either a required preserve-only value is absent from an active parent, or the node owns an issue at or below its own path (segment-wise, via the new `Formentation.InstancePath.ancestor_or_self?/2` — never a string prefix). `submission_status/1`'s precedence is `:undecodable` → `{:blocked, blockers}` → `{:invalid, issues}` → `:ready`; blockers win over ordinary issues but nothing is discarded from `issues/1`. An issue at or below an unsupported path is unrepairable by the form and is therefore owned by the blocker; an issue at an ancestor or an unrelated sibling is **not** assigned causally to the unsupported node — doing so would require validator metadata ("which property caused this failure?") Formentation does not have. A map-source definition carries no `ValidationPlan`, so `:unsupported_invalid` can never fire there, but a directly-observed missing-required preserve-only value still produces a blocker, with `issues: []`. Rendering goes through [[#D-027 — Projection reads semantic state through a StateView protocol|D-027]]'s seam rather than around it: the `%Formentation.Form{}` `StateView` implementation translates each blocker into one normalized `StateView.Issue` at the owning node's path — capability text plus any owned validation messages — and drops the issues that blocker already speaks for, so they are not also enumerated bare. Blockers lead the enumeration, then the ordinary path sort. `Formentation.Phoenix.Projector` renders that list with the same generic rule it applies to any source's non-field issues, learns nothing about blockers, and would show an equivalent Ash or Ecto entry unchanged. Links: [[#D-015 — One struct per node kind|D-015]], [[#D-025 — Instance validation dispatches through a source-neutral behaviour|D-025]], [[#D-026 — Content-derived presence for nested objects|D-026]], [[#D-027 — Projection reads semantic state through a StateView protocol|D-027]].
+**Decision.** Unsupported nodes remain a **preserve-only definition capability** — no struct change, no `format_version` bump. Concrete submission blocking is derived, never stored, from the materialized candidate plus the source-neutral `Issue.source: :validation` issues attached to it ([[#D-025 — Instance validation dispatches through a source-neutral behaviour|D-025]]): `Formentation.Form.submission_blockers/1` and `Formentation.Form.submission_status/1` classify each `Formentation.Node.Unsupported` (enumerated statically by the new `Formentation.Info.unsupported_nodes/1`) against the candidate and `form.issues`, producing a `Formentation.Form.SubmissionBlocker` when either a required preserve-only value is absent from an active parent, or the node owns an issue at or below its own path (segment-wise, via the new `Formentation.InstancePath.ancestor_or_self?/2` — never a string prefix). `submission_status/1`'s precedence is `:undecodable` → `{:blocked, blockers}` → `{:invalid, issues}` → `:ready`; blockers win over ordinary issues but nothing is discarded from `issues/1`. An issue at or below an unsupported path is unrepairable by the form and is therefore owned by the blocker; an issue at an ancestor or an unrelated sibling is **not** assigned causally to the unsupported node — doing so would require validator metadata ("which property caused this failure?") Formentation does not have. A map-source definition carries no `ValidationPlan`, so `:unsupported_invalid` can never fire there, but a directly-observed missing-required preserve-only value still produces a blocker, with `issues: []`. Rendering goes through [[#D-027 — Projection reads semantic state through a StateView protocol|D-027]]'s seam rather than around it: the `%Formentation.Form{}` `StateView` implementation translates each blocker into one normalized `StateView.Issue` at the owning node's path — capability text plus any owned validation messages — and drops the issues that blocker already speaks for, so they are not also enumerated bare. Blockers lead the enumeration, then the ordinary path sort. `Formentation.Phoenix.Projector` renders that list with the same generic rule it applies to any source's non-field issues, learns nothing about blockers, and would show an equivalent Ash or Ecto entry unchanged. Links: [[#D-015 — One struct per node kind|D-015]], [[#D-025 — Instance validation dispatches through a source-neutral behaviour|D-025]], [[#D-026 — Content-derived presence for nested objects|D-026]], [[#D-027 — Projection reads semantic state through a StateView protocol|D-027]].
 
 **Consequences.** `Formentation.Info.unsupported_nodes/1` is the extension point a future stricter policy (e.g. an `unsupported: :error` compile option that refuses definitions needing full edit capability) can build on without touching runtime classification. No opaque-replacement escape hatch was added — an unsupported node still cannot be edited by this form, only concretely diagnosed. The causal limit means a root-level or cross-field validation issue continues to render as an ordinary `{:invalid, _}` entry even when an unsupported node sits nearby in the tree; sharpening that requires validator-side metadata this decision deliberately does not invent.
 
@@ -514,7 +514,10 @@ record of why Phase 1 did not freeze a configurable contract, but its
 in [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]
 (2026-08-05) to `Formentation.Phoenix.RenderPreparation` and
 `Formentation.Phoenix.ReferenceComponents`, so “projection” is available for
-`Form` → `%Phoenix.HTML.Form{}`. Phase 3 must build the second UI and review
+`Form` → `%Phoenix.HTML.Form{}` (both were renamed again on 2026-08-08 by
+[[18-decisions#D-047 — The lib tree is restructured to state the north-star architecture|D-047]]
+to `Formentation.Phoenix.Render.Preparation` and
+`Formentation.Phoenix.UI.Reference`). Phase 3 must build the second UI and review
 consumer concurrently with the contract, publish the round-trip conformance
 suite, define capability-failure developer experience, and establish resource
 limits/performance evidence before exposing a stable prepared view.
@@ -536,7 +539,7 @@ whether a group was a fieldset or a nested Phoenix form. Resolves
 `Formentation.Info`: `presentation_root/1` returns the root layout descriptor
 and `presentation_at/2` returns `{:ok, descriptor}`, `:not_found`, or
 `:unsupported` for a semantic instance path. The descriptor vocabulary lives
-under `Formentation.Info.Presentation` and is deliberately small:
+under `Formentation.Info.Layout` and is deliberately small:
 `Object` for root/nested semantic-object layout boundaries, `Field` for scalar
 field references, and `Group` for presentation-only grouping. Object and field
 descriptors carry normalized `Formentation.InstancePath`s; group descriptors
@@ -879,7 +882,7 @@ unless `summary={true}`/`summary={false}` says otherwise, so composing under
 
 *2026-08-06*
 
-**Context.** `Formentation.Source.Map` previously copied `:one_of` options lists without validating list element types or verifying that `:one_of` was a list. This allowed malformed declarations like `one_of: [%{a: 1}]` or `one_of: "oops"` to compile without error and fail only during downstream rendering. Meanwhile, `Formentation.Semantic.Field` declares `@type option :: String.t() | number() | boolean()`.
+**Context.** `Formentation.Source.Map` previously copied `:one_of` options lists without validating list element types or verifying that `:one_of` was a list. This allowed malformed declarations like `one_of: [%{a: 1}]` or `one_of: "oops"` to compile without error and fail only during downstream rendering. Meanwhile, `Formentation.Definition.Semantic.Field` declares `@type option :: String.t() | number() | boolean()`.
 
 **Decision.** The Map source validates `:one_of` option declarations at the compilation boundary:
 - Valid option values must be scalars (`String.t()`, `number()`, or `boolean()`). Accepted values are retained verbatim without stringification, sorting, or deduplication.
@@ -892,7 +895,7 @@ unless `summary={true}`/`summary={false}` says otherwise, so composing under
 
 *2026-08-07*
 
-**Context.** [[#D-038 — Semantic value type and abstract widget are orthogonal prepared facts|D-038]] added `value_type` to `RenderNode.Field` but explicitly deferred `role` and `required?`, leaving that to [GitHub issue #37](https://github.com/kioopi/formentation/issues/37). `Formentation.Semantic.Field` already carries both facts pre-preparation; only `role` is read in passing (for widget inference) and neither reaches the prepared struct. A custom theme therefore cannot distinguish an `:email`-role field from a plain string, or tell whether a field is genuinely schema-required, without reaching back into the source `Definition` — which the renderer/UI boundary ([[20-renderer-ui-model|Renderer and UI model]]) forbids.
+**Context.** [[#D-038 — Semantic value type and abstract widget are orthogonal prepared facts|D-038]] added `value_type` to `RenderNode.Field` but explicitly deferred `role` and `required?`, leaving that to [GitHub issue #37](https://github.com/kioopi/formentation/issues/37). `Formentation.Definition.Semantic.Field` already carries both facts pre-preparation; only `role` is read in passing (for widget inference) and neither reaches the prepared struct. A custom theme therefore cannot distinguish an `:email`-role field from a plain string, or tell whether a field is genuinely schema-required, without reaching back into the source `Definition` — which the renderer/UI boundary ([[20-renderer-ui-model|Renderer and UI model]]) forbids.
 
 **Decision.** `RenderNode.Field` gains two more flat fields, `role` and `required?`, populated directly from `Semantic.Field` during preparation — the same additive, non-nested shape D-038 used for `value_type`. `required?` is the schema fact only; it is documented on the struct as presentation/accessibility-only (asterisks, `aria-required`, etc.) and must never be used by a theme to emit or infer the native HTML `required` attribute. The HTML constraint attribute continues to come solely from `validations[:required]`, governed unchanged by [[#D-010 — Empty-string, null, and absent-key decode policies|D-010]]'s existing policy of deriving HTML validation attributes from schema plus input policy, never from requiredness alone. The reference theme carries a conformance test asserting it never derives the HTML `required` attribute from `required?`, the same enforcement pattern [[#D-011 — Booleans use the hidden-input transport contract|D-011]] established for the checkbox hidden-input contract.
 
@@ -1006,7 +1009,7 @@ unrescued; adapter exception totality remains a separate contract (see
 [GitHub issue #6](https://github.com/kioopi/formentation/issues/6)).
 
 Symbolic selection is a closed, explicit mapping (`:map` →
-`Formentation.Source.Map`, `:json_schema` → `Formentation.JSONSchema`), not a
+`Formentation.Source.Map`, `:json_schema` → `Formentation.Source.JSONSchema`), not a
 registry or source-shape inference — plain maps are inherently ambiguous
 between a map declaration and a decoded JSON Schema, so the adapter stays
 mandatory. Any other atom is accepted as a custom adapter module only when
@@ -1059,7 +1062,7 @@ names an adapter" — the boundary
 [[#D-018 — Reach is the architecture gate|D-018]] and
 [[#D-025 — Instance validation dispatches through a source-neutral behaviour|D-025]]
 established. The closed selector mapping lives in core and therefore mentions
-`Formentation.Source.Map` and `Formentation.JSONSchema` literally. The gate
+`Formentation.Source.Map` and `Formentation.Source.JSONSchema` literally. The gate
 still passes, but only because a module literal returned as a value is not a
 call edge that Reach can see — not because the invariant is untouched. The
 rule's comments were corrected to record this as a deliberate, name-only
@@ -1076,6 +1079,123 @@ This is accepted: the adapter is developer-supplied and never user input, and
 validating adapter return shapes is adapter-totality work belonging to
 [GitHub issue #6](https://github.com/kioopi/formentation/issues/6), not to
 selection.
+
+## D-047 — The lib tree is restructured to state the north-star architecture
+
+*2026-08-08*
+
+**Context.** `lib/formentation/` had grown to 29 entries directly under the
+package root and `lib/formentation/phoenix/` to 14 — every source adapter
+module, every semantic/presentation storage struct, every runtime-state
+module (`Codec`, `Params`, `Transport`, `SubmissionBlocker`), and every
+Phoenix render module sitting flat beside the handful of shared kernel
+modules. The tree no longer reflected the layered shape
+[[19-north-star-architecture|the north-star architecture]] describes: a
+caller reading `lib/formentation/`
+could not tell a source-adapter module from a runtime-state module from a
+shared coordinate type by directory alone. Nothing here was a code-behaviour
+bug; it was the directory tree failing to state the architecture it
+implements.
+
+**Decision.** Group the 29 entries under `lib/formentation/` into 16, and the
+14 under `lib/formentation/phoenix/` into 8, by nesting each module under the
+layer that owns it: `Formentation.Definition.Semantic.*`,
+`Formentation.Definition.Presentation.*`,
+`Formentation.Definition.Validation`/`ValidationPlan` all move under
+`Formentation.Definition.*`; `Formentation.Codec`, `Formentation.Params`,
+`Formentation.Transport`, and `Formentation.SubmissionBlocker` move under
+`Formentation.Form.*`; `Formentation.Info.Presentation` becomes
+`Formentation.Info.Layout` under `Formentation.Info.*`; and
+`Formentation.Phoenix.RenderNode`, `RenderPlan`, `RenderPreparation` collapse
+into `Formentation.Phoenix.Render.{Node, Plan, Preparation}`, with
+`Formentation.Phoenix.ReferenceComponents` renamed to
+`Formentation.Phoenix.UI.Reference` — not `Theme.Reference`:
+[[20-renderer-ui-model|the renderer/UI model note]] narrows *theme* to visual
+configuration inside one UI (light/dark, colour tokens, density, sizing,
+radius, typography), and this module renders fieldsets, labels, inputs,
+selects, radio groups, and validation attributes — a UI integration by that
+same definition, not a theme. The source adapters (`Source`, `Source.Map`,
+`Source.Shared`, `Source.JSONSchema`, `Source.JSONSchema.Validator`) move to
+their own top-level `Formentation.Source.*` namespace, a sibling of
+`Formentation.Definition` rather than nested under it — see below. This is a
+**breaking rename of 31 published modules** — every caller referencing one of
+these modules by its full name must update the reference. It is accepted now,
+before `0.1.0`, specifically because no compatibility guarantee has shipped
+yet; the same rename after `0.1.0` would need a deprecation path this
+decision deliberately avoids paying for.
+
+**Why the shared kernel stays at the top level.** `InstancePath`,
+`TemplatePath`, `JSONPointer`, `NodeId`, `Origin`, `Diagnostic`, and `Issue`
+are not nested under `Definition` or `Form` even though both of those sit
+above them in every data flow — they are the vocabulary every layer,
+including `Definition` and `Form` themselves, depends on. The dependency
+direction settles which way nesting can go: `Formentation.Phoenix.Render.Plan`
+aliases `Formentation.Diagnostic`, and `Formentation.Diagnostic` itself
+aliases `Formentation.Origin`; `Formentation.NodeId` aliases
+`Formentation.JSONPointer` and `Formentation.TemplatePath`. Nesting any of
+these seven under `Formentation.Definition.*` would make kernel modules
+depend on `Definition.*`, inverting that direction — a `Phoenix`-layer struct
+would alias a name that reads as belonging to the `core`/`Definition` layer
+it must not depend on. A module's location under `lib/` is meant to name
+which layer owns it; the kernel's honest location is beside, not under,
+its dependents.
+
+**Why `Source` is a sibling of `Definition`, not nested under it.**
+`Semantic` and `Presentation` are constituents of a compiled `Definition`, so
+nesting them under `Definition` states real ownership. A source adapter sits
+*upstream* of a `Definition` and *produces* one; nesting it under `Definition`
+would invert that relationship. This was tried during the restructure and
+reverted after review: Reach's layer patterns match module-name prefixes with
+`*` matching across dots, and `forbid_multiple_matches: true` requires every
+module to match exactly one layer pattern. With `Formentation.Source.*`
+nested under `Formentation.Definition.Source.*`, `core`'s layer pattern could
+no longer be the single wildcard `"Formentation.Definition.*"` — it would
+also match the `source` and `json_schema` adapter layers — so `core` had to
+enumerate every `Definition` submodule by hand, needing a new `.reach.exs`
+entry for each. That manual enumeration was the signal, not just a cost to
+accept: the namespace hierarchy had stopped tracking the layer hierarchy, and
+Reach needing hand-maintained exceptions to cope was symptomatic of that, not
+a reason to keep the nesting. `Formentation.Source` therefore sits at the top
+level beside `Formentation.Definition` and `Formentation.Form`, and `core`'s
+layer pattern is the single wildcard `"Formentation.Definition.*"` again.
+
+The `source` layer itself still enumerates its four modules by hand
+(`Source`, `Source.Map`, `Source.Shared`, `Source.Shared.*`) rather than
+wildcarding `Formentation.Source.*`, because `Formentation.Source.JSONSchema`
+must remain the distinct `json_schema` layer
+([[#D-008 — JSV is the JSON Schema validator|D-008]]); a
+`Formentation.Source.*` wildcard on `source` would swallow `Source.JSONSchema`
+and violate `forbid_multiple_matches`. This is accepted — it is the same
+shape the source adapters already had before this restructure, not a new
+cost.
+
+**The legacy-mixed-storage guard was narrowed.** `Formentation.Phoenix.Node`
+does not exist — the module is `Formentation.Phoenix.Render.Node`, aliased to
+the bare name `Node` by convention at every call site inside the `Phoenix`
+namespace. That alias collided with an existing guard clause written to catch
+a since-removed struct: a legacy `%Formentation.Node{}` (the pre-D-033 mixed
+semantic/presentation storage struct) that could still reach rendering code
+through a stale alias, matched by pattern on the bare names `%Node.` and
+`Node.(Field|Group|Unsupported)`. After this restructure, `Formentation.Phoenix.Render.Node`'s
+own struct and submodules (`Node.Field`, `Node.Group`) alias to
+that same bare `Node.*` shape by ordinary convention, so the guard as written
+would now flag legitimate render-node usage as if it were the legacy mixed
+struct. The guard was narrowed to detect the legacy struct's *alias*
+declaration (`alias Formentation.Node`) rather than legacy-*looking* bare
+usage. This is an accepted trade: the guard is a smaller net than before —
+it no longer catches every syntactic shape that merely resembles the old
+struct — but it still catches the one thing it exists to catch, an actual
+alias to the removed `Formentation.Node` module, and a false positive against
+every ordinary `Formentation.Phoenix.Render.Node` reference would have made
+the guard a liability rather than a safeguard.
+
+**Consequences.** `lib/formentation/` now has 16 top-level entries and
+`lib/formentation/phoenix/` has 8; both counts are checked by the vault and
+by the restructure's own verification step. Every renamed module's `mix.exs`
+`groups_for_modules` entry, `.iex.exs` alias, and `.reach.exs` layer pattern
+moved with it — see [[Techdocs|the refreshed Techdocs notes]] for the
+current module-to-file map. The CHANGELOG under `Unreleased` lists the
+user-visible half of the rename table.
 
 ## Related notes
 

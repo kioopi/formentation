@@ -44,7 +44,7 @@ The working skeleton proved the difficult behaviours before a public model was
 frozen. That was the correct order. It also left three prototype-shaped seams:
 
 1. one definition tree mixes data objects and presentation groups;
-2. ordinary rendering exposes `Definition → Phoenix.HTML.Form → RenderPlan`
+2. ordinary rendering exposes `Definition → Phoenix.HTML.Form → Render.Plan`
    even though the runtime value already owns the definition;
 3. the documentation presents compiler and projection concepts too early.
 
@@ -117,7 +117,7 @@ The remaining mismatch is concentrated:
   tree; in some fixtures its field order is therefore presentation order.
 - the Phoenix projector walks the same mixed tree to recover layout;
 - `Phoenix.fields/1` requires a definition beside a Phoenix form;
-- `Projector`, `RenderPlan`, and the reference “theme” appear as normal public
+- `Projector`, `Render.Plan`, and the reference “theme” appear as normal public
   stages or vocabulary.
 
 This is one structural migration plus a public API consolidation, not a rewrite
@@ -544,7 +544,7 @@ For Phase 1:
 
 - no UI behaviour or registry is added;
 - the reference markup may be renamed to
-  `Formentation.Phoenix.ReferenceComponents` or an equivalent honest name;
+  `Formentation.Phoenix.UI.Reference` or an equivalent honest name;
 - advanced preparation structs stay internal or explicitly unstable;
 - independently valuable preparation tests remain.
 

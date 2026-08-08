@@ -10,7 +10,7 @@ status: draft
 
 # Compile pipeline
 
-> [!note] As of 2026-08-07 · Wave 3 façade (A3) complete
+> [!note] As of 2026-08-08 · Wave 3 façade (A3) complete; module paths refreshed for the lib-tree restructure ([[18-decisions#D-047 — The lib tree is restructured to state the north-star architecture|D-047]])
 > Describes the compile pipeline as built. The `Node` representation uses one struct per kind ([[18-decisions#D-015 — One struct per node kind|D-015]]); this note stays at pipeline altitude and defers `Node` internals to [[definition-and-node|Definition and Node]].
 
 The **compile pipeline** turns a declarative form description into a static, source-independent [[definition-and-node|`Definition`]] that can be cached, inspected, and queried — with no runtime state attached. It is the first half of Formentation: everything here runs once, ahead of any user interaction. The runtime half consumes the `Definition` and is documented in [[form-state-and-transitions|Form state and transitions]], [[phoenix-form-data|the FormData projection]], and [[rendering|Rendering]]; [[end-to-end-data-flow|End-to-end data flow]] joins both halves into one walk.
@@ -50,7 +50,7 @@ flowchart TD
 
 ### 1. Entry — `Formentation.compile/2` and `Formentation.form/2`
 
-`compile(declaration, adapter: :map)` is one public entry point. It resolves `:adapter` — a stable built-in selector (`:map` for `Formentation.Source.Map`, `:json_schema` for `Formentation.JSONSchema`), or any module exporting `compile/2` (the extension route for third-party adapters) — passes the rest through, and delegates to that adapter. Resolution failures (a missing, unsupported, or invalid `:adapter`) raise `ArgumentError` at this boundary rather than producing a diagnostic, since no adapter has run yet. Beyond that resolution, it carries no logic of its own — source selection is the only decision made here. ([[18-decisions#D-046 — Adapter resolution failures raise; compilation failures stay diagnostics|D-046]])
+`compile(declaration, adapter: :map)` is one public entry point. It resolves `:adapter` — a stable built-in selector (`:map` for `Formentation.Source.Map`, `:json_schema` for `Formentation.Source.JSONSchema`), or any module exporting `compile/2` (the extension route for third-party adapters) — passes the rest through, and delegates to that adapter. Resolution failures (a missing, unsupported, or invalid `:adapter`) raise `ArgumentError` at this boundary rather than producing a diagnostic, since no adapter has run yet. Beyond that resolution, it carries no logic of its own — source selection is the only decision made here. ([[18-decisions#D-046 — Adapter resolution failures raise; compilation failures stay diagnostics|D-046]])
 
 `Formentation.form/2` is the second public entry point: a compile-and-initialize façade. It extracts `data:` (defaulting to `%{}`) and `defaults:` from the option list for `Formentation.Form.new/3`, partitions them so an adapter can never receive `:data` or `:defaults` even if it takes options by those names (the escape hatch for that case is `compile/2` + `Form.new/3`), and forwards every other option to `compile/2` in original order. It only initializes a form after successful compilation; if compilation fails, the form is never built and `Form.new/3` is not called.
 
@@ -73,7 +73,7 @@ The adapter is where the real work happens. Every adapter implements the [[sourc
 Two adapters exist today:
 
 - **`Formentation.Source.Map`** — a plain-Elixir data source, zero dependencies. The reference adapter and the cheapest fixture format.
-- **`Formentation.JSONSchema`** — the JSON Schema adapter for a pinned 2020-12 subset, gated by a JSV metaschema pre-pass (`JSONSchema.Validator`) and carrying the UI-hints vocabulary (`order`, `groups`, `fields.*.widget|help`).
+- **`Formentation.Source.JSONSchema`** — the JSON Schema adapter for a pinned 2020-12 subset, gated by a JSV metaschema pre-pass (`JSONSchema.Validator`) and carrying the UI-hints vocabulary (`order`, `groups`, `fields.*.widget|help`).
 
 Both are held to a **differential property**: compiling the same form through either adapter yields `Info`-equivalent definitions, differing only in origins. That test is what makes "source-independent" a checked claim rather than an aspiration ([[18-decisions#D-004 — Two declaration sources from the start|D-004]] — design/roadmap).
 
@@ -103,7 +103,7 @@ Two subsystems run through every stage rather than sitting at one:
 
 ## Where the pipeline ends
 
-The pipeline stops at `Info`. It produces meaning, not markup: no projection, no components, no HTML. The compiled `Definition` is the **handoff point** to the runtime layer (`Formentation.Form`, `Formentation.Codec`, `Formentation.Transport`), which combines it with values, params, and usage; the projection and rendering layers then turn that pairing into HTML. The `form/2` façade composes both halves for callers who never need the intermediate definition; it calls `compile/2` first and reaches `Form.new/3` only once compilation has succeeded, so the handoff semantics are unchanged — the definition still crosses to the runtime exactly once, and never travels back.
+The pipeline stops at `Info`. It produces meaning, not markup: no projection, no components, no HTML. The compiled `Definition` is the **handoff point** to the runtime layer (`Formentation.Form`, `Formentation.Form.Codec`, `Formentation.Form.Transport`), which combines it with values, params, and usage; the projection and rendering layers then turn that pairing into HTML. The `form/2` façade composes both halves for callers who never need the intermediate definition; it calls `compile/2` first and reaches `Form.new/3` only once compilation has succeeded, so the handoff semantics are unchanged — the definition still crosses to the runtime exactly once, and never travels back.
 
 > [!info] Why the halves stay apart
 > A `Definition` never learns anything from a submission, and the runtime never rewrites one. That is what lets a definition be compiled once and shared across every request, user, and form instance that uses it — and what lets each layer be tested without the next. The full chain is drawn in [[end-to-end-data-flow|End-to-end data flow]]. `form/2` is single-shot for callers who compile and use once; `compile/2` + `Form.new/3` is the right choice when the definition is reused.
@@ -115,12 +115,12 @@ The pipeline stops at `Info`. It produces meaning, not markup: no projection, no
 | Entry point | `Formentation` | `lib/formentation.ex` |
 | Adapter contract | `Formentation.Source` | `lib/formentation/source.ex` |
 | Map adapter | `Formentation.Source.Map` | `lib/formentation/source/map.ex` |
-| JSON Schema adapter | `Formentation.JSONSchema` | `lib/formentation/json_schema.ex` |
-| Schema validator | `Formentation.JSONSchema.Validator` | `lib/formentation/json_schema/validator.ex` |
+| JSON Schema adapter | `Formentation.Source.JSONSchema` | `lib/formentation/source/json_schema.ex` |
+| Schema validator | `Formentation.Source.JSONSchema.Validator` | `lib/formentation/source/json_schema/validator.ex` |
 | Shared walk context | `Formentation.Source.Shared` | `lib/formentation/source/shared.ex` |
 | Compiled definition | `Formentation.Definition` | `lib/formentation/definition.ex` |
-| Semantic storage | `Formentation.Semantic.Object` · `Semantic.Field` · `Semantic.Unsupported` | `lib/formentation/semantic/` |
-| Presentation storage | `Formentation.Presentation.Object` · `Presentation.Field` · `Presentation.Group` | `lib/formentation/presentation/` |
+| Semantic storage | `Formentation.Definition.Semantic.Object` · `Semantic.Field` · `Semantic.Unsupported` | `lib/formentation/definition/semantic/` |
+| Presentation storage | `Formentation.Definition.Presentation.Object` · `Presentation.Field` · `Presentation.Group` | `lib/formentation/definition/presentation/` |
 | Query surface | `Formentation.Info` | `lib/formentation/info.ex` |
 
 ## Related notes

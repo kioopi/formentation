@@ -75,10 +75,10 @@ success-or-redisplay decision, described on
 mount/handler wiring, and no upload support: you write `mount/3` and
 `handle_event/3` yourself, exactly as you would without Formentation.
 
-### No theme API
+### No UI API
 
-The components render through a single built-in theme, called directly.
-There is no theme parameter, no component registry, and no documented
+The components render through a single built-in UI, called directly.
+There is no UI parameter, no component registry, and no documented
 contract for writing your own. You can style the markup with CSS against
 its class names; you cannot swap the markup.
 
@@ -130,7 +130,7 @@ scoped (sub-tree) transitions are reserved shapes in the API that raise
 if you use them.
 
 **A bare params map is refused.** `transition/2` requires a
-`Formentation.Params` envelope, because an absent key is ambiguous
+`Formentation.Form.Params` envelope, because an absent key is ambiguous
 between "cleared" and "untouched".
 
 **All-or-nothing candidates.** If any field fails to decode, there is no

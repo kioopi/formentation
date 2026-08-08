@@ -4,7 +4,8 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
   # view so `Phoenix.Component.used_input?/1` keeps working (D-014).
   # Spec: docs/superpowers/specs/2026-07-23-phase1-step5-formdata-design.md
 
-  alias Formentation.{Form, Info, Semantic}
+  alias Formentation.Definition.Semantic
+  alias Formentation.{Form, Info}
   alias Formentation.Phoenix.ProjectedForm
 
   def to_form(form_state, opts) do
@@ -188,10 +189,11 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
   # Formentation.Phoenix.StateView (D-027; for Formentation.Form that
   # never answers :default, so the projector never falls back to
   # used_input?/1), folded once into show_errors? by the projector;
-  # themes only read that flag, never used_input?/1 or Form.show_issues?/2
-  # directly. This projection decides no visibility itself. Object-level
-  # and root issues stay out of Phoenix's per-field convention; themes
-  # read them via the projector's plan.summary.
+  # UI implementations only read that flag, never used_input?/1 or
+  # Form.show_issues?/2 directly. This projection decides no visibility
+  # itself. Object-level and root issues stay out of Phoenix's per-field
+  # convention; UI implementations read them via the projector's
+  # plan.summary.
   defp errors_for(%Form{action: nil}, _object_path), do: []
 
   defp errors_for(%Form{} = form_state, object_path) do
@@ -209,7 +211,7 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
   # Only direct scalar children project into Phoenix's per-field errors:
   # an issue whose path names a group node (a missing required nested
   # object, for example) is object-level and stays out — it reaches a
-  # theme through the projector's plan.summary, which sources non-field
+  # UI implementation through the projector's plan.summary, which sources non-field
   # entries from StateView.issues/2 (D-027) rather than from this module.
   # NOTE: this match must grow with any future scalar/leaf node kind —
   # a leaf kind missing here has its errors silently dropped.

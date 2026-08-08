@@ -14,7 +14,7 @@ status: current
 
 *Covers Formentation as of 2026-08-07.*
 
-`Formentation.JSONSchema` compiles a **decoded** draft 2020-12 schema
+`Formentation.Source.JSONSchema` compiles a **decoded** draft 2020-12 schema
 document — the map you get from `JSON.decode!/1`, with string keys — into
 the same kind of definition the
 [[declaring-with-the-map-source|map source]] produces. Presentation intent
@@ -129,7 +129,7 @@ different from a **bad adapter**, which raises `ArgumentError` — see
 
 > [!important] Unsupported declarations are preserve-only, not editable
 > A property using an unsupported keyword compiles to
-> `Formentation.Semantic.Unsupported`. Its original value survives every
+> `Formentation.Definition.Semantic.Unsupported`. Its original value survives every
 > replace transition untouched — that preservation is the whole reason
 > an edit form does not silently delete data it cannot represent — but
 > the form can never decode, replace, or render it. Submitted params for

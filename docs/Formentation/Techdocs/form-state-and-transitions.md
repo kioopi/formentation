@@ -12,9 +12,9 @@ status: current
 
 # Form state and transitions
 
-> [!note] As of 2026-08-07 · content-derived nested-object presence (D-026); derived submission status (D-028); submit decision result (D-032); form/2 façade (D-046)
+> [!note] As of 2026-08-08 · content-derived nested-object presence (D-026); derived submission status (D-028); submit decision result (D-032); form/2 façade (D-046); module paths refreshed for the lib-tree restructure (D-047)
 > Describes the runtime state layer as built: `Formentation.Form`,
-> `Formentation.Transport`, and `Formentation.Codec` — now including the
+> `Formentation.Form.Transport`, and `Formentation.Form.Codec` — now including the
 > `validate/2`/`submit/2` LiveView entry points and the derived
 > `submission_status/1`/`submission_blockers/1` pair. This layer has **no
 > Phoenix dependency** and is fully usable from IEx. How the state is
@@ -73,7 +73,7 @@ pre-populated, and no lookup can fail.
 
 ## Transport normalization
 
-`Formentation.Transport.normalize/1` is pure string-and-map processing
+`Formentation.Form.Transport.normalize/1` is pure string-and-map processing
 with zero Phoenix dependency — the browser's conventions are decoded
 here so nothing downstream has to know them. One pass produces three
 views:
@@ -104,7 +104,7 @@ mention gets no entry at all, and `:unknown` is a lookup default in
 
 ## Codecs and the decode policy
 
-`Formentation.Codec.decode/3` turns one raw transport value into one
+`Formentation.Form.Codec.decode/3` turns one raw transport value into one
 operation. The posture is **strict with trim**, differentiated by type
 ([[18-decisions#D-010 — Empty-string, null, and absent-key decode policies|D-010]]):
 
@@ -134,7 +134,7 @@ Booleans reach the server through the hidden-input transport contract
 ([[18-decisions#D-011 — Booleans use the hidden-input transport contract|D-011]]) —
 an editable checkbox always submits `"false"` or `"true"`, never nothing
 — which is why the codec's vocabulary is exactly those two strings and
-[[rendering|the reference theme]] is obliged to emit the paired hidden
+[[rendering|the reference UI]] is obliged to emit the paired hidden
 input.
 
 ## A transition, end to end
@@ -329,7 +329,7 @@ fresh on every call; nothing new lives on the `%Form{}` struct
    ordered by instance path.
 4. **`:ready`** — no blockers, no issues.
 
-A `Formentation.SubmissionBlocker` relates one unsupported node to a
+A `Formentation.Form.SubmissionBlocker` relates one unsupported node to a
 concrete, observed problem. `submission_blockers/1` walks every
 unsupported node from `Info.unsupported_nodes_with_paths/1` and
 classifies each, in semantic declaration order, against the materialized
@@ -355,7 +355,7 @@ candidate and `form.issues`:
   Formentation does not have. Root and cross-field issues are never
   causally assigned to a preserve-only node on a guess.
 - **The validation-less fallback.** A map-source definition carries no
-  `Formentation.ValidationPlan`
+  `Formentation.Definition.ValidationPlan`
   ([[18-decisions#D-025 — Instance validation dispatches through a source-neutral behaviour|D-025]]),
   so `:unsupported_invalid` can never fire there — there is no validator
   to have filed the issue. A missing required preserve-only value is
@@ -364,9 +364,9 @@ candidate and `form.issues`:
 
 A blocker's `path` is the *unsupported node's own* instance path, not
 necessarily a deeper underlying issue's path; `node_id` is copied from
-`Formentation.Semantic.Unsupported.id` so tooling can relate a blocker back
+`Formentation.Definition.Semantic.Unsupported.id` so tooling can relate a blocker back
 to the compiled definition without parsing paths. On submit,
-`Formentation.Phoenix.RenderPreparation` turns blockers into capability entries
+`Formentation.Phoenix.Render.Preparation` turns blockers into capability entries
 in the error summary — see [[rendering#Error summary|Rendering]].
 
 ## Read surface
@@ -397,11 +397,11 @@ global defaults, and extensibility is [[phase-3-extensibility|Phase 3]].
 | --- | --- | --- |
 | Form state and transitions | `Formentation.Form` | `lib/formentation/form.ex` |
 | Per-field read model | `Formentation.Form.FieldState` | `lib/formentation/form/field_state.ex` |
-| Transition envelope | `Formentation.Params` | `lib/formentation/params.ex` |
-| Transport normalization | `Formentation.Transport` | `lib/formentation/transport.ex` |
-| Scalar codecs | `Formentation.Codec` | `lib/formentation/codec.ex` |
+| Transition envelope | `Formentation.Form.Params` | `lib/formentation/form/params.ex` |
+| Transport normalization | `Formentation.Form.Transport` | `lib/formentation/form/transport.ex` |
+| Scalar codecs | `Formentation.Form.Codec` | `lib/formentation/form/codec.ex` |
 | Runtime issue | `Formentation.Issue` | `lib/formentation/issue.ex` |
-| Derived submission blocker | `Formentation.SubmissionBlocker` | `lib/formentation/submission_blocker.ex` |
+| Derived submission blocker | `Formentation.Form.SubmissionBlocker` | `lib/formentation/form/submission_blocker.ex` |
 
 ## Related notes
 

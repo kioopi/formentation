@@ -11,7 +11,7 @@ status: current
 
 # Diagnostics and origins
 
-> [!note] As of 2026-08-07 · adapter selection and diagnostics
+> [!note] As of 2026-08-08 · adapter selection and diagnostics; module paths refreshed for the lib-tree restructure ([[18-decisions#D-047 — The lib tree is restructured to state the north-star architecture|D-047]])
 > Describes the explainability model as built: the `Diagnostic` struct,
 > the origin tags nodes carry, the guards, and the one *projection*-time
 > diagnostic that now exists. The full `Decision` / `Info.explain/3`
@@ -40,7 +40,7 @@ audiences.
 | Audience | whoever wrote the schema or hints | whoever is filling in the form |
 | Severity | `:error` \| `:warning` | — (all issues are problems) |
 | Discriminator | `code` | `code` plus `source` (`:decode` \| `:validation`) |
-| Lives on | `Definition.diagnostics` · `RenderPlan.diagnostics` | `Form.issues`, keyed by path |
+| Lives on | `Definition.diagnostics` · `Render.Plan.diagnostics` | `Form.issues`, keyed by path |
 
 Conflating them is the mistake the split prevents: a schema author's
 mistake ("this `type` is outside the supported subset") must never reach
@@ -152,9 +152,9 @@ and fire identically for both sources.
 
 Step 6 introduced the first diagnostic produced *after* compilation:
 `:widget_fallback`, emitted by
-[[rendering|`Formentation.Phoenix.RenderPreparation`]] onto
-`RenderPlan.diagnostics` when a declared widget hint cannot render the
-field it names — a widget outside the theme's set, or a `:checkbox` hint
+[[rendering|`Formentation.Phoenix.Render.Preparation`]] onto
+`Render.Plan.diagnostics` when a declared widget hint cannot render the
+field it names — a widget outside the UI's set, or a `:checkbox` hint
 on a non-boolean field. The projector falls back to the inferred widget
 and records why.
 
@@ -162,9 +162,9 @@ This generalizes the model in a way worth stating: a diagnostic is
 *anything a layer chose to do differently than the declaration asked*,
 reported at the point of choosing. The compiler is simply where most such
 choices happen. The projector's diagnostics live on the plan rather than
-the definition because they depend on the theme's capabilities — a
-different theme could render the same hint without complaint, and the
-cached, shared `Definition` must not carry one theme's opinion.
+the definition because they depend on the UI's capabilities — a
+different UI could render the same hint without complaint, and the
+cached, shared `Definition` must not carry one UI's opinion.
 
 ## Origins — provenance for resolved values
 
@@ -236,8 +236,8 @@ is [[phase-2-compiler-diagnostics|Phase 2]] territory.
 | Runtime issue | `Formentation.Issue` | `lib/formentation/issue.ex` |
 | Origin struct | `Formentation.Origin` | `lib/formentation/origin.ex` |
 | Guards · policy pass · `origin_entries/1` | `Formentation.Source.Shared` | `lib/formentation/source/shared.ex` |
-| Metaschema translation | `Formentation.JSONSchema.Validator` | `lib/formentation/json_schema/validator.ex` |
-| Projection-time diagnostic | `Formentation.Phoenix.RenderPreparation` | `lib/formentation/phoenix/render_preparation.ex` |
+| Metaschema translation | `Formentation.Source.JSONSchema.Validator` | `lib/formentation/source/json_schema/validator.ex` |
+| Projection-time diagnostic | `Formentation.Phoenix.Render.Preparation` | `lib/formentation/phoenix/render/preparation.ex` |
 
 ## Related notes
 

@@ -2,8 +2,8 @@ defmodule Formentation.DefinitionTest do
   use ExUnit.Case, async: true
 
   alias Formentation.{Definition, Definition.Finalizer, NodeId, TemplatePath}
-  alias Formentation.Presentation
-  alias Formentation.Semantic
+  alias Formentation.Definition.Presentation
+  alias Formentation.Definition.Semantic
 
   defp template(segments), do: TemplatePath.new!(segments)
 

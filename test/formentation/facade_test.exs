@@ -12,8 +12,14 @@ defmodule Formentation.FacadeTest do
       if pid = opts[:notify], do: send(pid, {:spy_adapter_opts, opts})
 
       case Keyword.fetch(opts, :result) do
-        {:ok, result} -> result
-        :error -> Formentation.Source.Map.compile(source, Keyword.drop(opts, [:notify, :result]))
+        {:ok, result} ->
+          result
+
+        :error ->
+          Formentation.Source.Map.compile(
+            source,
+            Keyword.drop(opts, [:notify, :result])
+          )
       end
     end
   end
@@ -46,10 +52,12 @@ defmodule Formentation.FacadeTest do
       result = Formentation.compile(declaration, adapter: :map)
 
       assert {:ok, %Definition{}, []} = result
-      assert result == Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
+      assert result ==
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
     end
 
-    test ":json_schema selector produces the same result as the Formentation.JSONSchema module, including ui hints" do
+    test ":json_schema selector produces the same result as the Formentation.Source.JSONSchema module, including ui hints" do
       schema = %{
         "type" => "object",
         "properties" => %{
@@ -71,7 +79,12 @@ defmodule Formentation.FacadeTest do
       result = Formentation.compile(schema, adapter: :json_schema, ui: ui)
 
       assert {:ok, %Definition{}, []} = result
-      assert result == Formentation.compile(schema, adapter: Formentation.JSONSchema, ui: ui)
+
+      assert result ==
+               Formentation.compile(schema,
+                 adapter: Formentation.Source.JSONSchema,
+                 ui: ui
+               )
     end
 
     test "both routes fail identically for an invalid declaration" do

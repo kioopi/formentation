@@ -3,18 +3,10 @@ defmodule Formentation.FormSubmissionTest do
 
   import Formentation.Test.FormHelpers
 
-  alias Formentation.{
-    Form,
-    InstancePath,
-    Issue,
-    Presentation,
-    Semantic,
-    SubmissionBlocker,
-    TemplatePath,
-    ValidationPlan
-  }
+  alias Formentation.{Form, InstancePath, Issue, TemplatePath}
 
-  alias Formentation.Definition.Finalizer
+  alias Formentation.Definition.{Finalizer, Presentation, Semantic, ValidationPlan}
+  alias Formentation.Form.SubmissionBlocker
 
   # ---- JSON Schema fixture: `tags` is an unsupported array whose items the
   # full schema still validates; `title` is an unrelated editable sibling.
@@ -31,7 +23,7 @@ defmodule Formentation.FormSubmissionTest do
     }
 
     {:ok, definition, _diagnostics} =
-      Formentation.compile(schema, adapter: Formentation.JSONSchema)
+      Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
     definition
   end
@@ -131,7 +123,7 @@ defmodule Formentation.FormSubmissionTest do
 
   # ---- Hand-built definition + fake validator: full control over issue paths.
   defmodule FakeValidation do
-    @behaviour Formentation.Validation
+    @behaviour Formentation.Definition.Validation
     @impl true
     # artifact IS the fixed issue list, ignoring the instance
     def validate(issues, _instance), do: issues
@@ -242,7 +234,7 @@ defmodule Formentation.FormSubmissionTest do
       }
 
       {:ok, definition, _diagnostics} =
-        Formentation.compile(schema, adapter: Formentation.JSONSchema)
+        Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
       assert {:error, submitted_form} = Form.submit(Form.new(definition), %{"title" => "No"})
 
@@ -269,7 +261,10 @@ defmodule Formentation.FormSubmissionTest do
       changed = Form.validate(form, %{"title" => "Draft"})
 
       transitioned =
-        Form.transition(form, %Formentation.Params{values: %{"title" => "Done"}, event: :submit})
+        Form.transition(form, %Formentation.Form.Params{
+          values: %{"title" => "Done"},
+          event: :submit
+        })
 
       assert %Form{action: :change} = changed
       assert %Form{action: :submit} = transitioned

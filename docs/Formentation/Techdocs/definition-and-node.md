@@ -10,8 +10,8 @@ status: current
 
 # Definition
 
-*As of 2026-07-27 (native semantic/presentation storage for the built-in
-sources and native-backed semantic/presentation query seams, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]).*
+*As of 2026-08-08 (native semantic/presentation storage for the built-in
+sources and native-backed semantic/presentation query seams, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; module paths refreshed for the lib-tree restructure, [[18-decisions#D-047 — The lib tree is restructured to state the north-star architecture|D-047]]).*
 
 `Formentation.Definition` is the compiler's product and the system's
 common language: an immutable, source-independent tree of semantic
@@ -25,10 +25,10 @@ produced.
 ```elixir
 %Formentation.Definition{
   format_version: 3,
-  semantic: %Formentation.Semantic.Object{...},
-  semantic_index: %Formentation.Semantic.Index{...},
-  presentation: %Formentation.Presentation.Object{...},
-  validation: %Formentation.ValidationPlan{} | nil,
+  semantic: %Formentation.Definition.Semantic.Object{...},
+  semantic_index: %Formentation.Definition.Semantic.Index{...},
+  presentation: %Formentation.Definition.Presentation.Object{...},
+  validation: %Formentation.Definition.ValidationPlan{} | nil,
   diagnostics: [%Formentation.Diagnostic{...}]
 }
 ```
@@ -52,8 +52,8 @@ template path. It is derived during finalization and lets runtime consumers
 resolve presentation references without re-walking the semantic tree for every
 field.
 
-`validation` is an optional `Formentation.ValidationPlan`
-— an executable module (implementing `Formentation.Validation`) paired
+`validation` is an optional `Formentation.Definition.ValidationPlan`
+— an executable module (implementing `Formentation.Definition.Validation`) paired
 with the opaque artifact that module owns; `nil` when the source provides
 no authoritative instance validation (the map source, currently).
 
@@ -65,7 +65,7 @@ no authoritative instance validation (the map source, currently).
 | `Semantic.Field` | `id`, `name`, `template_path`, `value_type` | `role`, `required?`, `read_only?`, `constraints`, `options`, `default`, `examples`, `origins` |
 | `Semantic.Unsupported` | `id`, `name`, `template_path` | `required?`, `origins` |
 
-`Formentation.Semantic` now reads `Definition.semantic` when it exists. It
+`Formentation.Definition.Semantic` now reads `Definition.semantic` when it exists. It
 derives current `InstancePath`s from the tree position and node names for
 query results, rather than storing an instance path on each semantic node.
 
@@ -88,7 +88,7 @@ semantic `InstancePath`s, and presentation groups expose layout identity only.
 `Formentation.Info.presentation_root/1` and
 `Formentation.Info.presentation_at/2` are the presentation-query seam.
 They read the native presentation tree and semantic index, then return typed
-descriptors under `Formentation.Info.Presentation`:
+descriptors under `Formentation.Info.Layout`:
 
 - `Object` — root or nested semantic-object layout boundary, carrying a
   normalized `InstancePath`.

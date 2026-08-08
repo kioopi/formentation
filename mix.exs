@@ -111,33 +111,22 @@ defmodule Formentation.MixProject do
     end
   end
 
+  # Internal-by-intent modules, kept out of the published docs. Everything
+  # under Formentation.Phoenix.Render.* is the projection pipeline: it keeps
+  # its moduledocs on purpose (`h Formentation.Phoenix.Render.Plan` in IEx is
+  # supported) and this filter is the only thing holding it back from the
+  # published surface. Formentation.Phoenix.UI.Reference is the reference
+  # UI, shipped as an example rather than as API.
+  #
+  # The single prefix replaces a hand-maintained module list: a new module
+  # under Render.* is covered without a mix.exs edit, so the directory
+  # boundary and the documentation boundary are now the same line.
   defp internal_documentation_module?(module) do
-    # Two categories, one predicate. RenderPreparation and ReferenceComponents
-    # are @moduledoc false and would be excluded anyway; they are listed for
-    # grep-ability, and that is the convention — a new internal module gets
-    # both @moduledoc false and an entry here. RenderPlan, RenderPreparation.Summary,
-    # RenderPreparation.Widget, RenderPreparation.Visibility and the RenderNode.*
-    # structs keep their moduledocs on purpose (`h Formentation.Phoenix.RenderPlan`
-    # in IEx is supported), so this filter is the only thing keeping them out of
-    # the published docs. The string prefixes, rather than a list, cover the
-    # documented structs nested under an already-excluded parent —
-    # RenderNode.FieldDOM/GroupDOM, RenderPlan.SummaryEntry — and any future
-    # sibling without a list edit.
     module in [
       Formentation.Phoenix.ProjectedForm,
-      Formentation.Phoenix.RenderPreparation,
-      Formentation.Phoenix.RenderPreparation.Context,
-      Formentation.Phoenix.RenderPreparation.Summary,
-      Formentation.Phoenix.RenderPreparation.Widget,
-      Formentation.Phoenix.RenderPreparation.Visibility,
-      Formentation.Phoenix.ReferenceComponents,
-      Formentation.Phoenix.RenderPlan,
-      Formentation.Phoenix.RenderNode
+      Formentation.Phoenix.UI.Reference
     ] or
-      String.starts_with?(Atom.to_string(module), [
-        "Elixir.Formentation.Phoenix.RenderNode.",
-        "Elixir.Formentation.Phoenix.RenderPlan."
-      ])
+      String.starts_with?(Atom.to_string(module), "Elixir.Formentation.Phoenix.Render.")
   end
 
   defp package do
@@ -163,28 +152,33 @@ defmodule Formentation.MixProject do
         "Compile & query": [
           Formentation,
           Formentation.Definition,
+          Formentation.Definition.Validation,
+          Formentation.Definition.ValidationPlan,
           Formentation.Info,
+          Formentation.Info.Layout,
           Formentation.Diagnostic
         ],
         "Nodes & paths": [
-          Formentation.Semantic.Object,
-          Formentation.Semantic.Field,
-          Formentation.Semantic.Unsupported,
-          Formentation.Presentation.Object,
-          Formentation.Presentation.Field,
-          Formentation.Presentation.Group,
+          Formentation.Definition.Semantic.Object,
+          Formentation.Definition.Semantic.Field,
+          Formentation.Definition.Semantic.Unsupported,
+          Formentation.Definition.Presentation.Object,
+          Formentation.Definition.Presentation.Field,
+          Formentation.Definition.Presentation.Group,
           Formentation.NodeId,
           Formentation.InstancePath,
           Formentation.TemplatePath,
-          Formentation.JSONPointer
+          Formentation.JSONPointer,
+          Formentation.Origin
         ],
         "Form runtime": [
           Formentation.Form,
           Formentation.Form.FieldState,
-          Formentation.Params,
-          Formentation.Issue,
-          Formentation.Codec,
-          Formentation.Transport
+          Formentation.Form.Params,
+          Formentation.Form.Codec,
+          Formentation.Form.Transport,
+          Formentation.Form.SubmissionBlocker,
+          Formentation.Issue
         ],
         "Phoenix rendering": [
           Formentation.Phoenix,
@@ -195,8 +189,8 @@ defmodule Formentation.MixProject do
         Sources: [
           Formentation.Source,
           Formentation.Source.Map,
-          Formentation.JSONSchema,
-          Formentation.JSONSchema.Validator
+          Formentation.Source.JSONSchema,
+          Formentation.Source.JSONSchema.Validator
         ]
       ]
     ]

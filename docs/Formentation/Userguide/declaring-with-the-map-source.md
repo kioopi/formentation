@@ -104,7 +104,7 @@ delete the other half.
 
 > [!important] Unsupported declarations are preserve-only, not editable
 > A property with an unrecognised `:kind` compiles to
-> `Formentation.Semantic.Unsupported`. Its original value survives every
+> `Formentation.Definition.Semantic.Unsupported`. Its original value survives every
 > replace transition untouched — the preservation path that keeps an
 > edit form from silently deleting data it cannot represent — but the
 > form can never decode, replace, or render it, and submitted params for
@@ -112,7 +112,7 @@ delete the other half.
 >
 > The map source attaches **no validator**, so a preserved opaque value
 > can never be *declared* invalid — there is no `:unsupported_invalid`
-> blocker without a `Formentation.ValidationPlan`
+> blocker without a `Formentation.Definition.ValidationPlan`
 > ([[declaring-with-json-schema|the JSON Schema source]] is the one that
 > can make that call). A `required: true` property that is unsupported
 > still concretely blocks submission the moment the original data is
@@ -155,7 +155,7 @@ case being a long string:
 {"notes", %{kind: :string, widget: :textarea, help: "Visible to all technicians."}}
 ```
 
-Widget names the reference theme understands are listed in
+Widget names the reference UI understands are listed in
 [[rendering-with-phoenix#Which widget you get|Rendering with Phoenix]]. A
 widget it cannot render falls back to the inferred one and records a
 diagnostic rather than failing.

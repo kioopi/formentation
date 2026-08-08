@@ -287,9 +287,9 @@ be visible in the outer model:
 ```elixir
 %Formentation.Definition{
   format_version: 3,
-  semantic: %Formentation.Semantic.Object{},
-  presentation: %Formentation.Presentation.Root{},
-  validation: %Formentation.ValidationPlan{} | nil,
+  semantic: %Formentation.Definition.Semantic.Object{},
+  presentation: %Formentation.Definition.Presentation.Root{},
+  validation: %Formentation.Definition.ValidationPlan{} | nil,
   diagnostics: []
 }
 ```
@@ -355,7 +355,7 @@ Module selection stays valid everywhere and is what a third-party adapter uses:
 
 ```elixir
 Formentation.compile(schema,
-  adapter: Formentation.JSONSchema,
+  adapter: Formentation.Source.JSONSchema,
   ui: ui_hints
 )
 ```

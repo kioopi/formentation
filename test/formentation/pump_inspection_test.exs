@@ -1,13 +1,16 @@
 defmodule Formentation.PumpInspectionTest do
   use ExUnit.Case, async: true
 
+  alias Formentation.Definition.{Presentation, Semantic}
   alias Formentation.Fixtures.PumpInspection
-  alias Formentation.{Info, Presentation, Semantic}
-  alias Formentation.Info.Presentation, as: PresentationInfo
+  alias Formentation.Info
+  alias Formentation.Info.Layout, as: PresentationInfo
 
   setup do
     {:ok, definition, []} =
-      Formentation.compile(PumpInspection.map_source(), adapter: Formentation.Source.Map)
+      Formentation.compile(PumpInspection.map_source(),
+        adapter: Formentation.Source.Map
+      )
 
     %{definition: definition}
   end
@@ -53,7 +56,9 @@ defmodule Formentation.PumpInspectionTest do
 
   test "compilation is deterministic", %{definition: definition} do
     {:ok, again, []} =
-      Formentation.compile(PumpInspection.map_source(), adapter: Formentation.Source.Map)
+      Formentation.compile(PumpInspection.map_source(),
+        adapter: Formentation.Source.Map
+      )
 
     assert again == definition
   end

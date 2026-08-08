@@ -8,9 +8,13 @@
   layers: [
     # Pure structural core: paths, nodes, definition, diagnostics, runtime
     # form state, codecs, transport. Source-independent and framework-free.
+    #
+    # The source adapters now live under their own top-level
+    # Formentation.Source namespace (siblings of Formentation.Definition,
+    # not nested under it), so the wildcard below no longer collides with
+    # :source/:json_schema and needs no per-submodule enumeration.
     core: [
       "Formentation",
-      "Formentation.Codec",
       "Formentation.Definition",
       "Formentation.Definition.*",
       "Formentation.Diagnostic",
@@ -23,23 +27,23 @@
       "Formentation.JSONPointer",
       "Formentation.NodeId",
       "Formentation.Origin",
-      "Formentation.Params",
-      "Formentation.Presentation",
-      "Formentation.Presentation.*",
-      "Formentation.Semantic",
-      "Formentation.Semantic.*",
-      "Formentation.SubmissionBlocker",
-      "Formentation.TemplatePath",
-      "Formentation.Transport",
-      "Formentation.Transport.*",
-      "Formentation.Validation",
-      "Formentation.ValidationPlan"
+      "Formentation.TemplatePath"
     ],
     # Declaration-source adapters. The map source is the in-core reference
     # adapter (D-004); Source.Shared holds adapter-generic compile helpers.
-    source: ["Formentation.Source", "Formentation.Source.*"],
+    # Enumerated rather than wildcarded so the JSON Schema adapter below
+    # stays a distinct layer — see the note on :core.
+    source: [
+      "Formentation.Source",
+      "Formentation.Source.Map",
+      "Formentation.Source.Shared",
+      "Formentation.Source.Shared.*"
+    ],
     # JSON Schema adapter — the only namespace allowed to touch JSV (D-008).
-    json_schema: ["Formentation.JSONSchema", "Formentation.JSONSchema.*"],
+    json_schema: [
+      "Formentation.Source.JSONSchema",
+      "Formentation.Source.JSONSchema.*"
+    ],
     # Phoenix projection layer (D-017). The FormData protocol impl is named
     # Phoenix.HTML.FormData.Formentation.Form by defimpl, hence the second
     # pattern. Formentation.Phoenix itself (the public component surface)
@@ -77,7 +81,7 @@
       # core must never invoke an adapter function directly.
       {:core, :source},
       # Core never calls an adapter: instance validation dispatches through
-      # the Formentation.Validation behaviour (D-025), so there is no
+      # the Formentation.Definition.Validation behaviour (D-025), so there is no
       # sanctioned core->json_schema call edge. See the D-046 note above for
       # the name-only selector exception.
       {:core, :json_schema},
@@ -100,14 +104,15 @@
       # "zero Phoenix dependency").
       {"Formentation.*", ["Phoenix.*"], except: ["Formentation.Phoenix.*"]},
       # JSV never leaks past its swap point (D-008).
-      {"Formentation.*", ["JSV.*"], except: ["Formentation.JSONSchema.Validator"]},
+      {"Formentation.*", ["JSV.*"],
+       except: ["Formentation.Source.JSONSchema.Validator"]},
       # Render preparation dispatches state-dependent decisions only through
       # Formentation.Phoenix.StateView (D-027); it must never call into
       # Formentation.Form directly. The {:phoenix, :core} layer dependency
       # is sanctioned (the projector reads Definition/Info/Node freely), so
       # no layer rule can express this narrower obligation — only a
       # per-module call rule can. This closes the alias-evasion gap the
-      # render_preparation_test.exs "architectural boundary" grep pin cannot see:
+      # render/preparation_test.exs "architectural boundary" grep pin cannot see:
       # `alias Formentation.{Form, ...}` (brace syntax) never produces the
       # literal substring "Formentation.Form" the grep looks for, but Reach
       # resolves calls against the call graph after alias resolution, so it
@@ -120,9 +125,9 @@
       # non-field issues must still cross the StateView seam. Do not relieve
       # pressure on this rule by moving further state-dependent decisions into
       # ProjectedForm; the "architectural boundary" tests in
-      # render_preparation_test.exs pin both that ProjectedForm never names
+      # render/preparation_test.exs pin both that ProjectedForm never names
       # StateView and that nothing else spells the private projection key.
-      {"Formentation.Phoenix.RenderPreparation", ["Formentation.Form", "Formentation.Form.*"]}
+      {"Formentation.Phoenix.Render.Preparation", ["Formentation.Form", "Formentation.Form.*"]}
     ]
   ],
   effects: [
@@ -159,7 +164,7 @@
     internal: ["Formentation.Source.Shared"],
     internal_callers: [
       {"Formentation.Source.Shared",
-       ["Formentation.Source.*", "Formentation.JSONSchema", "Formentation.JSONSchema.*"]}
+       ["Formentation.Source.*"]}
     ]
   ],
   smells: [
@@ -216,8 +221,10 @@
   ],
   tests: [
     hints: [
-      {"lib/formentation/phoenix/**", ["test/formentation/phoenix"]},
-      {"lib/formentation/json_schema/**", ["test/formentation/json_schema"]},
+      {"lib/formentation/phoenix/**",
+       ["test/formentation/phoenix", "test/formentation/invariants"]},
+      {"lib/formentation/source/json_schema/**",
+       ["test/formentation/source/json_schema"]},
       {"lib/formentation/source/**", ["test/formentation/source"]},
       {"lib/formentation/form.ex",
        ["test/formentation/form_test.exs", "test/formentation/form_property_test.exs"]}

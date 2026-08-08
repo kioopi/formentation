@@ -1,8 +1,9 @@
 defmodule Formentation.Source.MapTest do
   use ExUnit.Case, async: true
 
-  alias Formentation.{Info, Presentation, Semantic, TemplatePath}
-  alias Formentation.Info.Presentation, as: PresentationInfo
+  alias Formentation.Definition.{Presentation, Semantic}
+  alias Formentation.{Info, TemplatePath}
+  alias Formentation.Info.Layout, as: PresentationInfo
 
   defp compile!(declaration, opts \\ []) do
     {:ok, definition, _diagnostics} =
@@ -177,7 +178,8 @@ defmodule Formentation.Source.MapTest do
         ]
       }
 
-      {:ok, definition, []} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      {:ok, definition, []} =
+        Formentation.compile(declaration, adapter: Formentation.Source.Map)
 
       for {name, expected} <- [
             {"name", :string},
@@ -187,11 +189,11 @@ defmodule Formentation.Source.MapTest do
             {"when", :string},
             {"choice", :string}
           ] do
-        assert %Formentation.Semantic.Field{value_type: ^expected} =
+        assert %Formentation.Definition.Semantic.Field{value_type: ^expected} =
                  Formentation.Info.node_at(definition, [name])
       end
 
-      assert %Formentation.Semantic.Object{} = Formentation.Info.root(definition)
+      assert %Formentation.Definition.Semantic.Object{} = Formentation.Info.root(definition)
     end
   end
 
@@ -352,7 +354,8 @@ defmodule Formentation.Source.MapTest do
                     origin: {:map_source, [:properties, "field", :one_of, 0]},
                     message: msg
                   }
-                ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+                ]} =
+                 Formentation.compile(declaration, adapter: Formentation.Source.Map)
 
         assert msg =~ desc
       end
@@ -1096,14 +1099,20 @@ defmodule Formentation.Source.MapTest do
       declaration = %{kind: :object, properties: [{"a", %{kind: :string}}]}
 
       assert {:error, [%Formentation.Diagnostic{code: :max_nodes_exceeded}]} =
-               Formentation.compile(declaration, adapter: Formentation.Source.Map, max_nodes: 0)
+               Formentation.compile(declaration,
+                 adapter: Formentation.Source.Map,
+                 max_nodes: 0
+               )
     end
 
     test "a negative max_nodes errors immediately with max_nodes_exceeded" do
       declaration = %{kind: :object, properties: [{"a", %{kind: :string}}]}
 
       assert {:error, [%Formentation.Diagnostic{code: :max_nodes_exceeded}]} =
-               Formentation.compile(declaration, adapter: Formentation.Source.Map, max_nodes: -1)
+               Formentation.compile(declaration,
+                 adapter: Formentation.Source.Map,
+                 max_nodes: -1
+               )
     end
   end
 

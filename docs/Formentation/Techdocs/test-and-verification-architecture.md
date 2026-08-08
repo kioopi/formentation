@@ -12,7 +12,7 @@ status: current
 
 # Test and verification architecture
 
-> [!note] As of 2026-08-07 · step 7 + browser-testing suite + vault link and docs gates + the test.dev inner loop + adapter resolution (D-046)
+> [!note] As of 2026-08-08 · step 7 + browser-testing suite + vault link and docs gates + the test.dev inner loop + adapter resolution (D-046) + the invariants suite moved into `test/formentation/invariants/` + the three-way test-tree layout (module-mirroring, invariants, flat feature suites) documented
 > Describes the verification setup as built: the kinds of test in the
 > suite, what each one pins, and the static gates in `mix ci` — including
 > the demo's `Phoenix.LiveViewTest` suite and, now, the opt-in browser-real
@@ -124,10 +124,10 @@ that actually *matters* is asserted semantically instead — see below.
 
 `Formentation.HTMLAssertions` provides Floki helpers — `assert_labelled`,
 `describedby`, `assert_no_duplicate_ids`, `find_one` — shared by the
-theme, component, and snapshot tests, and each maps to a numbered item of
-[[rendering#Reference theme|the accessibility contract]]. Asserting
+UI, component, and snapshot tests, and each maps to a numbered item of
+[[rendering#`UI.Reference` components|the accessibility contract]]. Asserting
 "every control has a non-empty `<label for>` pointing at its id" as a DOM
-query rather than a substring match is what lets the theme's markup be
+query rather than a substring match is what lets the UI's markup be
 restyled freely while its guarantees stay pinned.
 
 ### The demo is where the LiveView lifecycle gets tested
@@ -245,8 +245,8 @@ forbidden from depending on `json_schema` **outright, with no exception**.
 Instance validation used to be the one sanctioned core→adapter edge
 (`Formentation.Form` → `JSONSchema.Validator`), which forced a baselined
 core/`json_schema` layer cycle; that dispatch now goes through the
-core-owned `Formentation.Validation` behaviour, so the edge, its named
-exception, and the baseline file are all gone ([[18-decisions#D-025 — Instance validation dispatches through a source-neutral behaviour|D-025]]). Core now names both adapter modules (`Formentation.Source.Map` and `Formentation.JSONSchema`) literally, as values returned by `resolve_adapter!/1`; the gate stays green because a module literal returned as a value is not a call edge the reach tool can see — the invariant's essence still holds: core resolves an adapter but never names one in a call position.
+core-owned `Formentation.Definition.Validation` behaviour, so the edge, its named
+exception, and the baseline file are all gone ([[18-decisions#D-025 — Instance validation dispatches through a source-neutral behaviour|D-025]]). Core now names both adapter modules (`Formentation.Source.Map` and `Formentation.Source.JSONSchema`) literally, as values returned by `resolve_adapter!/1`; the gate stays green because a module literal returned as a value is not a call edge the reach tool can see — the invariant's essence still holds: core resolves an adapter but never names one in a call position.
 
 **The Phoenix boundary is checked twice, differently.** `reach` checks it
 by module pattern; `boundary_test.exs` walks the AST of every file
@@ -263,7 +263,7 @@ The property that makes all of the above affordable is the one-directional
 [[end-to-end-data-flow|data flow]]: each layer is testable without the
 next. The compile pipeline is tested with no runtime state; the state
 layer with no Phoenix; the projector against any `FormData` source; the
-theme against a hand-built plan. Nothing needs a `Plug.Conn`, a LiveView
+UI against a hand-built plan. Nothing needs a `Plug.Conn`, a LiveView
 process, or a browser.
 
 That is not a happy accident of the test suite — it is the layering
@@ -289,16 +289,41 @@ no benchmarks. Coverage is measured (`mix six`) but no threshold gates the
 build. Diagnostic codes are asserted where they are produced but are not
 pinned against accidental renaming by any registry.
 
+## Where a new test belongs
+
+`test/` deliberately mixes three conventions rather than one, and choosing
+between them for a new test is a judgment call, not a lookup:
+
+- **Module-mirroring unit tests** sit beside the module they exercise
+  (`test/formentation/form/codec_test.exs` next to
+  `lib/formentation/form/codec.ex`) — the default whenever a test is about
+  one module's own contract.
+- **Cross-cutting contracts** live under `test/formentation/invariants/`
+  (`differential_test.exs`, `boundary_test.exs`,
+  `used_input_contract_test.exs`) — for claims that span multiple modules
+  or layers and have no single natural module to mirror, such as "the two
+  adapters agree" or "nothing outside Phoenix references Phoenix".
+- **Feature-level suites** stay flat at `test/formentation/`
+  (`form_submission_test.exs`, `form_nested_presence_test.exs`,
+  `form_validation_dispatch_test.exs`, `facade_test.exs`,
+  `pump_inspection_test.exs`) — for behaviour that a user-facing feature
+  exercises across several modules, where mirroring would fragment one
+  coherent scenario across each contributing module's test file instead.
+
+A new test mirrors its module by default; it moves to `invariants/` only
+when the claim is genuinely cross-module, and stays flat only when it is
+exercising a feature no single module owns.
+
 ## Code map
 
 | Concern | File |
 | --- | --- |
-| Differential property | `test/formentation/differential_test.exs` |
+| Differential property | `test/formentation/invariants/differential_test.exs` |
 | Fixture behaviour | `test/support/fixture.ex` |
 | Shared fixtures | `test/support/fixtures/` |
 | Accessibility helpers | `test/support/html_assertions.ex` |
 | Reviewed snapshot | `test/support/fixtures/pump_inspection/static_render.html` |
-| Phoenix boundary (AST) | `test/formentation/phoenix/boundary_test.exs` |
+| Phoenix boundary (AST) | `test/formentation/invariants/boundary_test.exs` |
 | Architecture policy | `.reach.exs` |
 | CI pipeline | `mix.exs` — the `ci` alias |
 | LiveView demo suite | `test/formentation_demo/`, `demo/formentation_demo/` |
@@ -310,7 +335,7 @@ pinned against accidental renaming by any registry.
 - [[browser-testing|Browser testing]] — the opt-in Playwright suite this note's mechanism table now includes
 - [[end-to-end-data-flow|End-to-end data flow]] — the layering this exploits
 - [[source-adapters#The differential-equivalence property|Source adapters]] — the differential property in context
-- [[rendering#Reference theme|Rendering]] — the accessibility contract being asserted
+- [[rendering#`UI.Reference` components|Rendering]] — the accessibility contract being asserted
 - [[phoenix-form-data|The FormData projection]] — what the contract tests pin
 - Design (Planning): [[11-testing-strategy|Testing strategy]] · [[02-design-principles|Design principles]]
 - [[Techdocs]] · [[Formentation|Vault entry note]]

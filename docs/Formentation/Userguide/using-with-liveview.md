@@ -42,7 +42,7 @@ rather than invented for this page.
 def mount(_params, _session, socket) do
   {:ok, definition, _diagnostics} =
     Formentation.compile(PumpInspection.json_schema(),
-      adapter: Formentation.JSONSchema,
+      adapter: Formentation.Source.JSONSchema,
       ui: PumpInspection.ui_hints()
     )
 
@@ -130,7 +130,7 @@ returns the changed form state. `Form.submit/2` runs the corresponding
 when `submission_status/1` is `:ready`; undecodable, blocked, and invalid
 submissions return `{:error, submitted_form}` for redisplay. Hand both
 functions the raw params subtree Phoenix already gave you: no
-`%Formentation.Params{}` envelope to build yourself in ordinary handlers.
+`%Formentation.Form.Params{}` envelope to build yourself in ordinary handlers.
 
 ### Under embedding, pluck your subtree first
 
@@ -181,7 +181,7 @@ visibility (below) a property of the form state itself rather than
 something a template can accidentally short-circuit.
 
 **2. Re-project after every transition.**
-`Formentation.Phoenix.RenderPlan` is a pure function of the definition
+`Formentation.Phoenix.Render.Plan` is a pure function of the definition
 and the *current* `Phoenix.HTML.Form` — every `handle_event` above ends
 by calling `assign_payload/1` again on the post-transition form state,
 exactly like a controller re-renders after a POST. There is no
@@ -258,7 +258,7 @@ output and redisplays the returned submitted form.
 
 The pump-inspection page (`/`) opens with a checkbox above the form,
 labeled "Native browser validation" and checked by default. It flips
-`novalidate` on `<.form>`. Checked (the default), the reference theme's
+`novalidate` on `<.form>`. Checked (the default), the reference UI's
 HTML5 `required`/`minlength` attributes do their normal job: a browser
 blocks a Save click on a blank required field before it is ever sent, and
 you see the browser's own native error bubble. Uncheck it and Save again

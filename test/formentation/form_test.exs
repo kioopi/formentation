@@ -2,14 +2,16 @@ defmodule Formentation.FormTest do
   use ExUnit.Case, async: true
 
   alias Formentation.Fixtures.PumpInspection
-  alias Formentation.{Form, InstancePath, Issue, Params}
-  alias Formentation.Form.FieldState
+  alias Formentation.{Form, InstancePath, Issue}
+  alias Formentation.Form.{FieldState, Params}
 
   doctest Formentation.Form
 
   defp pump_definition do
     {:ok, definition, []} =
-      Formentation.compile(PumpInspection.map_source(), adapter: Formentation.Source.Map)
+      Formentation.compile(PumpInspection.map_source(),
+        adapter: Formentation.Source.Map
+      )
 
     definition
   end
@@ -17,7 +19,7 @@ defmodule Formentation.FormTest do
   defp json_pump_definition do
     {:ok, definition, []} =
       Formentation.compile(PumpInspection.json_schema(),
-        adapter: Formentation.JSONSchema,
+        adapter: Formentation.Source.JSONSchema,
         ui: PumpInspection.ui_hints()
       )
 
@@ -61,7 +63,9 @@ defmodule Formentation.FormTest do
         ]
       }
 
-      {:ok, definition, []} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      {:ok, definition, []} =
+        Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
       definition
     end
 
@@ -107,7 +111,8 @@ defmodule Formentation.FormTest do
         groups: [%{id: "g", fields: ["priority"]}]
       }
 
-      {:ok, definition, []} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      {:ok, definition, []} =
+        Formentation.compile(declaration, adapter: Formentation.Source.Map)
 
       form = Form.new(definition, %{}, defaults: :apply)
 
@@ -118,7 +123,7 @@ defmodule Formentation.FormTest do
       form =
         defaults_definition()
         |> Form.new(%{}, defaults: :apply)
-        |> Form.transition(%Formentation.Params{values: %{}})
+        |> Form.transition(%Formentation.Form.Params{values: %{}})
 
       assert {:ok, candidate} = Form.candidate(form)
       refute Map.has_key?(candidate, "priority")
@@ -364,7 +369,9 @@ defmodule Formentation.FormTest do
         ]
       }
 
-      {:ok, definition, []} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      {:ok, definition, []} =
+        Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
       definition
     end
 
@@ -465,7 +472,7 @@ defmodule Formentation.FormTest do
       }
 
       {:ok, definition, diagnostics} =
-        Formentation.compile(schema, adapter: Formentation.JSONSchema)
+        Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
       assert Enum.any?(diagnostics, &(&1.code == :validator_unavailable))
       assert definition.validation == nil
@@ -601,7 +608,7 @@ defmodule Formentation.FormTest do
 
     test "is true after an explicit :submit transition envelope" do
       form =
-        Form.transition(Form.new(pump_definition()), %Formentation.Params{
+        Form.transition(Form.new(pump_definition()), %Formentation.Form.Params{
           values: %{"serial_number" => "PX"},
           event: :submit
         })
@@ -678,7 +685,9 @@ defmodule Formentation.FormTest do
         ]
       }
 
-      {:ok, definition, []} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      {:ok, definition, []} =
+        Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
       definition
     end
 
@@ -740,7 +749,7 @@ defmodule Formentation.FormTest do
       # diagnostics are non-empty here (:required_permits_empty advisory) — expected
       {:ok, definition, _diagnostics} =
         Formentation.compile(schema,
-          adapter: Formentation.JSONSchema,
+          adapter: Formentation.Source.JSONSchema,
           ui: %{"fields" => %{"serial_number" => %{"read_only" => true}}}
         )
 
@@ -760,7 +769,9 @@ defmodule Formentation.FormTest do
         ]
       }
 
-      {:ok, definition, []} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      {:ok, definition, []} =
+        Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
       form = Form.new(definition, %{"revision" => 4})
 
       form =

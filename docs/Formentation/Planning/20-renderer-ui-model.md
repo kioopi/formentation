@@ -874,7 +874,7 @@ both, and reject UI dependencies on:
 
 - `Formentation.Node.*` and private `Definition` representation;
 - private semantic traversal and query helpers such as
-  `Formentation.Semantic.*`, which are the most tempting substitute for a
+  `Formentation.Definition.Semantic.*`, which are the most tempting substitute for a
   prepared view;
 - JSON Schema, map-source, Ash, or native-state adapter internals;
 - private projector/render-plan/render-node structs;
@@ -1042,7 +1042,7 @@ target vocabulary is:
   context, UI descriptor, and overrides become a prepared view;
 - **rendering** — the selected UI turns that prepared view into output.
 
-`Formentation.Phoenix.RenderPreparation` performs render preparation, and
+`Formentation.Phoenix.Render.Preparation` performs render preparation, and
 [[06-runtime-projection|Runtime projection]] retains the historical term. The
 module rename is recorded in
 [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]. Documentation and new public APIs should prefer
@@ -1291,7 +1291,7 @@ The alignment work should not add:
 Those would commit to the seam before the split definition and collections have
 provided representative requirements. The pre-`0.1.0` alignment renamed
 `Formentation.Phoenix.Projector` to reflect preparation and
-`Formentation.Phoenix.Theme.Reference` to remove the obsolete architectural use
+`Formentation.Phoenix.UI.Reference` to remove the obsolete architectural use
 of “theme”; [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]
 records those vocabulary corrections, not a public UI contract.
 
@@ -1372,7 +1372,7 @@ Phase 3 prototypes must decide:
   preparation and large collections;
 - whether Spark materially improves authoring after plain descriptors exist;
 - whether `value_type`, `role`, and `required?` — the flat prepared meaning
-  facts on `RenderNode.Field` established by
+  facts on `Render.Node.Field` established by
   [[18-decisions#D-038 — Semantic value type and abstract widget are orthogonal prepared facts|D-038]]
   and [[18-decisions#D-043 — Semantic `role` and schema `required?` join `value_type` as flat prepared facts|D-043]] —
   should be grouped into a dedicated "prepared meaning" sub-struct once a

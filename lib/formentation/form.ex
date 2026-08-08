@@ -26,20 +26,11 @@ defmodule Formentation.Form do
       "42"
   """
 
-  alias Formentation.{
-    Codec,
-    Definition,
-    Info,
-    InstancePath,
-    Issue,
-    Params,
-    Semantic,
-    SubmissionBlocker,
-    Transport,
-    ValidationPlan
-  }
+  alias Formentation.{Definition, Info, InstancePath, Issue}
 
-  alias Formentation.Form.FieldState
+  alias Formentation.Definition.Semantic
+  alias Formentation.Definition.ValidationPlan
+  alias Formentation.Form.{Codec, FieldState, Params, SubmissionBlocker, Transport}
 
   @enforce_keys [:definition, :original]
   defstruct [
@@ -136,7 +127,7 @@ defmodule Formentation.Form do
   end
 
   @doc """
-  The concrete `Formentation.SubmissionBlocker`s for this form's current
+  The concrete `Formentation.Form.SubmissionBlocker`s for this form's current
   candidate, in unsupported-node declaration order; `[]` while the
   candidate is `:none` (classification defers with validation, D-012).
 
@@ -170,7 +161,7 @@ defmodule Formentation.Form do
       ...>     adapter: Formentation.Source.Map
       ...>   )
       iex> form = Formentation.Form.new(definition, %{})
-      iex> match?({:blocked, [%Formentation.SubmissionBlocker{code: :unsupported_required}]},
+      iex> match?({:blocked, [%Formentation.Form.SubmissionBlocker{code: :unsupported_required}]},
       ...>   Formentation.Form.submission_status(form))
       true
   """
