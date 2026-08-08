@@ -6,7 +6,8 @@ defmodule Formentation.Phoenix.ComponentsTest do
   import Formentation.HTMLAssertions
   import Phoenix.LiveViewTest, only: [render_component: 2]
 
-  alias Formentation.{Form, InstancePath, Params}
+  alias Formentation.{Form, InstancePath}
+  alias Formentation.Form.Params
   alias Formentation.Phoenix.{DOMIdentity, StateView}
   alias Phoenix.HTML.FormData
 

@@ -1,9 +1,10 @@
-defmodule Formentation.TransportTest do
+defmodule Formentation.Form.TransportTest do
   use ExUnit.Case, async: true
 
-  alias Formentation.{InstancePath, Transport}
+  alias Formentation.Form.Transport
+  alias Formentation.InstancePath
 
-  doctest Formentation.Transport
+  doctest Formentation.Form.Transport
 
   defp path(segments), do: InstancePath.new!(segments)
 

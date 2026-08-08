@@ -248,7 +248,7 @@ and group entries stay unlabelled.
 
 Capability explanations are not a projector concept. The
 `%Formentation.Form{}` state view translates each
-`Formentation.SubmissionBlocker` from `Form.submission_blockers/1` into one
+`Formentation.Form.SubmissionBlocker` from `Form.submission_blockers/1` into one
 normalized `StateView.Issue` at the owning unsupported node's path, whose
 message is the blocker's source-neutral capability text with the owned
 validation messages appended after `"Validation: "` when there are any. It

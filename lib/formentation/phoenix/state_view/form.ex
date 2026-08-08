@@ -7,7 +7,8 @@ defimpl Formentation.Phoenix.StateView, for: Formentation.Form do
   `Formentation.Form` only through that module's public queries.
   """
 
-  alias Formentation.{Form, InstancePath, SubmissionBlocker}
+  alias Formentation.{Form, InstancePath}
+  alias Formentation.Form.SubmissionBlocker
   alias Formentation.Phoenix.StateView
 
   def submitted?(form_state, _form), do: Form.submitted?(form_state)

@@ -3,7 +3,8 @@ defmodule Formentation.LayoutInvarianceTest do
 
   import Formentation.Test.FormHelpers
 
-  alias Formentation.{Form, Info, Issue, SubmissionBlocker}
+  alias Formentation.{Form, Info, Issue}
+  alias Formentation.Form.SubmissionBlocker
 
   @field_paths [
     ["title"],

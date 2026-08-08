@@ -1,4 +1,4 @@
-defmodule Formentation.Codec do
+defmodule Formentation.Form.Codec do
   @moduledoc """
   Scalar decoders from transport encodings to JSON values (D-010).
 
@@ -33,15 +33,15 @@ defmodule Formentation.Codec do
   string clears the key. String controls preserve input verbatim.
 
       iex> path = Formentation.InstancePath.new!(["age"])
-      iex> Formentation.Codec.decode(:integer, " 42 ", path)
+      iex> Formentation.Form.Codec.decode(:integer, " 42 ", path)
       {:set, 42}
-      iex> Formentation.Codec.decode(:integer, "", path)
+      iex> Formentation.Form.Codec.decode(:integer, "", path)
       :unset
-      iex> Formentation.Codec.decode(:string, "", path)
+      iex> Formentation.Form.Codec.decode(:string, "", path)
       {:set, ""}
-      iex> Formentation.Codec.decode(:boolean, "true", path)
+      iex> Formentation.Form.Codec.decode(:boolean, "true", path)
       {:set, true}
-      iex> {:invalid, issue} = Formentation.Codec.decode(:integer, "4x", path)
+      iex> {:invalid, issue} = Formentation.Form.Codec.decode(:integer, "4x", path)
       iex> {issue.code, issue.source}
       {:invalid_integer, :decode}
   """

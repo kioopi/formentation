@@ -8,7 +8,8 @@ defmodule Formentation.Phoenix.UsedInputContractTest do
 
   import Phoenix.Component, only: [used_input?: 1]
 
-  alias Formentation.{Form, Params}
+  alias Formentation.Form
+  alias Formentation.Form.Params
   alias Formentation.Phoenix.{RenderNode, RenderPreparation}
   alias Phoenix.HTML.FormData
 

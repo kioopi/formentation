@@ -101,7 +101,7 @@ Transitions are pure and usable from IEx — no Phoenix required:
 form = Formentation.Form.new(definition, %{"serial_number" => "PX-2044"})
 
 form =
-  Formentation.Form.transition(form, %Formentation.Params{
+  Formentation.Form.transition(form, %Formentation.Form.Params{
     values: %{"serial_number" => "PX-2044", "operating_hours" => "51o2"},
     event: :change
   })

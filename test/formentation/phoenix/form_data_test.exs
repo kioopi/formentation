@@ -4,7 +4,8 @@ defmodule Formentation.Phoenix.FormDataTest do
   import Formentation.Test.FormHelpers
 
   alias Formentation.Fixtures.PumpInspection
-  alias Formentation.{Form, Params}
+  alias Formentation.Form
+  alias Formentation.Form.Params
   alias Formentation.Phoenix.ProjectedForm
   alias Phoenix.HTML.FormData
 

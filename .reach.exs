@@ -17,7 +17,6 @@
     # require_all_modules fails the build.
     core: [
       "Formentation",
-      "Formentation.Codec",
       "Formentation.Definition",
       "Formentation.Definition.Finalizer",
       "Formentation.Definition.Finalizer.*",
@@ -37,11 +36,7 @@
       "Formentation.JSONPointer",
       "Formentation.NodeId",
       "Formentation.Origin",
-      "Formentation.Params",
-      "Formentation.SubmissionBlocker",
-      "Formentation.TemplatePath",
-      "Formentation.Transport",
-      "Formentation.Transport.*"
+      "Formentation.TemplatePath"
     ],
     # Declaration-source adapters. The map source is the in-core reference
     # adapter (D-004); Source.Shared holds adapter-generic compile helpers.
