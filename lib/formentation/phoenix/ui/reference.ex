@@ -1,4 +1,4 @@
-defmodule Formentation.Phoenix.Theme.Reference do
+defmodule Formentation.Phoenix.UI.Reference do
   @moduledoc false
 
   use Phoenix.Component
@@ -50,7 +50,7 @@ defmodule Formentation.Phoenix.Theme.Reference do
 
       iex> import Phoenix.LiveViewTest
       iex> html =
-      ...>   render_component(&Formentation.Phoenix.Theme.Reference.error_summary/1,
+      ...>   render_component(&Formentation.Phoenix.UI.Reference.error_summary/1,
       ...>     summary: [%Formentation.Phoenix.Render.Plan.SummaryEntry{id: "email", label: "Email", message: "is required"}]
       ...>   )
       iex> html =~ ~s(role="alert") and html =~ ~s(href="#email")

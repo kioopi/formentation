@@ -385,7 +385,7 @@ renderer ids are the control/label/help/error/fieldset/summary relationship
 surface. Groups render optional help with the already-prepared `GroupDOM.help`
 identity; components never derive help IDs themselves.
 
-## Reference components (`Formentation.Phoenix.Theme.Reference`)
+## Reference components (`Formentation.Phoenix.UI.Reference`)
 
 Per-widget function components called directly by `fields/1` and
 `field/1` — nothing dispatches through a configurable theme parameter.

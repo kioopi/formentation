@@ -39,7 +39,7 @@ for the reasoning behind each one.
   | `Formentation.Phoenix.RenderPlan` (and `.SummaryEntry`) | `Formentation.Phoenix.Render.Plan` (`.SummaryEntry`) |
   | `Formentation.Phoenix.RenderNode` (and `.Field`/`.Group`/`.FieldDOM`/`.GroupDOM`) | `Formentation.Phoenix.Render.Node` (`.Field`/`.Group`/`.FieldDOM`/`.GroupDOM`) |
   | `Formentation.Phoenix.RenderPreparation` (and `.Context`/`.Summary`/`.Visibility`/`.Widget`) | `Formentation.Phoenix.Render.Preparation` (`.Context`/`.Summary`/`.Visibility`/`.Widget`) |
-  | `Formentation.Phoenix.ReferenceComponents` | `Formentation.Phoenix.Theme.Reference` |
+  | `Formentation.Phoenix.ReferenceComponents` | `Formentation.Phoenix.UI.Reference` |
 
   The public API surface (`Formentation.compile/2`, `Formentation.form/2`,
   `Formentation.Form`, `Formentation.Info`, `Formentation.Phoenix.fields/1`

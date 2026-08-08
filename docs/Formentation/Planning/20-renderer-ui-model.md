@@ -1291,7 +1291,7 @@ The alignment work should not add:
 Those would commit to the seam before the split definition and collections have
 provided representative requirements. The pre-`0.1.0` alignment renamed
 `Formentation.Phoenix.Projector` to reflect preparation and
-`Formentation.Phoenix.Theme.Reference` to remove the obsolete architectural use
+`Formentation.Phoenix.UI.Reference` to remove the obsolete architectural use
 of “theme”; [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]
 records those vocabulary corrections, not a public UI contract.
 

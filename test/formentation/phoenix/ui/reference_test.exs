@@ -1,7 +1,7 @@
-defmodule Formentation.Phoenix.Theme.ReferenceTest do
+defmodule Formentation.Phoenix.UI.ReferenceTest do
   use ExUnit.Case, async: true
 
-  doctest Formentation.Phoenix.Theme.Reference
+  doctest Formentation.Phoenix.UI.Reference
 
   import Formentation.HTMLAssertions
   import Phoenix.LiveViewTest, only: [render_component: 2]
@@ -9,7 +9,7 @@ defmodule Formentation.Phoenix.Theme.ReferenceTest do
   alias Formentation.InstancePath
   alias Formentation.Phoenix.DOMIdentity
   alias Formentation.Phoenix.Render.Node
-  alias Formentation.Phoenix.Theme.Reference
+  alias Formentation.Phoenix.UI.Reference
 
   defp field_id(path, part), do: DOMIdentity.field("payload", InstancePath.new!(path), part)
 

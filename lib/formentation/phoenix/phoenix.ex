@@ -15,7 +15,7 @@ defmodule Formentation.Phoenix do
   use Phoenix.Component
 
   alias Formentation.Phoenix.Render.{Plan, Preparation}
-  alias Formentation.Phoenix.Theme.Reference
+  alias Formentation.Phoenix.UI.Reference
 
   @definition_doc "required only when `form`'s source is not a `%Formentation.Form{}`; a form " <>
                     "projected from `Formentation.Form` carries its own definition, and passing " <>

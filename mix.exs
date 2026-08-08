@@ -115,7 +115,7 @@ defmodule Formentation.MixProject do
   # under Formentation.Phoenix.Render.* is the projection pipeline: it keeps
   # its moduledocs on purpose (`h Formentation.Phoenix.Render.Plan` in IEx is
   # supported) and this filter is the only thing holding it back from the
-  # published surface. Formentation.Phoenix.Theme.Reference is the reference
+  # published surface. Formentation.Phoenix.UI.Reference is the reference
   # theme, shipped as an example rather than as API.
   #
   # The single prefix replaces a hand-maintained module list: a new module
@@ -124,7 +124,7 @@ defmodule Formentation.MixProject do
   defp internal_documentation_module?(module) do
     module in [
       Formentation.Phoenix.ProjectedForm,
-      Formentation.Phoenix.Theme.Reference
+      Formentation.Phoenix.UI.Reference
     ] or
       String.starts_with?(Atom.to_string(module), "Elixir.Formentation.Phoenix.Render.")
   end
