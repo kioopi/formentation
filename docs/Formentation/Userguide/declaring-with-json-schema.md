@@ -129,7 +129,7 @@ different from a **bad adapter**, which raises `ArgumentError` — see
 
 > [!important] Unsupported declarations are preserve-only, not editable
 > A property using an unsupported keyword compiles to
-> `Formentation.Semantic.Unsupported`. Its original value survives every
+> `Formentation.Definition.Semantic.Unsupported`. Its original value survives every
 > replace transition untouched — that preservation is the whole reason
 > an edit form does not silently delete data it cannot represent — but
 > the form can never decode, replace, or render it. Submitted params for

@@ -3,7 +3,7 @@ defmodule Formentation.Phoenix.RenderPreparation.Widget do
   Resolves a field's renderer-facing widget.
 
   Not part of the public API — reached only through `RenderPreparation.prepare/2`
-  and `prepare_at/3` while projecting a `Presentation.Field`. Kept out of the
+  and `prepare_at/3` while projecting a `Layout.Field`. Kept out of the
   published docs by `mix.exs`, but documented here because widget resolution is a
   self-contained decision worth understanding on its own: given a
   presentation-declared widget hint (or none) and the field's semantic shape,
@@ -17,8 +17,9 @@ defmodule Formentation.Phoenix.RenderPreparation.Widget do
   table in the rendering techdoc, which this module owns.
   """
 
-  alias Formentation.{Diagnostic, Semantic}
-  alias Formentation.Info.Presentation
+  alias Formentation.Definition.Semantic
+  alias Formentation.Diagnostic
+  alias Formentation.Info.Layout
 
   @type t ::
           :hidden_input
@@ -41,28 +42,28 @@ defmodule Formentation.Phoenix.RenderPreparation.Widget do
 
   ## Examples
 
-      iex> presentation = %Formentation.Info.Presentation.Field{
+      iex> presentation = %Formentation.Info.Layout.Field{
       ...>   semantic_path: Formentation.InstancePath.new!(["a"]),
       ...>   label: nil, help: nil, widget: nil, hidden?: false, origins: []
       ...> }
-      iex> node = Formentation.Semantic.Field.new("a", Formentation.TemplatePath.new!(["a"]), :boolean)
+      iex> node = Formentation.Definition.Semantic.Field.new("a", Formentation.TemplatePath.new!(["a"]), :boolean)
       iex> Formentation.Phoenix.RenderPreparation.Widget.resolve(presentation, node)
       {:checkbox, []}
 
-      iex> presentation = %Formentation.Info.Presentation.Field{
+      iex> presentation = %Formentation.Info.Layout.Field{
       ...>   semantic_path: Formentation.InstancePath.new!(["a"]),
       ...>   label: nil, help: nil, widget: :checkbox, hidden?: false, origins: []
       ...> }
-      iex> node = Formentation.Semantic.Field.new("a", Formentation.TemplatePath.new!(["a"]), :string)
+      iex> node = Formentation.Definition.Semantic.Field.new("a", Formentation.TemplatePath.new!(["a"]), :string)
       iex> {widget, [diagnostic]} = Formentation.Phoenix.RenderPreparation.Widget.resolve(presentation, node)
       iex> {widget, diagnostic.code}
       {:text_input, :widget_fallback}
   """
-  @spec resolve(Presentation.Field.t(), Semantic.Field.t()) :: {t(), [Diagnostic.t()]}
-  def resolve(%Presentation.Field{hidden?: true}, _node), do: {:hidden_input, []}
-  def resolve(%Presentation.Field{widget: nil}, node), do: {infer_widget(node), []}
+  @spec resolve(Layout.Field.t(), Semantic.Field.t()) :: {t(), [Diagnostic.t()]}
+  def resolve(%Layout.Field{hidden?: true}, _node), do: {:hidden_input, []}
+  def resolve(%Layout.Field{widget: nil}, node), do: {infer_widget(node), []}
 
-  def resolve(%Presentation.Field{widget: hint}, node) do
+  def resolve(%Layout.Field{widget: hint}, node) do
     case hinted_widget(hint, node) do
       {:ok, widget} ->
         {widget, []}

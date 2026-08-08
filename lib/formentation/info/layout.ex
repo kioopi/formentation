@@ -1,4 +1,4 @@
-defmodule Formentation.Info.Presentation do
+defmodule Formentation.Info.Layout do
   @moduledoc """
   Typed presentation traversal descriptors returned by `Formentation.Info`.
 
@@ -7,8 +7,9 @@ defmodule Formentation.Info.Presentation do
   stored presentation structs themselves.
   """
 
-  alias Formentation.{Definition, InstancePath, Origin, Semantic}
-  alias Formentation.Presentation, as: Layout
+  alias Formentation.{Definition, InstancePath, Origin}
+  alias Formentation.Definition.Presentation, as: Layout
+  alias Formentation.Definition.Semantic
 
   defmodule Object do
     @moduledoc """
@@ -27,7 +28,7 @@ defmodule Formentation.Info.Presentation do
             label: String.t() | nil,
             help: String.t() | nil,
             origins: [{atom(), Origin.t()}],
-            children: [Formentation.Info.Presentation.descriptor()]
+            children: [Formentation.Info.Layout.descriptor()]
           }
   end
 
@@ -63,7 +64,7 @@ defmodule Formentation.Info.Presentation do
             label: String.t() | nil,
             help: String.t() | nil,
             origins: [{atom(), Origin.t()}],
-            children: [Formentation.Info.Presentation.descriptor()]
+            children: [Formentation.Info.Layout.descriptor()]
           }
   end
 

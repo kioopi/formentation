@@ -1,8 +1,8 @@
-defmodule Formentation.Semantic do
+defmodule Formentation.Definition.Semantic do
   @moduledoc false
 
   alias Formentation.{Definition, InstancePath, TemplatePath}
-  alias Formentation.Semantic
+  alias Formentation.Definition.Semantic
 
   defmodule Entry do
     @moduledoc false

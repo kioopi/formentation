@@ -104,7 +104,7 @@ delete the other half.
 
 > [!important] Unsupported declarations are preserve-only, not editable
 > A property with an unrecognised `:kind` compiles to
-> `Formentation.Semantic.Unsupported`. Its original value survives every
+> `Formentation.Definition.Semantic.Unsupported`. Its original value survives every
 > replace transition untouched — the preservation path that keeps an
 > edit form from silently deleting data it cannot represent — but the
 > form can never decode, replace, or render it, and submitted params for

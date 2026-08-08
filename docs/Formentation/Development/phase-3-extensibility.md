@@ -176,7 +176,7 @@ references to:
 
 - source adapters and source-specific modules;
 - `Formentation.Node.*` or private `Definition` representation;
-- private semantic traversal/query helpers such as `Formentation.Semantic.*`;
+- private semantic traversal/query helpers such as `Formentation.Definition.Semantic.*`;
 - private projector/render-plan/render-node modules;
 - implementation modules not explicitly classified as supported UI API.
 

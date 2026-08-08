@@ -23,8 +23,9 @@ defmodule Formentation.Info do
       false
   """
 
-  alias Formentation.{Definition, Diagnostic, InstancePath, Origin, Semantic}
-  alias Formentation.Info.Presentation
+  alias Formentation.{Definition, Diagnostic, InstancePath, Origin}
+  alias Formentation.Definition.Semantic
+  alias Formentation.Info.Layout
 
   @doc "The root semantic object of the definition tree."
   @spec root(Definition.t()) :: Semantic.Object.t()
@@ -80,9 +81,9 @@ defmodule Formentation.Info do
           Semantic.Object.t()
           | Semantic.Field.t()
           | Semantic.Unsupported.t()
-          | Formentation.Presentation.Object.t()
-          | Formentation.Presentation.Field.t()
-          | Formentation.Presentation.Group.t()
+          | Formentation.Definition.Presentation.Object.t()
+          | Formentation.Definition.Presentation.Field.t()
+          | Formentation.Definition.Presentation.Group.t()
           | nil
   def node(%Definition{semantic_index: %{by_id: by_id}, presentation: presentation}, id)
       when is_binary(id) do
@@ -164,8 +165,8 @@ defmodule Formentation.Info do
   occurrences by `Formentation.InstancePath`; presentation groups carry
   layout identity only.
   """
-  @spec presentation_root(Definition.t()) :: Presentation.Object.t()
-  def presentation_root(%Definition{} = definition), do: Presentation.root(definition)
+  @spec presentation_root(Definition.t()) :: Layout.Object.t()
+  def presentation_root(%Definition{} = definition), do: Layout.root(definition)
 
   @doc """
   Looks up the presentation descriptor for a semantic instance path.
@@ -175,9 +176,9 @@ defmodule Formentation.Info do
   renderable presentation descriptor.
   """
   @spec presentation_at(Definition.t(), [InstancePath.segment()]) ::
-          Presentation.lookup_result()
+          Layout.lookup_result()
   def presentation_at(%Definition{} = definition, segments) do
-    Presentation.at(definition, segments)
+    Layout.at(definition, segments)
   end
 
   @doc "The compile-time diagnostics recorded on the definition."
@@ -204,7 +205,7 @@ defmodule Formentation.Info do
   defp presentation_origins(%Definition{presentation: nil}, _path), do: []
 
   defp presentation_origins(definition, path) do
-    case Presentation.at(definition, path) do
+    case Layout.at(definition, path) do
       {:ok, descriptor} -> descriptor.origins
       :unsupported -> []
       :not_found -> []

@@ -287,8 +287,8 @@ be visible in the outer model:
 ```elixir
 %Formentation.Definition{
   format_version: 3,
-  semantic: %Formentation.Semantic.Object{},
-  presentation: %Formentation.Presentation.Root{},
+  semantic: %Formentation.Definition.Semantic.Object{},
+  presentation: %Formentation.Definition.Presentation.Root{},
   validation: %Formentation.ValidationPlan{} | nil,
   diagnostics: []
 }

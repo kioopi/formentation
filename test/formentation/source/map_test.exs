@@ -1,8 +1,9 @@
 defmodule Formentation.Source.MapTest do
   use ExUnit.Case, async: true
 
-  alias Formentation.{Info, Presentation, Semantic, TemplatePath}
-  alias Formentation.Info.Presentation, as: PresentationInfo
+  alias Formentation.Definition.{Presentation, Semantic}
+  alias Formentation.{Info, TemplatePath}
+  alias Formentation.Info.Layout, as: PresentationInfo
 
   defp compile!(declaration, opts \\ []) do
     {:ok, definition, _diagnostics} =
@@ -187,11 +188,11 @@ defmodule Formentation.Source.MapTest do
             {"when", :string},
             {"choice", :string}
           ] do
-        assert %Formentation.Semantic.Field{value_type: ^expected} =
+        assert %Formentation.Definition.Semantic.Field{value_type: ^expected} =
                  Formentation.Info.node_at(definition, [name])
       end
 
-      assert %Formentation.Semantic.Object{} = Formentation.Info.root(definition)
+      assert %Formentation.Definition.Semantic.Object{} = Formentation.Info.root(definition)
     end
   end
 

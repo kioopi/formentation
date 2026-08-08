@@ -874,7 +874,7 @@ both, and reject UI dependencies on:
 
 - `Formentation.Node.*` and private `Definition` representation;
 - private semantic traversal and query helpers such as
-  `Formentation.Semantic.*`, which are the most tempting substitute for a
+  `Formentation.Definition.Semantic.*`, which are the most tempting substitute for a
   prepared view;
 - JSON Schema, map-source, Ash, or native-state adapter internals;
 - private projector/render-plan/render-node structs;

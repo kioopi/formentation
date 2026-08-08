@@ -164,19 +164,21 @@ defmodule Formentation.MixProject do
           Formentation,
           Formentation.Definition,
           Formentation.Info,
+          Formentation.Info.Layout,
           Formentation.Diagnostic
         ],
         "Nodes & paths": [
-          Formentation.Semantic.Object,
-          Formentation.Semantic.Field,
-          Formentation.Semantic.Unsupported,
-          Formentation.Presentation.Object,
-          Formentation.Presentation.Field,
-          Formentation.Presentation.Group,
+          Formentation.Definition.Semantic.Object,
+          Formentation.Definition.Semantic.Field,
+          Formentation.Definition.Semantic.Unsupported,
+          Formentation.Definition.Presentation.Object,
+          Formentation.Definition.Presentation.Field,
+          Formentation.Definition.Presentation.Group,
           Formentation.NodeId,
           Formentation.InstancePath,
           Formentation.TemplatePath,
-          Formentation.JSONPointer
+          Formentation.JSONPointer,
+          Formentation.Origin
         ],
         "Form runtime": [
           Formentation.Form,

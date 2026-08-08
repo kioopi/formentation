@@ -1,9 +1,10 @@
 defmodule Formentation.PumpInspectionTest do
   use ExUnit.Case, async: true
 
+  alias Formentation.Definition.{Presentation, Semantic}
   alias Formentation.Fixtures.PumpInspection
-  alias Formentation.{Info, Presentation, Semantic}
-  alias Formentation.Info.Presentation, as: PresentationInfo
+  alias Formentation.Info
+  alias Formentation.Info.Layout, as: PresentationInfo
 
   setup do
     {:ok, definition, []} =

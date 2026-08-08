@@ -1,4 +1,4 @@
-defmodule Formentation.Semantic.Field do
+defmodule Formentation.Definition.Semantic.Field do
   @moduledoc """
   Native semantic scalar field occurrence.
 

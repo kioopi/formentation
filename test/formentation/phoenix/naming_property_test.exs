@@ -6,7 +6,8 @@ defmodule Formentation.Phoenix.NamingPropertyTest do
   # back to its own instance path — otherwise what the browser posts
   # would land somewhere other than where the projection reads.
 
-  alias Formentation.{Form, Info, Semantic}
+  alias Formentation.Definition.Semantic
+  alias Formentation.{Form, Info}
   alias Phoenix.HTML.FormData
 
   defp field_name_gen, do: StreamData.string([?a..?z], min_length: 1, max_length: 8)

@@ -1,8 +1,9 @@
 defmodule Formentation.Phoenix.RenderPreparation do
   @moduledoc false
 
-  alias Formentation.{Info, InstancePath, Semantic}
-  alias Formentation.Info.Presentation
+  alias Formentation.Definition.Semantic
+  alias Formentation.{Info, InstancePath}
+  alias Formentation.Info.Layout
   alias Formentation.Phoenix.{DOMIdentity, RenderNode, RenderPlan}
   alias Formentation.Phoenix.RenderPreparation.{Context, Summary, Visibility, Widget}
 
@@ -124,7 +125,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
 
   defp presentation_root_at(definition, root_path) do
     case Info.presentation_at(definition, root_path) do
-      {:ok, %Presentation.Object{} = descriptor} ->
+      {:ok, %Layout.Object{} = descriptor} ->
         descriptor
 
       other ->
@@ -151,7 +152,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
     end)
   end
 
-  defp project_descriptor(%Presentation.Object{semantic_path: path} = object, form, ctx) do
+  defp project_descriptor(%Layout.Object{semantic_path: path} = object, form, ctx) do
     {form, ctx} = object_context(object, path.segments, form, ctx)
     {children, diagnostics} = project_children(object.children, form, ctx)
 
@@ -178,7 +179,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
      }, diagnostics}
   end
 
-  defp project_descriptor(%Presentation.Group{} = group, form, ctx) do
+  defp project_descriptor(%Layout.Group{} = group, form, ctx) do
     {children, diagnostics} = project_children(group.children, form, ctx)
     enclosing = InstancePath.new!(ctx.path)
 
@@ -197,7 +198,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
      }, diagnostics}
   end
 
-  defp project_descriptor(%Presentation.Field{} = field, form, ctx) do
+  defp project_descriptor(%Layout.Field{} = field, form, ctx) do
     case Map.fetch(ctx.semantic_nodes, field.semantic_path) do
       {:ok, %Semantic.Field{} = node} -> project_field(field, node, form, ctx)
       {:ok, other} -> invariant!("field descriptor resolved to #{inspect(other)}")
@@ -233,14 +234,14 @@ defmodule Formentation.Phoenix.RenderPreparation do
   end
 
   defp project_field(
-         %Presentation.Field{hidden?: true},
+         %Layout.Field{hidden?: true},
          %Semantic.Field{read_only?: true},
          _form,
          _ctx
        ),
        do: {nil, []}
 
-  defp project_field(%Presentation.Field{} = presentation, %Semantic.Field{} = node, form, ctx) do
+  defp project_field(%Layout.Field{} = presentation, %Semantic.Field{} = node, form, ctx) do
     field = form[access_key(node.name)]
     {widget, diagnostics} = Widget.resolve(presentation, node)
     path = presentation.semantic_path.segments
@@ -271,23 +272,23 @@ defmodule Formentation.Phoenix.RenderPreparation do
      }, diagnostics}
   end
 
-  defp object_legend(%Presentation.Object{label: label, semantic_path: %{segments: []}}) do
+  defp object_legend(%Layout.Object{label: label, semantic_path: %{segments: []}}) do
     label || "/"
   end
 
-  defp object_legend(%Presentation.Object{label: label, semantic_path: path}) do
+  defp object_legend(%Layout.Object{label: label, semantic_path: path}) do
     label || humanize(List.last(path.segments))
   end
 
-  defp group_legend(%Presentation.Group{label: label, id: id}) do
+  defp group_legend(%Layout.Group{label: label, id: id}) do
     label || humanize(id)
   end
 
-  defp descriptor_parent_path(%Presentation.Field{semantic_path: path}) do
+  defp descriptor_parent_path(%Layout.Field{semantic_path: path}) do
     Enum.drop(path.segments, -1)
   end
 
-  defp descriptor_parent_path(%Presentation.Object{semantic_path: path}) do
+  defp descriptor_parent_path(%Layout.Object{semantic_path: path}) do
     Enum.drop(path.segments, -1)
   end
 

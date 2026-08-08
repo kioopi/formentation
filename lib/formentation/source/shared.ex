@@ -1,8 +1,8 @@
 defmodule Formentation.Source.Shared do
   @moduledoc false
 
-  alias Formentation.Definition.Finalizer
-  alias Formentation.{Diagnostic, Presentation, Semantic, TemplatePath}
+  alias Formentation.Definition.{Finalizer, Presentation, Semantic}
+  alias Formentation.{Diagnostic, TemplatePath}
 
   defmodule Context do
     @moduledoc false

@@ -7,14 +7,12 @@ defmodule Formentation.FormSubmissionTest do
     Form,
     InstancePath,
     Issue,
-    Presentation,
-    Semantic,
     SubmissionBlocker,
     TemplatePath,
     ValidationPlan
   }
 
-  alias Formentation.Definition.Finalizer
+  alias Formentation.Definition.{Finalizer, Presentation, Semantic}
 
   # ---- JSON Schema fixture: `tags` is an unsupported array whose items the
   # full schema still validates; `title` is an unrelated editable sibling.
