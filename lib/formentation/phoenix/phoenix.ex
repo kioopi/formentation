@@ -14,7 +14,8 @@ defmodule Formentation.Phoenix do
 
   use Phoenix.Component
 
-  alias Formentation.Phoenix.{ReferenceComponents, RenderPlan, RenderPreparation}
+  alias Formentation.Phoenix.Render.{Plan, Preparation}
+  alias Formentation.Phoenix.Theme.Reference
 
   @definition_doc "required only when `form`'s source is not a `%Formentation.Form{}`; a form " <>
                     "projected from `Formentation.Form` carries its own definition, and passing " <>
@@ -74,7 +75,7 @@ defmodule Formentation.Phoenix do
   )
 
   def fields(assigns) do
-    plan = RenderPreparation.prepare(assigns.form, preparation_opts(assigns))
+    plan = Preparation.prepare(assigns.form, preparation_opts(assigns))
 
     assigns =
       assigns
@@ -83,8 +84,8 @@ defmodule Formentation.Phoenix do
 
     ~H"""
     <div class="ftn-form">
-      <ReferenceComponents.error_summary :if={@summary?} summary={@plan.summary} />
-      <ReferenceComponents.node :for={child <- @plan.root.children} node={child} />
+      <Reference.error_summary :if={@summary?} summary={@plan.summary} />
+      <Reference.node :for={child <- @plan.root.children} node={child} />
     </div>
     """
   end
@@ -117,11 +118,11 @@ defmodule Formentation.Phoenix do
       assign(
         assigns,
         :node,
-        RenderPreparation.prepare_at(assigns.form, assigns.path, preparation_opts(assigns))
+        Preparation.prepare_at(assigns.form, assigns.path, preparation_opts(assigns))
       )
 
     ~H"""
-    <ReferenceComponents.node :if={@node} node={@node} />
+    <Reference.node :if={@node} node={@node} />
     """
   end
 
@@ -137,6 +138,6 @@ defmodule Formentation.Phoenix do
   # Unset therefore means "only at the projection root"; an explicit
   # true/false always wins, so a caller composing subtrees by hand decides
   # where the one summary goes.
-  defp summary?(nil, %RenderPlan{root_path: root_path}), do: root_path == []
+  defp summary?(nil, %Plan{root_path: root_path}), do: root_path == []
   defp summary?(summary?, _plan) when is_boolean(summary?), do: summary?
 end

@@ -30,7 +30,7 @@ projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurr
 ## Render preparation data flow
 
 Internal `RenderPreparation.prepare/2` returns a
-`%Formentation.Phoenix.RenderPlan{}`. It is pure — the same form and
+`%Formentation.Phoenix.Render.Plan{}`. It is pure — the same form and
 definition context always produce the same plan, with no side effects and no
 mutation of form state. A form projected from `Formentation.Form` carries its
 definition and projection-root path, so ordinary component use supplies only
@@ -83,19 +83,19 @@ are both presentation-hidden and semantically read-only project to nothing.
 
 One struct per render node shape:
 
-- `Formentation.Phoenix.RenderPlan` — `root` (a `RenderNode.Group`),
+- `Formentation.Phoenix.Render.Plan` — `root` (a `RenderNode.Group`),
   `summary` (the submit-gated error-summary entries, each a
   `RenderPlan.SummaryEntry{id, label, message}`), `diagnostics`
   (projection-time `Diagnostic`s, e.g. `:widget_fallback`). Planning-note
   fields with no Phase 1 behavior (fingerprint, active branches, item
   identities) are omitted, not stubbed.
-- `Formentation.Phoenix.RenderPlan.SummaryEntry` — `message` (enforced) plus
+- `Formentation.Phoenix.Render.Plan.SummaryEntry` — `message` (enforced) plus
   a nilable `id` and `label`. `id` is the DOM id to link to, `nil` for an
   entry with no rendered target; `label` is the prefix the message carries,
   `nil` when the message stands alone. Both entry sources below build
   entries through `SummaryEntry.from_target/2`, which takes the `%{id, label}`
   pair a source resolves and the message it carries.
-- `Formentation.Phoenix.RenderNode.Group` — `legend`, `help`, `dom`, `kind`,
+- `Formentation.Phoenix.Render.Node.Group` — `legend`, `help`, `dom`, `kind`,
   `occurrence_path`, `children`. `dom` is a `GroupDOM{container, help}`
   prepared even for the structural root. Semantic objects and presentation
   groups both project to this one render shape, distinguished by `kind`
@@ -108,7 +108,7 @@ One struct per render node shape:
   apply one level down: `fields/1` renders the object's children without its
   fieldset, legend, or group help, and `field path={[]}` on that form is how
   the object's own fieldset is rendered.
-- `Formentation.Phoenix.RenderNode.Field` — `widget`, `field` (the
+- `Formentation.Phoenix.Render.Node.Field` — `widget`, `field` (the
   `%Phoenix.HTML.FormField{}`, carrying Phoenix id/name/value), `label`, `dom`,
   normalized semantic `value_type`, source `role` (an atom hint like `:email`
   or `:date`, or `nil`), schema `required?`, `help`,
@@ -127,7 +127,7 @@ One struct per render node shape:
 
 `show_errors?` is computed once during render preparation, so components never
 inspect `_unused_` markers or `form.action` (D-014, D-027).
-`Formentation.Phoenix.RenderPreparation.Visibility` owns this decision —
+`Formentation.Phoenix.Render.Preparation.Visibility` owns this decision —
 `prepare/2` hands it the two context facts it reads (`source`, `root_form`),
 narrowed the same way `Summary` is (see below). The source's
 `StateView.issue_visibility/3` decides first; only a `:default` answer falls
@@ -158,7 +158,7 @@ source has no state view and falls back to `Any`, which always answers
 
 ## Widget resolution
 
-`Formentation.Phoenix.RenderPreparation.Widget` owns this decision —
+`Formentation.Phoenix.Render.Preparation.Widget` owns this decision —
 `Widget.resolve/2` takes the `Info.Presentation.Field` descriptor and its
 `Semantic.Field` occurrence and returns `{widget, diagnostics}`. First match
 wins:
@@ -187,7 +187,7 @@ the oracle independent of the implementation it checks.
 
 ## Error summary
 
-`Formentation.Phoenix.RenderPreparation.Summary` owns this construction —
+`Formentation.Phoenix.Render.Preparation.Summary` owns this construction —
 `prepare/2` hands it the finished render tree and the four context facts it
 reads (`source`, `root_form`, `root_instance_path`, `definition`), and nothing
 else. The narrowed parameter is the boundary: summary construction works from
@@ -384,7 +384,7 @@ renderer ids are the control/label/help/error/fieldset/summary relationship
 surface. Groups render optional help with the already-prepared `GroupDOM.help`
 identity; components never derive help IDs themselves.
 
-## Reference components (`Formentation.Phoenix.ReferenceComponents`)
+## Reference components (`Formentation.Phoenix.Theme.Reference`)
 
 Per-widget function components called directly by `fields/1` and
 `field/1` — nothing dispatches through a configurable theme parameter.

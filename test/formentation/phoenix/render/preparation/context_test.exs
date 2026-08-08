@@ -1,11 +1,11 @@
-defmodule Formentation.Phoenix.RenderPreparation.ContextTest do
+defmodule Formentation.Phoenix.Render.Preparation.ContextTest do
   use ExUnit.Case, async: true
   use ExUnitProperties
 
-  doctest Formentation.Phoenix.RenderPreparation.Context
+  doctest Formentation.Phoenix.Render.Preparation.Context
 
   alias Formentation.{Form, InstancePath}
-  alias Formentation.Phoenix.RenderPreparation.Context
+  alias Formentation.Phoenix.Render.Preparation.Context
   alias Phoenix.HTML.FormData
 
   defp compile!(declaration) do

@@ -1,4 +1,4 @@
-defmodule Formentation.Phoenix.RenderNode.Group do
+defmodule Formentation.Phoenix.Render.Node.Group do
   @moduledoc """
   A rendered grouping. Data-nesting and presentational groups project to this
   one shape; their field names retain the distinction through FormData, and
@@ -11,7 +11,7 @@ defmodule Formentation.Phoenix.RenderNode.Group do
   """
 
   alias Formentation.InstancePath
-  alias Formentation.Phoenix.RenderNode
+  alias Formentation.Phoenix.Render.Node
 
   @enforce_keys [:legend, :dom, :kind]
   defstruct [:legend, :help, :dom, :occurrence_path, :kind, children: []]
@@ -19,9 +19,9 @@ defmodule Formentation.Phoenix.RenderNode.Group do
   @type t :: %__MODULE__{
           legend: String.t() | nil,
           help: String.t() | nil,
-          dom: RenderNode.GroupDOM.t(),
+          dom: Node.GroupDOM.t(),
           kind: :object | :presentation_group,
           occurrence_path: InstancePath.t() | nil,
-          children: [RenderNode.t()]
+          children: [Node.t()]
         }
 end

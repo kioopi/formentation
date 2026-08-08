@@ -1,9 +1,9 @@
-defmodule Formentation.Phoenix.RenderPlan.SummaryEntryTest do
+defmodule Formentation.Phoenix.Render.Plan.SummaryEntryTest do
   use ExUnit.Case, async: true
 
-  doctest Formentation.Phoenix.RenderPlan.SummaryEntry
+  doctest Formentation.Phoenix.Render.Plan.SummaryEntry
 
-  alias Formentation.Phoenix.RenderPlan.SummaryEntry
+  alias Formentation.Phoenix.Render.Plan.SummaryEntry
 
   describe "from_target/2" do
     test "ignores keys the target carries beyond id and label" do

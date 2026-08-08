@@ -1,4 +1,4 @@
-defmodule Formentation.Phoenix.RenderPlan do
+defmodule Formentation.Phoenix.Render.Plan do
   @moduledoc """
   The render-preparation output: a render-node tree plus the submit-gated error
   summary, the instance path the plan was rooted at, and preparation
@@ -15,13 +15,13 @@ defmodule Formentation.Phoenix.RenderPlan do
   alias __MODULE__.SummaryEntry
   alias Formentation.Diagnostic
   alias Formentation.InstancePath
-  alias Formentation.Phoenix.RenderNode
+  alias Formentation.Phoenix.Render.Node
 
   @enforce_keys [:root]
   defstruct [:root, root_path: [], summary: [], diagnostics: []]
 
   @type t :: %__MODULE__{
-          root: RenderNode.Group.t(),
+          root: Node.Group.t(),
           root_path: [InstancePath.segment()],
           summary: [SummaryEntry.t()],
           diagnostics: [Diagnostic.t()]

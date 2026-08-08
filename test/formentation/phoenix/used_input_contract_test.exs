@@ -10,7 +10,7 @@ defmodule Formentation.Phoenix.UsedInputContractTest do
 
   alias Formentation.Form
   alias Formentation.Form.Params
-  alias Formentation.Phoenix.{RenderNode, RenderPreparation}
+  alias Formentation.Phoenix.Render.{Node, Preparation}
   alias Phoenix.HTML.FormData
 
   defp nested_definition do
@@ -202,11 +202,11 @@ defmodule Formentation.Phoenix.UsedInputContractTest do
     # And the user-visible consequence, through the projector, is that
     # the (now-:required, since "title" is absent from the candidate)
     # error is shown.
-    plan = RenderPreparation.prepare(phoenix_form_t2, definition: definition)
+    plan = Preparation.prepare(phoenix_form_t2, definition: definition)
 
     title_node =
-      Enum.find(plan.root.children, &match?(%RenderNode.Field{field: %{field: :title}}, &1))
+      Enum.find(plan.root.children, &match?(%Node.Field{field: %{field: :title}}, &1))
 
-    assert %RenderNode.Field{show_errors?: true} = title_node
+    assert %Node.Field{show_errors?: true} = title_node
   end
 end

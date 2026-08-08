@@ -544,7 +544,7 @@ For Phase 1:
 
 - no UI behaviour or registry is added;
 - the reference markup may be renamed to
-  `Formentation.Phoenix.ReferenceComponents` or an equivalent honest name;
+  `Formentation.Phoenix.Theme.Reference` or an equivalent honest name;
 - advanced preparation structs stay internal or explicitly unstable;
 - independently valuable preparation tests remain.
 

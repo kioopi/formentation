@@ -1042,7 +1042,7 @@ target vocabulary is:
   context, UI descriptor, and overrides become a prepared view;
 - **rendering** — the selected UI turns that prepared view into output.
 
-`Formentation.Phoenix.RenderPreparation` performs render preparation, and
+`Formentation.Phoenix.Render.Preparation` performs render preparation, and
 [[06-runtime-projection|Runtime projection]] retains the historical term. The
 module rename is recorded in
 [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]. Documentation and new public APIs should prefer

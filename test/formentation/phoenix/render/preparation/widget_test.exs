@@ -1,13 +1,13 @@
-defmodule Formentation.Phoenix.RenderPreparation.WidgetTest do
+defmodule Formentation.Phoenix.Render.Preparation.WidgetTest do
   use ExUnit.Case, async: true
   use ExUnitProperties
 
-  doctest Formentation.Phoenix.RenderPreparation.Widget
+  doctest Formentation.Phoenix.Render.Preparation.Widget
 
   alias Formentation.Definition.Semantic
   alias Formentation.Info.Layout
   alias Formentation.{InstancePath, TemplatePath}
-  alias Formentation.Phoenix.RenderPreparation.Widget
+  alias Formentation.Phoenix.Render.Preparation.Widget
 
   # These properties deliberately never restate `Widget`'s clause order. An
   # oracle copied from the implementation shares its bugs and goes stale the

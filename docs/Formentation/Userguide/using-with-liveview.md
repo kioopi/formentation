@@ -181,7 +181,7 @@ visibility (below) a property of the form state itself rather than
 something a template can accidentally short-circuit.
 
 **2. Re-project after every transition.**
-`Formentation.Phoenix.RenderPlan` is a pure function of the definition
+`Formentation.Phoenix.Render.Plan` is a pure function of the definition
 and the *current* `Phoenix.HTML.Form` — every `handle_event` above ends
 by calling `assign_payload/1` again on the post-transition form state,
 exactly like a controller re-renders after a POST. There is no

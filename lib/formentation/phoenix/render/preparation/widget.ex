@@ -1,8 +1,8 @@
-defmodule Formentation.Phoenix.RenderPreparation.Widget do
+defmodule Formentation.Phoenix.Render.Preparation.Widget do
   @moduledoc """
   Resolves a field's renderer-facing widget.
 
-  Not part of the public API — reached only through `RenderPreparation.prepare/2`
+  Not part of the public API — reached only through `Render.Preparation.prepare/2`
   and `prepare_at/3` while projecting a `Layout.Field`. Kept out of the
   published docs by `mix.exs`, but documented here because widget resolution is a
   self-contained decision worth understanding on its own: given a
@@ -47,7 +47,7 @@ defmodule Formentation.Phoenix.RenderPreparation.Widget do
       ...>   label: nil, help: nil, widget: nil, hidden?: false, origins: []
       ...> }
       iex> node = Formentation.Definition.Semantic.Field.new("a", Formentation.TemplatePath.new!(["a"]), :boolean)
-      iex> Formentation.Phoenix.RenderPreparation.Widget.resolve(presentation, node)
+      iex> Formentation.Phoenix.Render.Preparation.Widget.resolve(presentation, node)
       {:checkbox, []}
 
       iex> presentation = %Formentation.Info.Layout.Field{
@@ -55,7 +55,7 @@ defmodule Formentation.Phoenix.RenderPreparation.Widget do
       ...>   label: nil, help: nil, widget: :checkbox, hidden?: false, origins: []
       ...> }
       iex> node = Formentation.Definition.Semantic.Field.new("a", Formentation.TemplatePath.new!(["a"]), :string)
-      iex> {widget, [diagnostic]} = Formentation.Phoenix.RenderPreparation.Widget.resolve(presentation, node)
+      iex> {widget, [diagnostic]} = Formentation.Phoenix.Render.Preparation.Widget.resolve(presentation, node)
       iex> {widget, diagnostic.code}
       {:text_input, :widget_fallback}
   """

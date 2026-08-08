@@ -80,7 +80,7 @@ not concrete UI components.
 
 ## Rendering
 
-- ~~Does theme selection affect compilation, projection, or only rendering?~~ Answered 2026-07-23, for Phase 1: rendering only, and there is no theme selection yet — `Formentation.Phoenix.ReferenceComponents` is called directly rather than dispatched through a configurable parameter — [[18-decisions#D-020 — The reference theme is a markup set, not a contract|D-020]].
+- ~~Does theme selection affect compilation, projection, or only rendering?~~ Answered 2026-07-23, for Phase 1: rendering only, and there is no theme selection yet — `Formentation.Phoenix.Theme.Reference` is called directly rather than dispatched through a configurable parameter — [[18-decisions#D-020 — The reference theme is a markup set, not a contract|D-020]].
   Refined 2026-07-26: a UI is a component-library integration; a theme is only
   visual configuration within one UI. The future contract is planned in
   [[20-renderer-ui-model|Renderer and UI model]].

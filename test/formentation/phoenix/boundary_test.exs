@@ -34,10 +34,10 @@ defmodule Formentation.Phoenix.BoundaryTest do
     assert offenders == []
   end
 
-  # Context owns the native-vs-generic entry branch, so RenderPreparation has
+  # Context owns the native-vs-generic entry branch, so Render.Preparation has
   # no reason to consult ProjectedForm directly any more.
-  test "RenderPreparation reaches ProjectedForm only through Context" do
-    source = File.read!(Path.join(@lib, "formentation/phoenix/render_preparation.ex"))
+  test "Render.Preparation reaches ProjectedForm only through Context" do
+    source = File.read!(Path.join(@lib, "formentation/phoenix/render/preparation.ex"))
 
     refute String.contains?(source, "ProjectedForm")
   end
@@ -45,20 +45,30 @@ defmodule Formentation.Phoenix.BoundaryTest do
   # D-045's headline invariant: Context answers "which projection are we in"
   # and owns the cursor, but never builds a Phoenix form. cursor_to/2 returns
   # a descent distance and enter/2 returns a child segment precisely so the
-  # descending stays in RenderPreparation. A text scan cannot state this —
+  # descending stays in Render.Preparation. A text scan cannot state this —
   # context.ex names FormData in five doctest setups and one error message —
   # so match on the alias in the AST, where docstrings and error copy are
   # inert literals and only real code counts. Same mechanism as
   # references_phoenix?/1 above, narrowed to one module.
   test "Context never depends on Phoenix.HTML.FormData" do
-    file = Path.join(@lib, "formentation/phoenix/render_preparation/context.ex")
+    file = Path.join(@lib, "formentation/phoenix/render/preparation/context.ex")
 
     refute references_form_data?(file)
   end
 
+  # The bare-name patterns `%Node.` and `Node.(Field|Group|Unsupported)` used
+  # to stand in for the aliased legacy `Formentation.Node` struct. Since that
+  # module no longer exists, and `Formentation.Phoenix.Render.Node` is now
+  # aliased to the bare name `Node` by design (Task 5), a bare-usage match
+  # would false-positive on the sanctioned module. The guard now detects the
+  # legacy *alias* itself instead of legacy-looking *usage*: a bare `Node`
+  # can only mean the removed struct if something aliased it, either as
+  # `alias Formentation.Node` (first clause) or inside a brace-collapsed
+  # `alias Formentation.{..., Node, ...}` (second clause) — the fully
+  # qualified pattern alone would miss the brace form.
   defp legacy_mixed_storage_reference?(source) do
     Regex.match?(~r/\bFormentation\.Node\b/, source) or
-      Regex.match?(~r/%Node\.|\bNode\.(Field|Group|Unsupported)\b/, source) or
+      Regex.match?(~r/alias\s+Formentation\.\{[^}]*\bNode\b/, source) or
       String.contains?(source, ["nests_data?", "stamp_declaration_order", "definition.root"]) or
       String.contains?(source, "%Definition{root:")
   end
