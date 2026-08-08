@@ -25,6 +25,8 @@
       "Formentation.Definition.Presentation.*",
       "Formentation.Definition.Semantic",
       "Formentation.Definition.Semantic.*",
+      "Formentation.Definition.Validation",
+      "Formentation.Definition.ValidationPlan",
       "Formentation.Diagnostic",
       "Formentation.Form",
       "Formentation.Form.*",
@@ -39,9 +41,7 @@
       "Formentation.SubmissionBlocker",
       "Formentation.TemplatePath",
       "Formentation.Transport",
-      "Formentation.Transport.*",
-      "Formentation.Validation",
-      "Formentation.ValidationPlan"
+      "Formentation.Transport.*"
     ],
     # Declaration-source adapters. The map source is the in-core reference
     # adapter (D-004); Source.Shared holds adapter-generic compile helpers.
@@ -95,7 +95,7 @@
       # core must never invoke an adapter function directly.
       {:core, :source},
       # Core never calls an adapter: instance validation dispatches through
-      # the Formentation.Validation behaviour (D-025), so there is no
+      # the Formentation.Definition.Validation behaviour (D-025), so there is no
       # sanctioned core->json_schema call edge. See the D-046 note above for
       # the name-only selector exception.
       {:core, :json_schema},

@@ -28,7 +28,7 @@ produced.
   semantic: %Formentation.Definition.Semantic.Object{...},
   semantic_index: %Formentation.Definition.Semantic.Index{...},
   presentation: %Formentation.Definition.Presentation.Object{...},
-  validation: %Formentation.ValidationPlan{} | nil,
+  validation: %Formentation.Definition.ValidationPlan{} | nil,
   diagnostics: [%Formentation.Diagnostic{...}]
 }
 ```
@@ -52,8 +52,8 @@ template path. It is derived during finalization and lets runtime consumers
 resolve presentation references without re-walking the semantic tree for every
 field.
 
-`validation` is an optional `Formentation.ValidationPlan`
-— an executable module (implementing `Formentation.Validation`) paired
+`validation` is an optional `Formentation.Definition.ValidationPlan`
+— an executable module (implementing `Formentation.Definition.Validation`) paired
 with the opaque artifact that module owns; `nil` when the source provides
 no authoritative instance validation (the map source, currently).
 

@@ -150,14 +150,14 @@ two distinct gates, both offline against JSV's embedded metaschemas:
    pointer.
 2. **Build the *instance* validator** — after the walk, `build_instance_validator/1`
    compiles the opaque validator artifact wrapped in a
-   `Formentation.ValidationPlan` and stored on `Definition.validation`.
+   `Formentation.Definition.ValidationPlan` and stored on `Definition.validation`.
    This degrades gracefully: a dangling local `$ref` or any remote `$ref`
    (fetching is disabled) yields `validation: nil` plus a
    `:validator_unavailable` warning instead of raising.
 
 > [!note] Boundary
 > The validator is *built* here but *consumed* at runtime —
-> `validate/2` (the `Formentation.Validation` callback) checks a submitted
+> `validate/2` (the `Formentation.Definition.Validation` callback) checks a submitted
 > instance and belongs to the runtime layer, not the compile pipeline.
 > This note stops at construction.
 

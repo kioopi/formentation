@@ -289,7 +289,7 @@ be visible in the outer model:
   format_version: 3,
   semantic: %Formentation.Definition.Semantic.Object{},
   presentation: %Formentation.Definition.Presentation.Root{},
-  validation: %Formentation.ValidationPlan{} | nil,
+  validation: %Formentation.Definition.ValidationPlan{} | nil,
   diagnostics: []
 }
 ```

@@ -1095,7 +1095,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
         adapter: Formentation.Definition.Source.JSONSchema
       )
 
-    assert %Formentation.ValidationPlan{
+    assert %Formentation.Definition.ValidationPlan{
              module: Formentation.Definition.Source.JSONSchema.Validator,
              artifact: artifact
            } =

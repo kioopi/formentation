@@ -1,9 +1,9 @@
-defmodule Formentation.ValidationPlanTest do
+defmodule Formentation.Definition.ValidationPlanTest do
   use ExUnit.Case, async: true
 
-  alias Formentation.ValidationPlan
+  alias Formentation.Definition.ValidationPlan
 
-  doctest Formentation.ValidationPlan
+  doctest Formentation.Definition.ValidationPlan
 
   test "carries an executable module and an opaque artifact" do
     plan = %ValidationPlan{module: List, artifact: {:opaque, 1}}

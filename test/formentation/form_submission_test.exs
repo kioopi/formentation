@@ -8,11 +8,10 @@ defmodule Formentation.FormSubmissionTest do
     InstancePath,
     Issue,
     SubmissionBlocker,
-    TemplatePath,
-    ValidationPlan
+    TemplatePath
   }
 
-  alias Formentation.Definition.{Finalizer, Presentation, Semantic}
+  alias Formentation.Definition.{Finalizer, Presentation, Semantic, ValidationPlan}
 
   # ---- JSON Schema fixture: `tags` is an unsupported array whose items the
   # full schema still validates; `title` is an unrelated editable sibling.
@@ -129,7 +128,7 @@ defmodule Formentation.FormSubmissionTest do
 
   # ---- Hand-built definition + fake validator: full control over issue paths.
   defmodule FakeValidation do
-    @behaviour Formentation.Validation
+    @behaviour Formentation.Definition.Validation
     @impl true
     # artifact IS the fixed issue list, ignoring the instance
     def validate(issues, _instance), do: issues

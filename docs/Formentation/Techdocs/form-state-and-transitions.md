@@ -355,7 +355,7 @@ candidate and `form.issues`:
   Formentation does not have. Root and cross-field issues are never
   causally assigned to a preserve-only node on a guess.
 - **The validation-less fallback.** A map-source definition carries no
-  `Formentation.ValidationPlan`
+  `Formentation.Definition.ValidationPlan`
   ([[18-decisions#D-025 — Instance validation dispatches through a source-neutral behaviour|D-025]]),
   so `:unsupported_invalid` can never fire there — there is no validator
   to have filed the issue. A missing required preserve-only value is

@@ -112,7 +112,7 @@ delete the other half.
 >
 > The map source attaches **no validator**, so a preserved opaque value
 > can never be *declared* invalid — there is no `:unsupported_invalid`
-> blocker without a `Formentation.ValidationPlan`
+> blocker without a `Formentation.Definition.ValidationPlan`
 > ([[declaring-with-json-schema|the JSON Schema source]] is the one that
 > can make that call). A `required: true` property that is unsupported
 > still concretely blocks submission the moment the original data is
