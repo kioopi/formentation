@@ -3,15 +3,10 @@ defmodule Formentation.FormSubmissionTest do
 
   import Formentation.Test.FormHelpers
 
-  alias Formentation.{
-    Form,
-    InstancePath,
-    Issue,
-    SubmissionBlocker,
-    TemplatePath
-  }
+  alias Formentation.{Form, InstancePath, Issue, TemplatePath}
 
   alias Formentation.Definition.{Finalizer, Presentation, Semantic, ValidationPlan}
+  alias Formentation.Form.SubmissionBlocker
 
   # ---- JSON Schema fixture: `tags` is an unsupported array whose items the
   # full schema still validates; `title` is an unrelated editable sibling.
@@ -266,7 +261,10 @@ defmodule Formentation.FormSubmissionTest do
       changed = Form.validate(form, %{"title" => "Draft"})
 
       transitioned =
-        Form.transition(form, %Formentation.Params{values: %{"title" => "Done"}, event: :submit})
+        Form.transition(form, %Formentation.Form.Params{
+          values: %{"title" => "Done"},
+          event: :submit
+        })
 
       assert %Form{action: :change} = changed
       assert %Form{action: :submit} = transitioned

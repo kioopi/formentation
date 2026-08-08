@@ -67,7 +67,7 @@ defmodule FormentationDemo.PumpInspectionLiveTest do
     #       "insulation_ok" => "true", "last_service" => "", "notes" => "",
     #       "operating_hours" => "4800", "serial_number" => "", "voltage" => "230.0"}}
     #
-    # `Formentation.Transport.normalize/1` only marks a path `:unused` when it
+    # `Formentation.Form.Transport.normalize/1` only marks a path `:unused` when it
     # finds a sibling `_unused_<key>`; Formentation itself renders no such hidden
     # markers (that convention belongs to Phoenix's own checkbox/select helpers,
     # not to plain text inputs). So every key present in a full-form change is

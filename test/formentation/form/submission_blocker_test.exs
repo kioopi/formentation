@@ -1,7 +1,8 @@
-defmodule Formentation.SubmissionBlockerTest do
+defmodule Formentation.Form.SubmissionBlockerTest do
   use ExUnit.Case, async: true
 
-  alias Formentation.{InstancePath, SubmissionBlocker}
+  alias Formentation.Form.SubmissionBlocker
+  alias Formentation.InstancePath
 
   test "builds with enforced keys and an empty issues default" do
     blocker = %SubmissionBlocker{

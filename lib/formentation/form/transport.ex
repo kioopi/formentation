@@ -1,4 +1,4 @@
-defmodule Formentation.Transport do
+defmodule Formentation.Form.Transport do
   @moduledoc """
   Pure transport normalization (D-014): splits raw browser params into
   domain params with Phoenix transport metadata stripped, a byte-identical
@@ -20,7 +20,7 @@ defmodule Formentation.Transport do
 
   defmodule Normalized do
     @moduledoc """
-    The three views `Formentation.Transport.normalize/1` splits raw
+    The three views `Formentation.Form.Transport.normalize/1` splits raw
     params into: cleaned `domain_params` for decoding, the
     byte-identical `phoenix_params` view for `used_input?/1`, and
     per-path `usage`.
@@ -41,7 +41,7 @@ defmodule Formentation.Transport do
   @doc """
   Splits raw browser params into the three views transitions consume.
 
-      iex> n = Formentation.Transport.normalize(%{
+      iex> n = Formentation.Form.Transport.normalize(%{
       ...>   "name" => "Ada",
       ...>   "_unused_name" => "",
       ...>   "_csrf_token" => "token"

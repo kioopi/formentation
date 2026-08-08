@@ -130,7 +130,7 @@ returns the changed form state. `Form.submit/2` runs the corresponding
 when `submission_status/1` is `:ready`; undecodable, blocked, and invalid
 submissions return `{:error, submitted_form}` for redisplay. Hand both
 functions the raw params subtree Phoenix already gave you: no
-`%Formentation.Params{}` envelope to build yourself in ordinary handlers.
+`%Formentation.Form.Params{}` envelope to build yourself in ordinary handlers.
 
 ### Under embedding, pluck your subtree first
 

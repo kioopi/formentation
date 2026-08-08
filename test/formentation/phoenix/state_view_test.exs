@@ -5,7 +5,8 @@ defmodule Formentation.Phoenix.StateViewTest do
 
   doctest Formentation.Phoenix.StateView
 
-  alias Formentation.{Form, Params, SubmissionBlocker}
+  alias Formentation.Form
+  alias Formentation.Form.{Params, SubmissionBlocker}
   alias Formentation.InstancePath
   alias Formentation.Phoenix.StateView
 

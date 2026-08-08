@@ -1,4 +1,4 @@
-defmodule Formentation.SubmissionBlocker do
+defmodule Formentation.Form.SubmissionBlocker do
   @moduledoc """
   A concrete reason the current form cannot repair a problem in its
   candidate with the capabilities its definition represents.

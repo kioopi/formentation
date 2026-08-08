@@ -104,7 +104,10 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       )
 
     form_state =
-      Form.transition(Form.new(definition), %Formentation.Params{values: values, event: event})
+      Form.transition(Form.new(definition), %Formentation.Form.Params{
+        values: values,
+        event: event
+      })
 
     {definition, FormData.to_form(form_state, as: "payload")}
   end
@@ -212,7 +215,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       definition = flat_definition()
 
       form_state =
-        Form.transition(Form.new(definition), %Formentation.Params{
+        Form.transition(Form.new(definition), %Formentation.Form.Params{
           values: %{"serial_number" => "PX-2044", "operating_hours" => "51o2", "notes" => ""},
           event: :submit
         })
@@ -1461,7 +1464,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       formentation_plan =
         definition
         |> Form.new()
-        |> Form.transition(%Formentation.Params{
+        |> Form.transition(%Formentation.Form.Params{
           values: %{"operating_hours" => "51o2"},
           event: :submit
         })
@@ -1593,7 +1596,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
         Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
 
       form_state =
-        Form.transition(Form.new(definition), %Formentation.Params{
+        Form.transition(Form.new(definition), %Formentation.Form.Params{
           values: %{"address" => %{"street" => "ab"}},
           event: :change
         })
@@ -1631,7 +1634,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       definition = nested_path_definition()
 
       form_state =
-        Form.transition(Form.new(definition), %Formentation.Params{
+        Form.transition(Form.new(definition), %Formentation.Form.Params{
           values: %{"title" => "t", "address" => %{"street" => "", "geo" => %{"lat" => "x"}}},
           event: :submit
         })
@@ -1659,7 +1662,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
         })
 
       form_state =
-        Form.transition(Form.new(definition), %Formentation.Params{
+        Form.transition(Form.new(definition), %Formentation.Form.Params{
           values: %{"title" => "ab"},
           event: :submit
         })
@@ -1845,7 +1848,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       form_state =
         Form.transition(
           Form.new(definition, %{"address" => %{"street" => "Elm"}}),
-          %Formentation.Params{
+          %Formentation.Form.Params{
             values: %{"address" => %{"street" => "ab"}},
             event: :change
           }
@@ -1881,7 +1884,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       definition = nested_path_definition()
 
       form_state =
-        Form.transition(Form.new(definition), %Formentation.Params{
+        Form.transition(Form.new(definition), %Formentation.Form.Params{
           values: %{"address" => %{"geo" => %{"lat" => "x"}}},
           event: :change
         })

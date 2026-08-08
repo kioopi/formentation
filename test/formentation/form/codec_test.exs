@@ -1,9 +1,10 @@
-defmodule Formentation.CodecTest do
+defmodule Formentation.Form.CodecTest do
   use ExUnit.Case, async: true
 
-  alias Formentation.{Codec, InstancePath, Issue}
+  alias Formentation.Form.Codec
+  alias Formentation.{InstancePath, Issue}
 
-  doctest Formentation.Codec
+  doctest Formentation.Form.Codec
 
   @path InstancePath.new!(["field"])
 

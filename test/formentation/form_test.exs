@@ -2,8 +2,8 @@ defmodule Formentation.FormTest do
   use ExUnit.Case, async: true
 
   alias Formentation.Fixtures.PumpInspection
-  alias Formentation.{Form, InstancePath, Issue, Params}
-  alias Formentation.Form.FieldState
+  alias Formentation.{Form, InstancePath, Issue}
+  alias Formentation.Form.{FieldState, Params}
 
   doctest Formentation.Form
 
@@ -123,7 +123,7 @@ defmodule Formentation.FormTest do
       form =
         defaults_definition()
         |> Form.new(%{}, defaults: :apply)
-        |> Form.transition(%Formentation.Params{values: %{}})
+        |> Form.transition(%Formentation.Form.Params{values: %{}})
 
       assert {:ok, candidate} = Form.candidate(form)
       refute Map.has_key?(candidate, "priority")
@@ -608,7 +608,7 @@ defmodule Formentation.FormTest do
 
     test "is true after an explicit :submit transition envelope" do
       form =
-        Form.transition(Form.new(pump_definition()), %Formentation.Params{
+        Form.transition(Form.new(pump_definition()), %Formentation.Form.Params{
           values: %{"serial_number" => "PX"},
           event: :submit
         })

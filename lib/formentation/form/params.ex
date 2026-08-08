@@ -1,4 +1,4 @@
-defmodule Formentation.Params do
+defmodule Formentation.Form.Params do
   @moduledoc """
   The explicit transition envelope (D-013): values plus mode, scope, and
   event. A bare params map is ambiguous — an absent key could mean

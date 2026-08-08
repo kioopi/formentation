@@ -130,7 +130,7 @@ scoped (sub-tree) transitions are reserved shapes in the API that raise
 if you use them.
 
 **A bare params map is refused.** `transition/2` requires a
-`Formentation.Params` envelope, because an absent key is ambiguous
+`Formentation.Form.Params` envelope, because an absent key is ambiguous
 between "cleared" and "untouched".
 
 **All-or-nothing candidates.** If any field fails to decode, there is no

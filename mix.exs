@@ -185,10 +185,11 @@ defmodule Formentation.MixProject do
         "Form runtime": [
           Formentation.Form,
           Formentation.Form.FieldState,
-          Formentation.Params,
-          Formentation.Issue,
-          Formentation.Codec,
-          Formentation.Transport
+          Formentation.Form.Params,
+          Formentation.Form.Codec,
+          Formentation.Form.Transport,
+          Formentation.Form.SubmissionBlocker,
+          Formentation.Issue
         ],
         "Phoenix rendering": [
           Formentation.Phoenix,

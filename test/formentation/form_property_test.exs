@@ -6,7 +6,8 @@ defmodule Formentation.FormPropertyTest do
   use ExUnitProperties
 
   alias Formentation.Fixtures.PumpInspection
-  alias Formentation.{Form, Params}
+  alias Formentation.Form
+  alias Formentation.Form.Params
 
   defp pump_definition do
     {:ok, definition, []} =
