@@ -1,12 +1,12 @@
-defmodule Formentation.Phoenix.RenderPreparation.Summary do
+defmodule Formentation.Phoenix.Render.Preparation.Summary do
   @moduledoc """
-  Builds a `RenderPlan`'s submit-gated error summary from a prepared render
-  tree plus the projection context `RenderPreparation` resolved for it.
+  Builds a `Render.Plan`'s submit-gated error summary from a prepared render
+  tree plus the projection context `Render.Preparation` resolved for it.
 
-  Not part of the public API — reached only through `RenderPreparation.prepare/2`'s
+  Not part of the public API — reached only through `Render.Preparation.prepare/2`'s
   `plan.summary`. Kept out of the published docs by `mix.exs`, but documented
   here because it is one of the two summary-entry sources worth understanding
-  together: field-level entries are read off the already-prepared `RenderNode`
+  together: field-level entries are read off the already-prepared `Render.Node`
   tree, and root/object/unsupported-node entries are read from `StateView.issues/2`,
   since those never enter Phoenix's per-field error convention.
 
@@ -21,11 +21,12 @@ defmodule Formentation.Phoenix.RenderPreparation.Summary do
   """
 
   alias Formentation.{Definition, Info, InstancePath}
-  alias Formentation.Phoenix.{RenderNode, RenderPlan, StateView}
-  alias Formentation.Phoenix.RenderPreparation.Visibility
+  alias Formentation.Phoenix.Render.{Node, Plan}
+  alias Formentation.Phoenix.Render.Preparation.Visibility
+  alias Formentation.Phoenix.StateView
 
   @typedoc """
-  The slice of `RenderPreparation`'s projection context this module reads.
+  The slice of `Render.Preparation`'s projection context this module reads.
   Deliberately narrower than the full context passed around during
   projection (which also carries `path`, `root_path`, `semantic_nodes` and
   `dom_namespace`) — summary construction works only from the already-prepared
@@ -44,11 +45,11 @@ defmodule Formentation.Phoenix.RenderPreparation.Summary do
   @doc """
   Returns the summary entries for `root`, or `[]` when `ctx` is not submitted.
 
-  `root` is the `RenderNode.Group` `RenderPreparation` just finished
+  `root` is the `Render.Node.Group` `Render.Preparation` just finished
   projecting. Entry order is: field entries in tree order, then non-field
   entries in the state view's authoritative order.
   """
-  @spec build(RenderNode.Group.t(), ctx()) :: [RenderPlan.SummaryEntry.t()]
+  @spec build(Node.Group.t(), ctx()) :: [Plan.SummaryEntry.t()]
   def build(root, ctx) do
     if Visibility.submitted?(%{source: ctx.source, root_form: ctx.root_form}) do
       field_entries(root) ++ non_field_entries(root, ctx)
@@ -57,25 +58,25 @@ defmodule Formentation.Phoenix.RenderPreparation.Summary do
     end
   end
 
-  defp field_entries(%RenderNode.Group{children: children}) do
+  defp field_entries(%Node.Group{children: children}) do
     Enum.flat_map(children, &field_entries/1)
   end
 
   # Hidden inputs have no visible, focusable target in the reference theme, so
   # their errors cannot be actionable summary entries.
-  defp field_entries(%RenderNode.Field{widget: :hidden_input}), do: []
+  defp field_entries(%Node.Field{widget: :hidden_input}), do: []
 
-  defp field_entries(%RenderNode.Field{show_errors?: true} = node) do
+  defp field_entries(%Node.Field{show_errors?: true} = node) do
     target = %{id: summary_target(node), label: node.label}
 
     for {message, _opts} <- node.errors do
-      RenderPlan.SummaryEntry.from_target(target, message)
+      Plan.SummaryEntry.from_target(target, message)
     end
   end
 
-  defp field_entries(%RenderNode.Field{}), do: []
+  defp field_entries(%Node.Field{}), do: []
 
-  defp summary_target(%RenderNode.Field{widget: widget, dom: dom}),
+  defp summary_target(%Node.Field{widget: widget, dom: dom}),
     do: Map.fetch!(dom, summary_part(widget))
 
   # Reference-theme contract: every widget must appear here. Composite widgets
@@ -113,10 +114,10 @@ defmodule Formentation.Phoenix.RenderPreparation.Summary do
   defp non_field_entry(%StateView.Issue{path: path, message: message}, ctx, targets) do
     case Map.fetch(targets, path) do
       {:ok, target} ->
-        RenderPlan.SummaryEntry.from_target(target, message)
+        Plan.SummaryEntry.from_target(target, message)
 
       :error ->
-        RenderPlan.SummaryEntry.from_target(%{id: nil, label: summary_label(ctx, path)}, message)
+        Plan.SummaryEntry.from_target(%{id: nil, label: summary_label(ctx, path)}, message)
     end
   end
 
@@ -126,17 +127,17 @@ defmodule Formentation.Phoenix.RenderPreparation.Summary do
   # DOM id from the issue's path. A `:presentation_group` is skipped but its
   # children are still walked, since a semantic object can render inside a
   # presentation-only wrapper.
-  defp object_targets(%RenderNode.Group{children: children}) do
+  defp object_targets(%Node.Group{children: children}) do
     Enum.reduce(children, %{}, &index_object_target/2)
   end
 
-  defp index_object_target(%RenderNode.Field{}, index), do: index
+  defp index_object_target(%Node.Field{}, index), do: index
 
-  defp index_object_target(%RenderNode.Group{kind: :presentation_group} = group, index) do
+  defp index_object_target(%Node.Group{kind: :presentation_group} = group, index) do
     Enum.reduce(group.children, index, &index_object_target/2)
   end
 
-  defp index_object_target(%RenderNode.Group{kind: :object} = group, index) do
+  defp index_object_target(%Node.Group{kind: :object} = group, index) do
     target = %{id: group.dom.container, label: group.legend}
 
     index

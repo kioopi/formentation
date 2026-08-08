@@ -1,4 +1,4 @@
-defmodule Formentation.Phoenix.RenderNode.Field do
+defmodule Formentation.Phoenix.Render.Node.Field do
   @moduledoc """
   A single renderable control with all component-ready facts a reference
   component needs, including resolved widget, semantic `value_type`, source
@@ -14,7 +14,7 @@ defmodule Formentation.Phoenix.RenderNode.Field do
   governed by D-010's empty-string decode policy.
   """
 
-  alias Formentation.Phoenix.RenderNode
+  alias Formentation.Phoenix.Render.Node
 
   @enforce_keys [:widget, :field, :label, :dom, :value_type]
   defstruct [
@@ -37,7 +37,7 @@ defmodule Formentation.Phoenix.RenderNode.Field do
           widget: atom(),
           field: Phoenix.HTML.FormField.t(),
           label: String.t(),
-          dom: RenderNode.FieldDOM.t(),
+          dom: Node.FieldDOM.t(),
           value_type: Formentation.Definition.Semantic.Field.value_type(),
           role: atom() | nil,
           help: String.t() | nil,

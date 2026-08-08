@@ -1,4 +1,4 @@
-defmodule Formentation.Phoenix.RenderNode.FieldDOM do
+defmodule Formentation.Phoenix.Render.Node.FieldDOM do
   @moduledoc """
   Exact renderer-owned DOM identities prepared for one field occurrence.
 

@@ -1,4 +1,4 @@
-defmodule Formentation.Phoenix.RenderNode.GroupDOM do
+defmodule Formentation.Phoenix.Render.Node.GroupDOM do
   @moduledoc """
   Exact renderer-owned DOM identities prepared for one group occurrence.
 

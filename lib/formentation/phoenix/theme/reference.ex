@@ -1,27 +1,27 @@
-defmodule Formentation.Phoenix.ReferenceComponents do
+defmodule Formentation.Phoenix.Theme.Reference do
   @moduledoc false
 
   use Phoenix.Component
   import Kernel, except: [node: 1]
 
-  alias Formentation.Phoenix.RenderNode
+  alias Formentation.Phoenix.Render.Node
 
   @doc """
-  Dispatches one render node: a `RenderNode.Group` becomes a
+  Dispatches one render node: a `Render.Node.Group` becomes a
   `fieldset.ftn-group` with a legend, optional associated help, and recursive children, a
-  `RenderNode.Field` delegates to `field/1`. An `:object` group's fieldset
+  `Render.Node.Field` delegates to `field/1`. An `:object` group's fieldset
   carries `tabindex="-1"`, the same non-tab-stop focus-target convention a
   radio group's fieldset uses, so a linked error-summary entry (#34) moves
   focus somewhere meaningful. A `:presentation_group` carries no `tabindex`
   — it owns no semantic occurrence, so it is never a summary target.
 
   ```heex
-  <ReferenceComponents.node :for={child <- @plan.root.children} node={child} />
+  <Reference.node :for={child <- @plan.root.children} node={child} />
   ```
   """
-  attr(:node, :any, required: true, doc: "a RenderNode.Field or RenderNode.Group")
+  attr(:node, :any, required: true, doc: "a Render.Node.Field or Render.Node.Group")
 
-  def node(%{node: %RenderNode.Group{}} = assigns) do
+  def node(%{node: %Node.Group{}} = assigns) do
     # Keep these elements contiguous: HEEx removes :if elements but retains
     # surrounding whitespace, and the no-help snapshot is byte-exact.
     ~H"""
@@ -39,7 +39,7 @@ defmodule Formentation.Phoenix.ReferenceComponents do
     """
   end
 
-  def node(%{node: %RenderNode.Field{}} = assigns), do: field(assigns)
+  def node(%{node: %Node.Field{}} = assigns), do: field(assigns)
 
   @doc """
   The submit-gated error summary (accessibility contract item 5): an
@@ -50,8 +50,8 @@ defmodule Formentation.Phoenix.ReferenceComponents do
 
       iex> import Phoenix.LiveViewTest
       iex> html =
-      ...>   render_component(&Formentation.Phoenix.ReferenceComponents.error_summary/1,
-      ...>     summary: [%Formentation.Phoenix.RenderPlan.SummaryEntry{id: "email", label: "Email", message: "is required"}]
+      ...>   render_component(&Formentation.Phoenix.Theme.Reference.error_summary/1,
+      ...>     summary: [%Formentation.Phoenix.Render.Plan.SummaryEntry{id: "email", label: "Email", message: "is required"}]
       ...>   )
       iex> html =~ ~s(role="alert") and html =~ ~s(href="#email")
       true
@@ -78,9 +78,9 @@ defmodule Formentation.Phoenix.ReferenceComponents do
   node's `show_errors?` is set. A `:hidden_input` node renders as a bare
   hidden input with no wrapper or label.
   """
-  attr(:node, RenderNode.Field, required: true)
+  attr(:node, Node.Field, required: true)
 
-  def field(%{node: %RenderNode.Field{widget: :hidden_input}} = assigns) do
+  def field(%{node: %Node.Field{widget: :hidden_input}} = assigns) do
     ~H"""
     <input type="hidden" name={@node.field.name} id={@node.dom.control} value={@node.field.value} />
     """
@@ -101,14 +101,14 @@ defmodule Formentation.Phoenix.ReferenceComponents do
     """
   end
 
-  attr(:node, RenderNode.Field, required: true)
+  attr(:node, Node.Field, required: true)
   attr(:describedby, :string, required: true)
 
   # HTML required on a checkbox means "must be CHECKED" — a different
   # constraint than a required boolean, which the D-011 hidden input
   # already satisfies by always submitting true or false. So :required
   # is dropped from the rendered attributes here.
-  defp control(%{node: %RenderNode.Field{widget: :checkbox}} = assigns) do
+  defp control(%{node: %Node.Field{widget: :checkbox}} = assigns) do
     ~H"""
     <input :if={not @node.read_only?} type="hidden" name={@node.field.name} value="false" />
     <input
@@ -126,7 +126,7 @@ defmodule Formentation.Phoenix.ReferenceComponents do
     """
   end
 
-  defp control(%{node: %RenderNode.Field{widget: :textarea}} = assigns) do
+  defp control(%{node: %Node.Field{widget: :textarea}} = assigns) do
     ~H"""
     <textarea
       id={@node.dom.control}
@@ -139,7 +139,7 @@ defmodule Formentation.Phoenix.ReferenceComponents do
     """
   end
 
-  defp control(%{node: %RenderNode.Field{widget: :select}} = assigns) do
+  defp control(%{node: %Node.Field{widget: :select}} = assigns) do
     assigns = assign(assigns, :current, current_option(assigns.node.field.value))
 
     ~H"""
@@ -163,7 +163,7 @@ defmodule Formentation.Phoenix.ReferenceComponents do
     """
   end
 
-  defp control(%{node: %RenderNode.Field{widget: :radio_group}} = assigns) do
+  defp control(%{node: %Node.Field{widget: :radio_group}} = assigns) do
     assigns = assign(assigns, :current, current_option(assigns.node.field.value))
 
     ~H"""
@@ -218,9 +218,9 @@ defmodule Formentation.Phoenix.ReferenceComponents do
   defp input_type(:email_input), do: "email"
   defp input_type(:url_input), do: "url"
 
-  defp inputmode(%RenderNode.Field{widget: :number_input, value_type: :integer}), do: "numeric"
-  defp inputmode(%RenderNode.Field{widget: :number_input, value_type: :number}), do: "decimal"
-  defp inputmode(%RenderNode.Field{}), do: nil
+  defp inputmode(%Node.Field{widget: :number_input, value_type: :integer}), do: "numeric"
+  defp inputmode(%Node.Field{widget: :number_input, value_type: :number}), do: "decimal"
+  defp inputmode(%Node.Field{}), do: nil
 
   defp describedby(node) do
     ids =
@@ -241,7 +241,7 @@ defmodule Formentation.Phoenix.ReferenceComponents do
   # attributes: :number_input and :text_input render text controls, while
   # textareas and selects do not accept min/max/step. Radio groups use their
   # separate required-only policy below.
-  defp validation_attrs(%RenderNode.Field{value_type: value_type} = node, except)
+  defp validation_attrs(%Node.Field{value_type: value_type} = node, except)
        when value_type in [:integer, :number] do
     node.validations |> Keyword.drop([:min, :max, :step | except]) |> Map.new()
   end

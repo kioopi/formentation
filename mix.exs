@@ -111,33 +111,22 @@ defmodule Formentation.MixProject do
     end
   end
 
+  # Internal-by-intent modules, kept out of the published docs. Everything
+  # under Formentation.Phoenix.Render.* is the projection pipeline: it keeps
+  # its moduledocs on purpose (`h Formentation.Phoenix.Render.Plan` in IEx is
+  # supported) and this filter is the only thing holding it back from the
+  # published surface. Formentation.Phoenix.Theme.Reference is the reference
+  # theme, shipped as an example rather than as API.
+  #
+  # The single prefix replaces a hand-maintained module list: a new module
+  # under Render.* is covered without a mix.exs edit, so the directory
+  # boundary and the documentation boundary are now the same line.
   defp internal_documentation_module?(module) do
-    # Two categories, one predicate. RenderPreparation and ReferenceComponents
-    # are @moduledoc false and would be excluded anyway; they are listed for
-    # grep-ability, and that is the convention — a new internal module gets
-    # both @moduledoc false and an entry here. RenderPlan, RenderPreparation.Summary,
-    # RenderPreparation.Widget, RenderPreparation.Visibility and the RenderNode.*
-    # structs keep their moduledocs on purpose (`h Formentation.Phoenix.RenderPlan`
-    # in IEx is supported), so this filter is the only thing keeping them out of
-    # the published docs. The string prefixes, rather than a list, cover the
-    # documented structs nested under an already-excluded parent —
-    # RenderNode.FieldDOM/GroupDOM, RenderPlan.SummaryEntry — and any future
-    # sibling without a list edit.
     module in [
       Formentation.Phoenix.ProjectedForm,
-      Formentation.Phoenix.RenderPreparation,
-      Formentation.Phoenix.RenderPreparation.Context,
-      Formentation.Phoenix.RenderPreparation.Summary,
-      Formentation.Phoenix.RenderPreparation.Widget,
-      Formentation.Phoenix.RenderPreparation.Visibility,
-      Formentation.Phoenix.ReferenceComponents,
-      Formentation.Phoenix.RenderPlan,
-      Formentation.Phoenix.RenderNode
+      Formentation.Phoenix.Theme.Reference
     ] or
-      String.starts_with?(Atom.to_string(module), [
-        "Elixir.Formentation.Phoenix.RenderNode.",
-        "Elixir.Formentation.Phoenix.RenderPlan."
-      ])
+      String.starts_with?(Atom.to_string(module), "Elixir.Formentation.Phoenix.Render.")
   end
 
   defp package do

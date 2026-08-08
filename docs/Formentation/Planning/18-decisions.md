@@ -512,8 +512,8 @@ record of why Phase 1 did not freeze a configurable contract, but its
 `Formentation.Phoenix.Theme.Reference` name is transitional. The current
 `Formentation.Phoenix.Projector` performs render preparation and **was renamed**
 in [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]
-(2026-08-05) to `Formentation.Phoenix.RenderPreparation` and
-`Formentation.Phoenix.ReferenceComponents`, so “projection” is available for
+(2026-08-05) to `Formentation.Phoenix.Render.Preparation` and
+`Formentation.Phoenix.Theme.Reference`, so “projection” is available for
 `Form` → `%Phoenix.HTML.Form{}`. Phase 3 must build the second UI and review
 consumer concurrently with the contract, publish the round-trip conformance
 suite, define capability-failure developer experience, and establish resource

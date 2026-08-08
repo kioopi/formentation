@@ -121,7 +121,7 @@
       # is sanctioned (the projector reads Definition/Info/Node freely), so
       # no layer rule can express this narrower obligation — only a
       # per-module call rule can. This closes the alias-evasion gap the
-      # render_preparation_test.exs "architectural boundary" grep pin cannot see:
+      # render/preparation_test.exs "architectural boundary" grep pin cannot see:
       # `alias Formentation.{Form, ...}` (brace syntax) never produces the
       # literal substring "Formentation.Form" the grep looks for, but Reach
       # resolves calls against the call graph after alias resolution, so it
@@ -134,9 +134,9 @@
       # non-field issues must still cross the StateView seam. Do not relieve
       # pressure on this rule by moving further state-dependent decisions into
       # ProjectedForm; the "architectural boundary" tests in
-      # render_preparation_test.exs pin both that ProjectedForm never names
+      # render/preparation_test.exs pin both that ProjectedForm never names
       # StateView and that nothing else spells the private projection key.
-      {"Formentation.Phoenix.RenderPreparation", ["Formentation.Form", "Formentation.Form.*"]}
+      {"Formentation.Phoenix.Render.Preparation", ["Formentation.Form", "Formentation.Form.*"]}
     ]
   ],
   effects: [

@@ -1,4 +1,4 @@
-defmodule Formentation.Phoenix.RenderPreparationTest.ProjectorAdapter do
+defmodule Formentation.Phoenix.Render.PreparationTest.ProjectorAdapter do
   @moduledoc """
   Keeps the pre-rename `Projector.project/2,3` and `project_at/3,4` call
   shapes working so ~1200 lines of behavioural assertions did not have to be
@@ -15,33 +15,34 @@ defmodule Formentation.Phoenix.RenderPreparationTest.ProjectorAdapter do
   `definition:` requirement itself is proved.
   """
 
-  alias Formentation.Phoenix.RenderPreparation
+  alias Formentation.Phoenix.Render.Preparation
 
-  def project(definition, form), do: RenderPreparation.prepare(form, definition: definition)
+  def project(definition, form), do: Preparation.prepare(form, definition: definition)
 
   def project(definition, form, opts),
-    do: RenderPreparation.prepare(form, Keyword.put(opts, :definition, definition))
+    do: Preparation.prepare(form, Keyword.put(opts, :definition, definition))
 
   def project_at(definition, form, path),
-    do: RenderPreparation.prepare_at(form, path, definition: definition)
+    do: Preparation.prepare_at(form, path, definition: definition)
 
   def project_at(definition, form, path, opts),
-    do: RenderPreparation.prepare_at(form, path, Keyword.put(opts, :definition, definition))
+    do: Preparation.prepare_at(form, path, Keyword.put(opts, :definition, definition))
 end
 
-defmodule Formentation.Phoenix.RenderPreparationTest do
+defmodule Formentation.Phoenix.Render.PreparationTest do
   use ExUnit.Case, async: true
 
   import Formentation.Test.FormHelpers
 
-  doctest Formentation.Phoenix.RenderPreparation
+  doctest Formentation.Phoenix.Render.Preparation
 
   alias Formentation.Definition.Finalizer
   alias Formentation.Definition.Presentation, as: NativePresentation
   alias Formentation.Definition.Semantic
   alias Formentation.{Form, InstancePath, NodeId, TemplatePath}
-  alias Formentation.Phoenix.{DOMIdentity, RenderNode, RenderPlan, RenderPreparation}
-  alias Formentation.Phoenix.RenderPreparationTest.ProjectorAdapter, as: Projector
+  alias Formentation.Phoenix.DOMIdentity
+  alias Formentation.Phoenix.Render.{Node, Plan, Preparation}
+  alias Formentation.Phoenix.Render.PreparationTest.ProjectorAdapter, as: Projector
   alias Phoenix.HTML.FormData
 
   defp compile!(declaration) do
@@ -121,12 +122,12 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
       plan = Projector.project(definition, form)
 
-      assert %RenderPlan{root: %RenderNode.Group{} = root, summary: [], diagnostics: []} = plan
+      assert %Plan{root: %Node.Group{} = root, summary: [], diagnostics: []} = plan
       assert root.legend == "/"
       assert root.kind == :object
       assert root.occurrence_path == InstancePath.new!([])
 
-      assert [%RenderNode.Field{} = serial, %RenderNode.Field{}, %RenderNode.Field{} = notes] =
+      assert [%Node.Field{} = serial, %Node.Field{}, %Node.Field{} = notes] =
                root.children
 
       assert serial.label == "Serial number"
@@ -202,7 +203,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
       plan = Projector.project(definition, form)
 
-      assert [%RenderNode.Field{label: "Serial number"}] = plan.root.children
+      assert [%Node.Field{label: "Serial number"}] = plan.root.children
     end
 
     test "errors attach through the existing-atom access convention" do
@@ -240,7 +241,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
   defp single_widget(spec) do
     plan = single_field_plan(spec)
-    [%RenderNode.Field{widget: widget}] = plan.root.children
+    [%Node.Field{widget: widget}] = plan.root.children
     {widget, plan.diagnostics}
   end
 
@@ -249,17 +250,17 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       definition = flat_definition()
       form = FormData.to_form(Form.new(definition), as: "payload")
 
-      assert %RenderPlan{} = RenderPreparation.prepare(form)
+      assert %Plan{} = Preparation.prepare(form)
     end
 
     test "requires an explicit definition for a generic form" do
       form = FormData.to_form(%{}, as: "payload")
 
       assert_raise ArgumentError, ~r/native projected form.*generic form plus definition:/, fn ->
-        RenderPreparation.prepare(form)
+        Preparation.prepare(form)
       end
 
-      assert %RenderPlan{} = RenderPreparation.prepare(form, definition: flat_definition())
+      assert %Plan{} = Preparation.prepare(form, definition: flat_definition())
     end
 
     test "rejects an explicit definition that differs from a native form source" do
@@ -268,7 +269,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       form = FormData.to_form(Form.new(native_definition), as: "payload")
 
       assert_raise ArgumentError, ~r/source definition is authoritative.*remove/, fn ->
-        RenderPreparation.prepare(form, definition: other_definition)
+        Preparation.prepare(form, definition: other_definition)
       end
     end
 
@@ -277,16 +278,16 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       broken = %{form | options: Keyword.delete(form.options, :__formentation__)}
 
       assert_raise ArgumentError, ~r/not a valid Formentation projection.*rebuild/, fn ->
-        RenderPreparation.prepare(broken, definition: flat_definition())
+        Preparation.prepare(broken, definition: flat_definition())
       end
     end
 
     test "prepares a nested form's own object at the relative root path" do
       {_root, address} = nested_projection_forms()
 
-      node = RenderPreparation.prepare_at(address, [])
+      node = Preparation.prepare_at(address, [])
 
-      assert %RenderNode.Group{legend: "Address", help: "Where it lives."} = node
+      assert %Node.Group{legend: "Address", help: "Where it lives."} = node
 
       assert node.dom.container ==
                DOMIdentity.object(
@@ -297,7 +298,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
       # The child name is what proves no second nesting happened: a double
       # descent would produce asset[payload][address][address][street].
-      assert [%RenderNode.Field{field: %{name: "asset[payload][address][street]"}}] =
+      assert [%Node.Field{field: %{name: "asset[payload][address][street]"}}] =
                node.children
     end
 
@@ -311,11 +312,11 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
       message = ~r/projected form root \["address", "street"\] is not an object/
 
-      assert_raise ArgumentError, message, fn -> RenderPreparation.prepare(tampered) end
-      assert_raise ArgumentError, message, fn -> RenderPreparation.prepare_at(tampered, []) end
+      assert_raise ArgumentError, message, fn -> Preparation.prepare(tampered) end
+      assert_raise ArgumentError, message, fn -> Preparation.prepare_at(tampered, []) end
 
       assert_raise ArgumentError, message, fn ->
-        RenderPreparation.prepare_at(tampered, ["street"])
+        Preparation.prepare_at(tampered, ["street"])
       end
     end
 
@@ -335,20 +336,20 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       unsupported = %{root | options: Keyword.put(root.options, :__formentation__, ["weird"])}
 
       assert_raise ArgumentError, ~r/projected form root \["nope"\] does not exist/, fn ->
-        RenderPreparation.prepare(missing)
+        Preparation.prepare(missing)
       end
 
       assert_raise ArgumentError, ~r/projected form root \["weird"\] is unsupported/, fn ->
-        RenderPreparation.prepare(unsupported)
+        Preparation.prepare(unsupported)
       end
 
       # Both entry points, since validation now lives in the shared context.
       assert_raise ArgumentError, ~r/projected form root \["nope"\] does not exist/, fn ->
-        RenderPreparation.prepare_at(missing, [])
+        Preparation.prepare_at(missing, [])
       end
 
       assert_raise ArgumentError, ~r/projected form root \["weird"\] is unsupported/, fn ->
-        RenderPreparation.prepare_at(unsupported, ["anything"])
+        Preparation.prepare_at(unsupported, ["anything"])
       end
     end
 
@@ -366,16 +367,16 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       root = FormData.to_form(form_state, as: "asset[payload]")
       [address] = FormData.to_form(form_state, root, :address, [])
 
-      plan = RenderPreparation.prepare(address)
+      plan = Preparation.prepare(address)
 
-      assert [%RenderNode.Field{field: %{name: "asset[payload][address][street]"}}] =
+      assert [%Node.Field{field: %{name: "asset[payload][address][street]"}}] =
                plan.root.children
 
-      assert %RenderNode.Field{field: %{name: "asset[payload][address][street]"}} =
-               RenderPreparation.prepare_at(address, ["street"])
+      assert %Node.Field{field: %{name: "asset[payload][address][street]"}} =
+               Preparation.prepare_at(address, ["street"])
 
       assert_raise ArgumentError, ~r/relative path.*projected root/, fn ->
-        RenderPreparation.prepare_at(address, ["title"])
+        Preparation.prepare_at(address, ["title"])
       end
     end
 
@@ -383,11 +384,11 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       {root, address} = nested_projection_forms()
 
       [root_street] =
-        RenderPreparation.prepare(root).root.children
-        |> Enum.filter(&match?(%RenderNode.Group{}, &1))
+        Preparation.prepare(root).root.children
+        |> Enum.filter(&match?(%Node.Group{}, &1))
         |> Enum.flat_map(& &1.children)
 
-      [nested_street] = RenderPreparation.prepare(address).root.children
+      [nested_street] = Preparation.prepare(address).root.children
 
       assert root_street.field.name == nested_street.field.name
 
@@ -425,7 +426,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       root = FormData.to_form(state, as: "asset[payload]", id: "asset_payload")
       [address] = FormData.to_form(state, root, :address, [])
 
-      node = RenderPreparation.prepare_at(address, ["geo", "lat"])
+      node = Preparation.prepare_at(address, ["geo", "lat"])
 
       assert node.field.name == "asset[payload][address][geo][lat]"
       assert node.field.value == "51.5"
@@ -441,45 +442,45 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
   describe "widget resolution" do
     test "retains normalized value type independently from the resolved widget" do
-      assert [%RenderNode.Field{widget: :text_input, value_type: :string}] =
+      assert [%Node.Field{widget: :text_input, value_type: :string}] =
                single_field_plan(%{kind: :string}).root.children
 
-      assert [%RenderNode.Field{widget: :checkbox, value_type: :boolean}] =
+      assert [%Node.Field{widget: :checkbox, value_type: :boolean}] =
                single_field_plan(%{kind: :boolean}).root.children
 
-      assert [%RenderNode.Field{widget: :number_input, value_type: :integer}] =
+      assert [%Node.Field{widget: :number_input, value_type: :integer}] =
                single_field_plan(%{kind: :integer}).root.children
 
-      assert [%RenderNode.Field{widget: :number_input, value_type: :number}] =
+      assert [%Node.Field{widget: :number_input, value_type: :number}] =
                single_field_plan(%{kind: :number}).root.children
     end
 
     test "retains numeric value type when widget resolution chooses another control" do
-      assert [%RenderNode.Field{widget: :text_input, value_type: :number}] =
+      assert [%Node.Field{widget: :text_input, value_type: :number}] =
                single_field_plan(%{kind: :number, widget: :text}).root.children
 
-      assert [%RenderNode.Field{widget: :select, value_type: :integer}] =
+      assert [%Node.Field{widget: :select, value_type: :integer}] =
                single_field_plan(%{kind: :integer, one_of: [1, 2]}).root.children
 
-      assert [%RenderNode.Field{widget: :hidden_input, value_type: :number}] =
+      assert [%Node.Field{widget: :hidden_input, value_type: :number}] =
                single_field_plan(%{kind: :number, hidden: true}).root.children
     end
 
     test "threads semantic role onto the prepared field" do
-      assert [%RenderNode.Field{role: :email}] =
+      assert [%Node.Field{role: :email}] =
                single_field_plan(%{kind: :string, role: :email}).root.children
 
-      assert [%RenderNode.Field{role: :date}] =
+      assert [%Node.Field{role: :date}] =
                single_field_plan(%{kind: :string, role: :date}).root.children
     end
 
     test "threads the inferred semantic role when the source field omits a role" do
-      assert [%RenderNode.Field{role: :text}] =
+      assert [%Node.Field{role: :text}] =
                single_field_plan(%{kind: :string}).root.children
     end
 
     test "required? defaults to false when the field is not schema-required" do
-      assert [%RenderNode.Field{required?: false}] =
+      assert [%Node.Field{required?: false}] =
                single_field_plan(%{kind: :string}).root.children
     end
 
@@ -496,7 +497,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
       # Required string fields keep the empty value schema-valid (D-010), so
       # the compiler intentionally omits the HTML `required` attribute here.
-      assert [%RenderNode.Field{required?: true, validations: validations}] = plan.root.children
+      assert [%Node.Field{required?: true, validations: validations}] = plan.root.children
       refute Keyword.has_key?(validations, :required)
     end
 
@@ -526,7 +527,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
     test "prepares one radio option id per option" do
       plan = single_field_plan(%{kind: :string, one_of: ["yes", "no"], widget: :radio})
-      [%RenderNode.Field{options: options, dom: dom}] = plan.root.children
+      [%Node.Field{options: options, dom: dom}] = plan.root.children
 
       assert dom.options ==
                Enum.map(0..1, fn index ->
@@ -572,7 +573,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
       form = FormData.to_form(Form.new(definition), as: "payload")
 
-      assert %RenderNode.Group{help: "Where the asset is installed."} =
+      assert %Node.Group{help: "Where the asset is installed."} =
                Projector.project(definition, form).root.children |> List.first()
     end
 
@@ -591,7 +592,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
       form = FormData.to_form(Form.new(definition), as: "payload")
 
-      assert %RenderNode.Group{help: "Where the asset is installed."} =
+      assert %Node.Group{help: "Where the asset is installed."} =
                Projector.project(definition, form).root.children |> List.first()
     end
 
@@ -600,7 +601,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       form = FormData.to_form(Form.new(definition), as: "payload")
       plan = Projector.project(definition, form)
 
-      assert %RenderNode.Group{help: "Record one pump."} = plan.root
+      assert %Node.Group{help: "Record one pump."} = plan.root
       assert Projector.project_at(definition, form, []) == plan.root
     end
 
@@ -622,7 +623,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       assert {:ok, definition} = Finalizer.finalize(semantic, presentation)
       form = FormData.to_form(Form.new(definition), as: "payload")
 
-      assert [%RenderNode.Group{help: "Identification details."}] =
+      assert [%Node.Group{help: "Identification details."}] =
                Projector.project(definition, form).root.children
     end
 
@@ -635,7 +636,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
       form = FormData.to_form(Form.new(definition), as: "payload")
 
-      assert %RenderNode.Group{help: nil, dom: %{container: container, help: help}} =
+      assert %Node.Group{help: nil, dom: %{container: container, help: help}} =
                Projector.project(definition, form).root.children |> List.first()
 
       assert is_binary(container)
@@ -695,7 +696,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       native_identities =
         Form.new(first)
         |> FormData.to_form(as: "payload")
-        |> RenderPreparation.prepare()
+        |> Preparation.prepare()
         |> Map.fetch!(:root)
         |> flatten_fields()
         |> Map.new(&{&1.field.name, &1.dom})
@@ -739,9 +740,9 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       plan = Projector.project(definition, form)
 
       assert [
-               %RenderNode.Field{field: %{name: "payload[a]"}},
-               %RenderNode.Group{legend: "Late", children: grouped},
-               %RenderNode.Field{field: %{name: "payload[c]"}}
+               %Node.Field{field: %{name: "payload[a]"}},
+               %Node.Group{legend: "Late", children: grouped},
+               %Node.Field{field: %{name: "payload[c]"}}
              ] = plan.root.children
 
       assert Enum.map(grouped, & &1.field.name) == ["payload[d]", "payload[b]"]
@@ -762,10 +763,10 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       form = FormData.to_form(Form.new(definition), as: "payload")
       plan = Projector.project(definition, form)
 
-      assert [%RenderNode.Field{}, %RenderNode.Group{legend: "Electrical"} = group] =
+      assert [%Node.Field{}, %Node.Group{legend: "Electrical"} = group] =
                plan.root.children
 
-      assert [%RenderNode.Field{} = voltage, %RenderNode.Field{}] = group.children
+      assert [%Node.Field{} = voltage, %Node.Field{}] = group.children
       assert voltage.field.name == "payload[voltage]"
     end
 
@@ -787,8 +788,8 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
       plan = Projector.project(definition, form)
 
-      assert [_title, %RenderNode.Group{legend: "Address"} = address] = plan.root.children
-      assert [%RenderNode.Field{} = street] = address.children
+      assert [_title, %Node.Group{legend: "Address"} = address] = plan.root.children
+      assert [%Node.Field{} = street] = address.children
       assert street.field.name == "payload[address][street]"
       assert street.field.value == "Elm"
     end
@@ -810,10 +811,10 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
       form = FormData.to_form(Form.new(definition), as: "payload")
 
-      %RenderNode.Group{children: [%RenderNode.Group{} = address]} =
+      %Node.Group{children: [%Node.Group{} = address]} =
         Projector.project(definition, form).root
 
-      [%RenderNode.Group{} = presentation_group] = address.children
+      [%Node.Group{} = presentation_group] = address.children
 
       assert presentation_group.dom.container ==
                DOMIdentity.group(
@@ -856,10 +857,10 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
           as: "payload"
         )
 
-      assert [%RenderNode.Group{legend: "Main", children: [details, title]}] =
+      assert [%Node.Group{legend: "Main", children: [details, title]}] =
                Projector.project(definition, form).root.children
 
-      assert %RenderNode.Group{legend: "Details", children: [width]} = details
+      assert %Node.Group{legend: "Details", children: [width]} = details
       assert width.field.name == "payload[details][width]"
       assert width.field.value == "12"
       assert title.field.name == "payload[title]"
@@ -883,7 +884,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       form = FormData.to_form(Form.new(definition), as: "payload")
       plan = Projector.project(definition, form)
 
-      assert [%RenderNode.Field{label: "Name"}] = plan.root.children
+      assert [%Node.Field{label: "Name"}] = plan.root.children
     end
   end
 
@@ -908,10 +909,10 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
           as: "payload"
         )
 
-      assert %RenderNode.Group{legend: "Address", children: [street]} =
+      assert %Node.Group{legend: "Address", children: [street]} =
                Projector.project_at(definition, form, ["address"])
 
-      assert %RenderNode.Field{} = street
+      assert %Node.Field{} = street
       assert street.field.name == "payload[address][street]"
       assert street.field.value == "Elm"
     end
@@ -926,7 +927,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
       form = FormData.to_form(Form.new(definition, %{"title" => "Pump"}), as: "payload")
 
-      assert %RenderNode.Field{field: field} = Projector.project_at(definition, form, ["title"])
+      assert %Node.Field{field: field} = Projector.project_at(definition, form, ["title"])
       assert field.name == "payload[title]"
       assert field.value == "Pump"
     end
@@ -982,7 +983,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       }
 
       plan = Projector.project(definition, FormData.to_form(source, as: "payload"))
-      [%RenderNode.Field{widget: :radio_group, dom: dom}] = plan.root.children
+      [%Node.Field{widget: :radio_group, dom: dom}] = plan.root.children
 
       assert [%{id: summary_target}] = plan.summary
       assert summary_target == dom.container
@@ -1061,9 +1062,9 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       form_state = submitted_form(Form.new(definition), %{"title" => "t"})
       plan = Projector.project(definition, FormData.to_form(form_state, as: "payload"))
 
-      assert %RenderNode.Group{} =
+      assert %Node.Group{} =
                address_group =
-               Enum.find(plan.root.children, &match?(%RenderNode.Group{}, &1))
+               Enum.find(plan.root.children, &match?(%Node.Group{}, &1))
 
       assert [%{id: id, label: "Address", message: message}] = plan.summary
       assert id == address_group.dom.container
@@ -1100,7 +1101,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
     test "a source whose semantic submit is :commit reveals an unused field's error" do
       plan = Projector.project(scalar_definition(), fixture_form(submitted?: true))
 
-      assert [%RenderNode.Field{show_errors?: true}] = plan.root.children
+      assert [%Node.Field{show_errors?: true}] = plan.root.children
       assert [%{label: "Operating hours", message: "is invalid"}] = plan.summary
     end
 
@@ -1113,7 +1114,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
       plan = Projector.project(scalar_definition(), form)
 
-      assert [%RenderNode.Field{show_errors?: false}] = plan.root.children
+      assert [%Node.Field{show_errors?: false}] = plan.root.children
       assert plan.summary == []
     end
 
@@ -1122,7 +1123,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
       plan = Projector.project(scalar_definition(), form)
 
-      assert [%RenderNode.Field{show_errors?: true}] = plan.root.children
+      assert [%Node.Field{show_errors?: true}] = plan.root.children
     end
 
     test ":hide suppresses a field error semantic submission would reveal" do
@@ -1131,14 +1132,14 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
       plan = Projector.project(scalar_definition(), form)
 
-      assert [%RenderNode.Field{show_errors?: false}] = plan.root.children
+      assert [%Node.Field{show_errors?: false}] = plan.root.children
       assert plan.summary == []
     end
 
     test "a source with no issue enumeration still projects fields and scalar summaries" do
       plan = Projector.project(scalar_definition(), fixture_form(submitted?: true))
 
-      assert [%RenderNode.Field{}] = plan.root.children
+      assert [%Node.Field{}] = plan.root.children
       assert [_] = plan.summary
     end
   end
@@ -1216,7 +1217,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       root = FormData.to_form(form_state, as: "asset[payload]", id: "asset_payload")
       [address] = FormData.to_form(form_state, root, :address, [])
 
-      assert Enum.map(RenderPreparation.prepare(root).summary, & &1.message) == [
+      assert Enum.map(Preparation.prepare(root).summary, & &1.message) == [
                "value must have at least 4 properties, got 2",
                "value must have at least 3 properties, got 1",
                "property 'geo' is required",
@@ -1225,7 +1226,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
       # Root-of-form and sibling entries are gone; self and descendant remain,
       # in adapter order — the filter never reorders.
-      address_plan = RenderPreparation.prepare(address)
+      address_plan = Preparation.prepare(address)
       address_summary = address_plan.summary
 
       assert Enum.map(address_summary, & &1.message) == [
@@ -1242,9 +1243,9 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       assert self_entry.message == "value must have at least 3 properties, got 1"
       assert geo_entry.message == "property 'geo' is required"
 
-      assert %RenderNode.Group{} =
+      assert %Node.Group{} =
                geo_group =
-               Enum.find(address_plan.root.children, &match?(%RenderNode.Group{}, &1))
+               Enum.find(address_plan.root.children, &match?(%Node.Group{}, &1))
 
       assert geo_id == geo_group.dom.container
     end
@@ -1257,7 +1258,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
         )
 
       assert [%{id: nil, label: nil, message: "the whole form is wrong"}] = plan.summary
-      assert [%RenderNode.Field{errors: []}] = plan.root.children
+      assert [%Node.Field{errors: []}] = plan.root.children
     end
 
     # Spec §7.3, source-neutrally: the supported-nested-object regression
@@ -1283,12 +1284,12 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
       plan = Projector.project(definition, form)
 
-      assert [%RenderNode.Group{children: [street]} = address_group] = plan.root.children
+      assert [%Node.Group{children: [street]} = address_group] = plan.root.children
 
       assert [%{id: id, label: "Address", message: "is incomplete"}] = plan.summary
       assert id == address_group.dom.container
 
-      assert %RenderNode.Field{errors: [], show_errors?: false} = street
+      assert %Node.Field{errors: [], show_errors?: false} = street
       assert street.field.name == "payload[address][street]"
       assert street.field.value == "Main"
     end
@@ -1333,18 +1334,18 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       occurrence = InstancePath.new!(["address"])
 
       duplicate_group = fn container ->
-        %RenderNode.Group{
+        %Node.Group{
           legend: "Address",
-          dom: %RenderNode.GroupDOM{container: container, help: container <> "-help"},
+          dom: %Node.GroupDOM{container: container, help: container <> "-help"},
           kind: :object,
           occurrence_path: occurrence,
           children: []
         }
       end
 
-      root = %RenderNode.Group{
+      root = %Node.Group{
         legend: "/",
-        dom: %RenderNode.GroupDOM{container: "root", help: "root-help"},
+        dom: %Node.GroupDOM{container: "root", help: "root-help"},
         kind: :object,
         occurrence_path: InstancePath.new!([]),
         children: [duplicate_group.("address-a"), duplicate_group.("address-b")]
@@ -1360,7 +1361,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       }
 
       assert_raise ArgumentError, ~r/two rendered object groups claim/, fn ->
-        Formentation.Phoenix.RenderPreparation.Summary.build(root, ctx)
+        Formentation.Phoenix.Render.Preparation.Summary.build(root, ctx)
       end
     end
 
@@ -1391,7 +1392,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
       plan = Projector.project(scalar_definition(), form)
 
-      assert [%RenderNode.Field{show_errors?: true, errors: [{"is invalid", []}]}] =
+      assert [%Node.Field{show_errors?: true, errors: [{"is invalid", []}]}] =
                plan.root.children
 
       assert [%{label: "Operating hours", message: "is invalid"}] = plan.summary
@@ -1431,7 +1432,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
 
       plan = Projector.project(scalar_definition(), form)
 
-      assert [%RenderPlan.SummaryEntry{}, %RenderPlan.SummaryEntry{}] = plan.summary
+      assert [%Plan.SummaryEntry{}, %Plan.SummaryEntry{}] = plan.summary
     end
 
     test "a :hide answer omits a non-field issue from a submitted summary" do
@@ -1484,7 +1485,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       assert decisions(formentation_plan).show_errors? == [true]
     end
 
-    defp decisions(%RenderPlan{root: root, summary: summary}) do
+    defp decisions(%Plan{root: root, summary: summary}) do
       %{
         show_errors?: root |> flatten_fields() |> Enum.map(& &1.show_errors?),
         summary: Enum.map(summary, &{&1.label, &1.message})
@@ -1679,10 +1680,10 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       assert names == ["payload[title]"]
     end
 
-    defp flatten_fields(%RenderNode.Group{children: children}),
+    defp flatten_fields(%Node.Group{children: children}),
       do: Enum.flat_map(children, &flatten_fields/1)
 
-    defp flatten_fields(%RenderNode.Field{} = field), do: [field]
+    defp flatten_fields(%Node.Field{} = field), do: [field]
   end
 
   describe "architectural boundary" do
@@ -1691,25 +1692,25 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
     # A source-text assertion states that obligation directly, and is the
     # regression PR #13 must keep green when it rebases its blocker work
     # into the Formentation.Form state view.
-    @projector_source File.read!("lib/formentation/phoenix/render_preparation.ex")
+    @projector_source File.read!("lib/formentation/phoenix/render/preparation.ex")
     # File.read!/1 above is not a Mix compile dependency by itself; it
     # currently recompiles correctly only incidentally, via the
-    # `doctest Formentation.Phoenix.RenderPreparation` at the top of this file.
+    # `doctest Formentation.Phoenix.Render.Preparation` at the top of this file.
     # This makes the recompilation guarantee explicit rather than
     # incidental, so the pin can never validate a stale snapshot.
-    @external_resource "lib/formentation/phoenix/render_preparation.ex"
+    @external_resource "lib/formentation/phoenix/render/preparation.ex"
 
     # Preparation's source lives in two files since context resolution moved
-    # to RenderPreparation.Context. The obligations below are about the
+    # to Preparation.Context. The obligations below are about the
     # preparation *layer*, not about one file, so they scan both: a pin that
-    # names only render_preparation.ex keeps passing while the code it was
+    # names only render/preparation.ex keeps passing while the code it was
     # written to constrain moves next door.
-    @context_source File.read!("lib/formentation/phoenix/render_preparation/context.ex")
-    @external_resource "lib/formentation/phoenix/render_preparation/context.ex"
+    @context_source File.read!("lib/formentation/phoenix/render/preparation/context.ex")
+    @external_resource "lib/formentation/phoenix/render/preparation/context.ex"
 
     @preparation_sources [
-      {"render_preparation.ex", @projector_source},
-      {"render_preparation/context.ex", @context_source}
+      {"render/preparation.ex", @projector_source},
+      {"render/preparation/context.ex", @context_source}
     ]
 
     # #28 requires one authoritative decoder of the private projection key.
@@ -1768,7 +1769,11 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
                "#{file} reads mixed definition storage"
 
         refute source =~ "nests_data?", "#{file} branches on nests_data?"
-        refute source =~ "%Node.Group", "#{file} names %Node.Group{}"
+        # The %Node.Group{} bare-name check that used to live here is gone:
+        # superseded by boundary_test.exs's legacy-alias check, since
+        # %Render.Node.Group{} is sanctioned (Task 5) and this file's alias
+        # of Formentation.Phoenix.Render.Node to the bare name `Node` would
+        # otherwise false-positive.
       end
     end
 
@@ -1790,7 +1795,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
       assert build_body =~ "validate_projection_root!"
 
       # The refute is module-wide rather than scoped to build/4's body:
-      # presentation_root_at/2 is private to RenderPreparation, so Context
+      # presentation_root_at/2 is private to Preparation, so Context
       # cannot call it under any circumstance and a scoped refute would be
       # vacuous. The reachable regression is Context reaching for the same
       # Info queries directly, anywhere in the file. Context resolution
@@ -1800,7 +1805,7 @@ defmodule Formentation.Phoenix.RenderPreparationTest do
              "Context materializes presentation descriptors"
 
       # The claims above cover Context. The regression could also come back
-      # from the other side: RenderPreparation itself calling
+      # from the other side: Preparation itself calling
       # presentation_root_at/2 outside prepare/2 — from prepare_at/3, say,
       # which would put whole-body traversal back on the field/1 path without
       # Context being involved at all. So pin that too: presentation_root_at

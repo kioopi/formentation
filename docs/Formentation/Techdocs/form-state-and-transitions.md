@@ -366,7 +366,7 @@ A blocker's `path` is the *unsupported node's own* instance path, not
 necessarily a deeper underlying issue's path; `node_id` is copied from
 `Formentation.Definition.Semantic.Unsupported.id` so tooling can relate a blocker back
 to the compiled definition without parsing paths. On submit,
-`Formentation.Phoenix.RenderPreparation` turns blockers into capability entries
+`Formentation.Phoenix.Render.Preparation` turns blockers into capability entries
 in the error summary — see [[rendering#Error summary|Rendering]].
 
 ## Read surface

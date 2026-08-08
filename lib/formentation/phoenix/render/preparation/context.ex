@@ -1,9 +1,9 @@
-defmodule Formentation.Phoenix.RenderPreparation.Context do
+defmodule Formentation.Phoenix.Render.Preparation.Context do
   @moduledoc """
-  The projection context `RenderPreparation` resolves before traversing, and
+  The projection context `Render.Preparation` resolves before traversing, and
   the cursor it carries while traversing.
 
-  Not part of the public API — reached only through `RenderPreparation.prepare/2`
+  Not part of the public API — reached only through `Render.Preparation.prepare/2`
   and `prepare_at/3`. Kept out of the published docs by `mix.exs`, but
   documented here because "which projection are we in" is a self-contained
   question worth understanding on its own: a form arrives either as a native
@@ -22,7 +22,7 @@ defmodule Formentation.Phoenix.RenderPreparation.Context do
 
   alias Formentation.{Definition, Info, InstancePath}
   alias Formentation.Phoenix.{ProjectedForm, StateView}
-  alias Formentation.Phoenix.RenderPreparation.{Summary, Visibility}
+  alias Formentation.Phoenix.Render.Preparation.{Summary, Visibility}
 
   @missing_namespace ~S"""
                      Formentation cannot mint DOM ids without a namespace. Give the form a name or an id
@@ -76,7 +76,7 @@ defmodule Formentation.Phoenix.RenderPreparation.Context do
       ...>     adapter: Formentation.Definition.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
-      iex> ctx = Formentation.Phoenix.RenderPreparation.Context.resolve(form, definition: definition)
+      iex> ctx = Formentation.Phoenix.Render.Preparation.Context.resolve(form, definition: definition)
       iex> {ctx.root_path, ctx.path, ctx.dom_namespace}
       {[], [], "payload"}
   """
@@ -116,8 +116,8 @@ defmodule Formentation.Phoenix.RenderPreparation.Context do
       ...>     adapter: Formentation.Definition.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
-      iex> ctx = Formentation.Phoenix.RenderPreparation.Context.resolve(form, definition: definition)
-      iex> {descent, moved} = Formentation.Phoenix.RenderPreparation.Context.cursor_to(ctx, ["address"])
+      iex> ctx = Formentation.Phoenix.Render.Preparation.Context.resolve(form, definition: definition)
+      iex> {descent, moved} = Formentation.Phoenix.Render.Preparation.Context.cursor_to(ctx, ["address"])
       iex> {descent, moved.path}
       {["address"], ["address"]}
   """
@@ -139,7 +139,7 @@ defmodule Formentation.Phoenix.RenderPreparation.Context do
   Returns `:self` when `path` is where the cursor already sits, `{:child,
   segment, ctx}` when `path` is a direct child — `segment` being the one the
   caller must descend its form into — and `:error` for anything else. What an
-  `:error` *means* is the caller's to say: only `RenderPreparation` knows that
+  `:error` *means* is the caller's to say: only `Render.Preparation` knows that
   a non-child object descriptor is an internal invariant failure rather than a
   user-reachable condition, so this function reports the fact and leaves the
   error vocabulary on the traversal side.
@@ -152,8 +152,8 @@ defmodule Formentation.Phoenix.RenderPreparation.Context do
       ...>     adapter: Formentation.Definition.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
-      iex> ctx = Formentation.Phoenix.RenderPreparation.Context.resolve(form, definition: definition)
-      iex> {:child, segment, moved} = Formentation.Phoenix.RenderPreparation.Context.enter(ctx, ["address"])
+      iex> ctx = Formentation.Phoenix.Render.Preparation.Context.resolve(form, definition: definition)
+      iex> {:child, segment, moved} = Formentation.Phoenix.Render.Preparation.Context.enter(ctx, ["address"])
       iex> {segment, moved.path}
       {"address", ["address"]}
 
@@ -163,8 +163,8 @@ defmodule Formentation.Phoenix.RenderPreparation.Context do
       ...>     adapter: Formentation.Definition.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
-      iex> ctx = Formentation.Phoenix.RenderPreparation.Context.resolve(form, definition: definition)
-      iex> Formentation.Phoenix.RenderPreparation.Context.enter(ctx, ["address", "street"])
+      iex> ctx = Formentation.Phoenix.Render.Preparation.Context.resolve(form, definition: definition)
+      iex> Formentation.Phoenix.Render.Preparation.Context.enter(ctx, ["address", "street"])
       :error
   """
   @spec enter(t(), [InstancePath.segment()]) ::
@@ -182,7 +182,7 @@ defmodule Formentation.Phoenix.RenderPreparation.Context do
   @doc """
   Returns the narrower slice of this context that `Summary.build/2` reads.
 
-  `Summary` owns the shape — see its `t:Formentation.Phoenix.RenderPreparation.Summary.ctx/0`
+  `Summary` owns the shape — see its `t:Formentation.Phoenix.Render.Preparation.Summary.ctx/0`
   — because summary construction works only from the already-prepared render
   tree and the source's `StateView`, never from namespace or traversal state.
   Naming the slice here rather than taking it at the call site means renaming a
@@ -197,8 +197,8 @@ defmodule Formentation.Phoenix.RenderPreparation.Context do
       ...>     adapter: Formentation.Definition.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
-      iex> ctx = Formentation.Phoenix.RenderPreparation.Context.resolve(form, definition: definition)
-      iex> ctx |> Formentation.Phoenix.RenderPreparation.Context.summary_view() |> Map.keys() |> Enum.sort()
+      iex> ctx = Formentation.Phoenix.Render.Preparation.Context.resolve(form, definition: definition)
+      iex> ctx |> Formentation.Phoenix.Render.Preparation.Context.summary_view() |> Map.keys() |> Enum.sort()
       [:definition, :root_form, :root_instance_path, :source]
   """
   @spec summary_view(t()) :: Summary.ctx()
@@ -214,7 +214,7 @@ defmodule Formentation.Phoenix.RenderPreparation.Context do
   @doc """
   Returns the narrower slice of this context that `Visibility` reads.
 
-  `Visibility` owns the shape — see its `t:Formentation.Phoenix.RenderPreparation.Visibility.ctx/0`
+  `Visibility` owns the shape — see its `t:Formentation.Phoenix.Render.Preparation.Visibility.ctx/0`
   — because visibility decisions work only from the source's `StateView` and
   the root form, never from namespace or traversal state.
 
@@ -226,8 +226,8 @@ defmodule Formentation.Phoenix.RenderPreparation.Context do
       ...>     adapter: Formentation.Definition.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
-      iex> ctx = Formentation.Phoenix.RenderPreparation.Context.resolve(form, definition: definition)
-      iex> ctx |> Formentation.Phoenix.RenderPreparation.Context.visibility_view() |> Map.keys() |> Enum.sort()
+      iex> ctx = Formentation.Phoenix.Render.Preparation.Context.resolve(form, definition: definition)
+      iex> ctx |> Formentation.Phoenix.Render.Preparation.Context.visibility_view() |> Map.keys() |> Enum.sort()
       [:root_form, :source]
   """
   @spec visibility_view(t()) :: Visibility.ctx()
@@ -251,7 +251,7 @@ defmodule Formentation.Phoenix.RenderPreparation.Context do
   end
 
   # Validating the root is not the same as building it. semantic_kind/2 is a
-  # single index lookup; RenderPreparation's presentation_root_at/2
+  # single index lookup; Render.Preparation's presentation_root_at/2
   # materializes the descriptor tree recursively, and only prepare/2 consumes
   # that. Building it here made every prepare_at/3 call — that is, every
   # field/1 render — pay for whole-body presentation traversal to answer a

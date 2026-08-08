@@ -1,14 +1,15 @@
-defmodule Formentation.Phoenix.ReferenceComponentsTest do
+defmodule Formentation.Phoenix.Theme.ReferenceTest do
   use ExUnit.Case, async: true
 
-  doctest Formentation.Phoenix.ReferenceComponents
+  doctest Formentation.Phoenix.Theme.Reference
 
   import Formentation.HTMLAssertions
   import Phoenix.LiveViewTest, only: [render_component: 2]
 
   alias Formentation.InstancePath
-  alias Formentation.Phoenix.{DOMIdentity, RenderNode}
-  alias Formentation.Phoenix.ReferenceComponents, as: Reference
+  alias Formentation.Phoenix.DOMIdentity
+  alias Formentation.Phoenix.Render.Node
+  alias Formentation.Phoenix.Theme.Reference
 
   defp field_id(path, part), do: DOMIdentity.field("payload", InstancePath.new!(path), part)
 
@@ -26,7 +27,7 @@ defmodule Formentation.Phoenix.ReferenceComponentsTest do
       field: form_field(),
       label: "Notes",
       value_type: :string,
-      dom: %RenderNode.FieldDOM{
+      dom: %Node.FieldDOM{
         control: field_id(["notes"], :control),
         container: field_id(["notes"], :container),
         help: field_id(["notes"], :help),
@@ -41,7 +42,7 @@ defmodule Formentation.Phoenix.ReferenceComponentsTest do
       read_only?: false
     ]
 
-    struct!(RenderNode.Field, Keyword.merge(defaults, overrides))
+    struct!(Node.Field, Keyword.merge(defaults, overrides))
   end
 
   defp render_field(overrides) do
@@ -54,7 +55,7 @@ defmodule Formentation.Phoenix.ReferenceComponentsTest do
       value_type: :boolean,
       field: form_field(id: "insulation_ok", name: "insulation_ok", field: :insulation_ok),
       label: "Insulation test passed",
-      dom: %RenderNode.FieldDOM{
+      dom: %Node.FieldDOM{
         control: DOMIdentity.field("payload", InstancePath.new!(["insulation_ok"]), :control),
         container: DOMIdentity.field("payload", InstancePath.new!(["insulation_ok"]), :container),
         help: DOMIdentity.field("payload", InstancePath.new!(["insulation_ok"]), :help),
@@ -72,7 +73,7 @@ defmodule Formentation.Phoenix.ReferenceComponentsTest do
       field: form_field(id: "condition", name: "condition", field: :condition),
       label: "Condition",
       options: ["good", "worn", "defective"],
-      dom: %RenderNode.FieldDOM{
+      dom: %Node.FieldDOM{
         control: DOMIdentity.field("payload", InstancePath.new!(["condition"]), :control),
         container: DOMIdentity.field("payload", InstancePath.new!(["condition"]), :container),
         help: DOMIdentity.field("payload", InstancePath.new!(["condition"]), :help),
@@ -94,7 +95,7 @@ defmodule Formentation.Phoenix.ReferenceComponentsTest do
       field: form_field(id: "condition", name: "condition", field: :condition),
       label: "Condition",
       options: ["good", "worn"],
-      dom: %RenderNode.FieldDOM{
+      dom: %Node.FieldDOM{
         control: DOMIdentity.field("payload", InstancePath.new!(["condition"]), :control),
         container: DOMIdentity.field("payload", InstancePath.new!(["condition"]), :container),
         help: DOMIdentity.field("payload", InstancePath.new!(["condition"]), :help),
@@ -500,10 +501,10 @@ defmodule Formentation.Phoenix.ReferenceComponentsTest do
 
   describe "node dispatch and groups" do
     test "a group renders a fieldset with legend and its children" do
-      group = %RenderNode.Group{
+      group = %Node.Group{
         legend: "Electrical",
         help: "Measurements and safety checks.",
-        dom: %RenderNode.GroupDOM{
+        dom: %Node.GroupDOM{
           container: group_id("electrical", :container),
           help: group_id("electrical", :help)
         },
@@ -524,9 +525,9 @@ defmodule Formentation.Phoenix.ReferenceComponentsTest do
     end
 
     test "a group without help omits the help element and describedby attribute" do
-      group = %RenderNode.Group{
+      group = %Node.Group{
         legend: "Electrical",
-        dom: %RenderNode.GroupDOM{
+        dom: %Node.GroupDOM{
           container: group_id("electrical", :container),
           help: group_id("electrical", :help)
         },
@@ -541,10 +542,10 @@ defmodule Formentation.Phoenix.ReferenceComponentsTest do
     end
 
     test "an empty binary group help remains associated" do
-      group = %RenderNode.Group{
+      group = %Node.Group{
         legend: "Electrical",
         help: "",
-        dom: %RenderNode.GroupDOM{
+        dom: %Node.GroupDOM{
           container: group_id("electrical", :container),
           help: group_id("electrical", :help)
         },
@@ -560,10 +561,10 @@ defmodule Formentation.Phoenix.ReferenceComponentsTest do
     test "group help is escaped" do
       help = "</p><script>alert('group')</script>"
 
-      group = %RenderNode.Group{
+      group = %Node.Group{
         legend: "Electrical",
         help: help,
-        dom: %RenderNode.GroupDOM{
+        dom: %Node.GroupDOM{
           container: group_id("electrical", :container),
           help: group_id("electrical", :help)
         },
@@ -577,10 +578,10 @@ defmodule Formentation.Phoenix.ReferenceComponentsTest do
     end
 
     test "nested groups recurse" do
-      inner = %RenderNode.Group{
+      inner = %Node.Group{
         legend: "Details",
         help: "Inner help.",
-        dom: %RenderNode.GroupDOM{
+        dom: %Node.GroupDOM{
           container: group_id("inner", :container),
           help: group_id("inner", :help)
         },
@@ -588,10 +589,10 @@ defmodule Formentation.Phoenix.ReferenceComponentsTest do
         children: [field_node()]
       }
 
-      outer = %RenderNode.Group{
+      outer = %Node.Group{
         legend: "Details",
         help: "Outer help.",
-        dom: %RenderNode.GroupDOM{
+        dom: %Node.GroupDOM{
           container: group_id("outer", :container),
           help: group_id("outer", :help)
         },

@@ -1,11 +1,12 @@
-defmodule Formentation.Phoenix.RenderPreparation do
+defmodule Formentation.Phoenix.Render.Preparation do
   @moduledoc false
 
   alias Formentation.Definition.Semantic
   alias Formentation.{Info, InstancePath}
   alias Formentation.Info.Layout
-  alias Formentation.Phoenix.{DOMIdentity, RenderNode, RenderPlan}
-  alias Formentation.Phoenix.RenderPreparation.{Context, Summary, Visibility, Widget}
+  alias Formentation.Phoenix.DOMIdentity
+  alias Formentation.Phoenix.Render.{Node, Plan}
+  alias Formentation.Phoenix.Render.Preparation.{Context, Summary, Visibility, Widget}
 
   @doc """
   Projects the whole definition against `form` into a render plan.
@@ -31,12 +32,12 @@ defmodule Formentation.Phoenix.RenderPreparation do
       ...>     adapter: Formentation.Definition.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
-      iex> plan = Formentation.Phoenix.RenderPreparation.prepare(form, definition: definition)
+      iex> plan = Formentation.Phoenix.Render.Preparation.prepare(form, definition: definition)
       iex> [field] = plan.root.children
       iex> {field.widget, field.label, field.field.name}
       {:email_input, "Email", "payload[email]"}
   """
-  @spec prepare(Phoenix.HTML.Form.t()) :: RenderPlan.t()
+  @spec prepare(Phoenix.HTML.Form.t()) :: Plan.t()
   def prepare(%Phoenix.HTML.Form{} = form), do: prepare(form, [])
 
   @doc """
@@ -50,17 +51,17 @@ defmodule Formentation.Phoenix.RenderPreparation do
       ...>     adapter: Formentation.Definition.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
-      iex> [field] = Formentation.Phoenix.RenderPreparation.prepare(form, definition: definition, dom_namespace: "asset_payload").root.children
+      iex> [field] = Formentation.Phoenix.Render.Preparation.prepare(form, definition: definition, dom_namespace: "asset_payload").root.children
       iex> {field.dom.control, field.field.name}
       {"ftn--asset_payload--field--control--email", "payload[email]"}
   """
-  @spec prepare(Phoenix.HTML.Form.t(), keyword()) :: RenderPlan.t()
+  @spec prepare(Phoenix.HTML.Form.t(), keyword()) :: Plan.t()
   def prepare(%Phoenix.HTML.Form{} = form, opts) when is_list(opts) do
     ctx = Context.resolve(form, opts)
     descriptor = presentation_root_at(ctx.definition, ctx.root_path)
     {root, diagnostics} = project_descriptor(descriptor, form, ctx)
 
-    %RenderPlan{
+    %Plan{
       root: root,
       root_path: ctx.root_path,
       summary: summary(root, ctx),
@@ -83,12 +84,12 @@ defmodule Formentation.Phoenix.RenderPreparation do
       ...>     adapter: Formentation.Definition.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
-      iex> node = Formentation.Phoenix.RenderPreparation.prepare_at(form, ["email"], definition: definition)
+      iex> node = Formentation.Phoenix.Render.Preparation.prepare_at(form, ["email"], definition: definition)
       iex> {node.widget, node.field.name}
       {:email_input, "payload[email]"}
   """
   @spec prepare_at(Phoenix.HTML.Form.t(), [String.t()]) ::
-          RenderNode.t() | nil
+          Node.t() | nil
   def prepare_at(%Phoenix.HTML.Form{} = form, segments)
       when is_list(segments),
       do: prepare_at(form, segments, [])
@@ -97,7 +98,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
   Projects one subtree with an explicit renderer-owned DOM namespace.
   """
   @spec prepare_at(Phoenix.HTML.Form.t(), [String.t()], keyword()) ::
-          RenderNode.t() | nil
+          Node.t() | nil
   def prepare_at(%Phoenix.HTML.Form{} = form, segments, opts)
       when is_list(segments) do
     %InstancePath{segments: segments} = InstancePath.new!(segments)
@@ -164,12 +165,12 @@ defmodule Formentation.Phoenix.RenderPreparation do
     # never drift apart from each other.
     occurrence = InstancePath.new!(ctx.path)
 
-    dom = %RenderNode.GroupDOM{
+    dom = %Node.GroupDOM{
       container: DOMIdentity.object(ctx.dom_namespace, occurrence, :container),
       help: DOMIdentity.object(ctx.dom_namespace, occurrence, :help)
     }
 
-    {%RenderNode.Group{
+    {%Node.Group{
        legend: object_legend(object),
        help: object.help,
        dom: dom,
@@ -183,12 +184,12 @@ defmodule Formentation.Phoenix.RenderPreparation do
     {children, diagnostics} = project_children(group.children, form, ctx)
     enclosing = InstancePath.new!(ctx.path)
 
-    dom = %RenderNode.GroupDOM{
+    dom = %Node.GroupDOM{
       container: DOMIdentity.group(ctx.dom_namespace, group.id, enclosing, :container),
       help: DOMIdentity.group(ctx.dom_namespace, group.id, enclosing, :help)
     }
 
-    {%RenderNode.Group{
+    {%Node.Group{
        legend: group_legend(group),
        help: group.help,
        dom: dom,
@@ -247,7 +248,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
     path = presentation.semantic_path.segments
     instance_path = presentation.semantic_path
 
-    dom = %RenderNode.FieldDOM{
+    dom = %Node.FieldDOM{
       control: DOMIdentity.field(ctx.dom_namespace, instance_path, :control),
       container: DOMIdentity.field(ctx.dom_namespace, instance_path, :container),
       help: DOMIdentity.field(ctx.dom_namespace, instance_path, :help),
@@ -255,7 +256,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
       options: DOMIdentity.field_options(ctx.dom_namespace, instance_path, node.options)
     }
 
-    {%RenderNode.Field{
+    {%Node.Field{
        widget: widget,
        field: field,
        label: presentation.label || humanize(node.name),
