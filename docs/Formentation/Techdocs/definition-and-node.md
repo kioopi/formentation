@@ -10,8 +10,8 @@ status: current
 
 # Definition
 
-*As of 2026-07-27 (native semantic/presentation storage for the built-in
-sources and native-backed semantic/presentation query seams, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]).*
+*As of 2026-08-08 (native semantic/presentation storage for the built-in
+sources and native-backed semantic/presentation query seams, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; module paths refreshed for the lib-tree restructure, [[18-decisions#D-047 — The lib tree is restructured to state the north-star architecture|D-047]]).*
 
 `Formentation.Definition` is the compiler's product and the system's
 common language: an immutable, source-independent tree of semantic

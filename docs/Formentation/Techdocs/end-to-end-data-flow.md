@@ -12,7 +12,7 @@ status: current
 
 # End-to-end data flow
 
-> [!note] As of 2026-08-07 · projected Phoenix forms and three-source rendering join (D-041), submit decision result (D-032), prepared DOM identities (D-035), form/2 façade (D-046)
+> [!note] As of 2026-08-08 · projected Phoenix forms and three-source rendering join (D-041), submit decision result (D-032), prepared DOM identities (D-035), form/2 façade (D-046); module paths refreshed for the lib-tree restructure (D-047)
 > Follows one form through every layer that exists today, and stops
 > where the built system stops. Each layer has its own deep-dive note;
 > this one is about the **joins between them** — what crosses each
@@ -32,7 +32,7 @@ flowchart TD
     Def["Definition"]
     State["Form"]
     PForm["%Phoenix.HTML.Form{}"]
-    Plan["RenderPlan"]
+    Plan["Render.Plan"]
     HTML["HTML"]
     Params["Browser params"]
     Decision["submit decision<br/>success or redisplay"]
@@ -129,7 +129,7 @@ becomes `asset[payload][serial_number]`. Renderer-owned ids are separately
 prepared from `dom_namespace`, then the Phoenix form id/name, so the same
 control id is `ftn--asset_payload--field--control--serial_number`.
 
-## 4 · `%Phoenix.HTML.Form{}` → `RenderPlan`
+## 4 · `%Phoenix.HTML.Form{}` → `Render.Plan`
 
 **Crosses:** Three things come here, from three different places: values,
 errors, and per-field usage come through Phoenix's own conventions on the form
@@ -137,7 +137,7 @@ struct; the projection root comes from the private `options` key; and, for a
 native Formentation form, the definition comes from `form.source`. Only the
 middle one is new in D-041. A generic FormData source supplies the definition
 explicitly. **Comes back:** a
-`%RenderPlan{}`.
+`%Render.Plan{}`.
 
 [[rendering|Render preparation]] walks the definition in declaration order and
 pairs each node with the corresponding `Phoenix.HTML.FormField`,
@@ -165,7 +165,7 @@ for a source with no dedicated implementation
 summary's object-level entries come from its `issues/2`, and degrade to
 field entries only for a source whose state view reports `:unavailable`.
 
-## 5 · `RenderPlan` → HTML
+## 5 · `Render.Plan` → HTML
 
 **Crosses:** render nodes. **Comes back:** markup.
 

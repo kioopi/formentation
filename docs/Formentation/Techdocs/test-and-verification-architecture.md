@@ -12,7 +12,7 @@ status: current
 
 # Test and verification architecture
 
-> [!note] As of 2026-08-08 · step 7 + browser-testing suite + vault link and docs gates + the test.dev inner loop + adapter resolution (D-046) + the invariants suite moved into `test/formentation/invariants/`
+> [!note] As of 2026-08-08 · step 7 + browser-testing suite + vault link and docs gates + the test.dev inner loop + adapter resolution (D-046) + the invariants suite moved into `test/formentation/invariants/` + the three-way test-tree layout (module-mirroring, invariants, flat feature suites) documented
 > Describes the verification setup as built: the kinds of test in the
 > suite, what each one pins, and the static gates in `mix ci` — including
 > the demo's `Phoenix.LiveViewTest` suite and, now, the opt-in browser-real
@@ -288,6 +288,31 @@ structurally, not by a browser tool), no performance or load testing, and
 no benchmarks. Coverage is measured (`mix six`) but no threshold gates the
 build. Diagnostic codes are asserted where they are produced but are not
 pinned against accidental renaming by any registry.
+
+## Where a new test belongs
+
+`test/` deliberately mixes three conventions rather than one, and choosing
+between them for a new test is a judgment call, not a lookup:
+
+- **Module-mirroring unit tests** sit beside the module they exercise
+  (`test/formentation/form/codec_test.exs` next to
+  `lib/formentation/form/codec.ex`) — the default whenever a test is about
+  one module's own contract.
+- **Cross-cutting contracts** live under `test/formentation/invariants/`
+  (`differential_test.exs`, `boundary_test.exs`,
+  `used_input_contract_test.exs`) — for claims that span multiple modules
+  or layers and have no single natural module to mirror, such as "the two
+  adapters agree" or "nothing outside Phoenix references Phoenix".
+- **Feature-level suites** stay flat at `test/formentation/`
+  (`form_submission_test.exs`, `form_nested_presence_test.exs`,
+  `form_validation_dispatch_test.exs`, `facade_test.exs`,
+  `pump_inspection_test.exs`) — for behaviour that a user-facing feature
+  exercises across several modules, where mirroring would fragment one
+  coherent scenario across each contributing module's test file instead.
+
+A new test mirrors its module by default; it moves to `invariants/` only
+when the claim is genuinely cross-module, and stays flat only when it is
+exercising a feature no single module owns.
 
 ## Code map
 

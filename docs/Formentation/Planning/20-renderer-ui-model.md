@@ -1372,7 +1372,7 @@ Phase 3 prototypes must decide:
   preparation and large collections;
 - whether Spark materially improves authoring after plain descriptors exist;
 - whether `value_type`, `role`, and `required?` — the flat prepared meaning
-  facts on `RenderNode.Field` established by
+  facts on `Render.Node.Field` established by
   [[18-decisions#D-038 — Semantic value type and abstract widget are orthogonal prepared facts|D-038]]
   and [[18-decisions#D-043 — Semantic `role` and schema `required?` join `value_type` as flat prepared facts|D-043]] —
   should be grouped into a dedicated "prepared meaning" sub-struct once a

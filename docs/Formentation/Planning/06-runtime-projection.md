@@ -14,7 +14,7 @@ Runtime projection combines a static
 renderer context, and UI capabilities to produce a concrete prepared view.
 
 > [!important] Terminology direction
-> `RenderPlan` and render-node structs are the current Phase 1 implementation
+> `Render.Plan` and render-node structs are the current Phase 1 implementation
 > seams, not yet public extension contracts.
 > [[20-renderer-ui-model|Renderer and UI model]] uses **prepared view** for the
 > target responsibility and defers its exact public shape until a second UI
@@ -45,9 +45,9 @@ preparation error. The current implementation may represent it as a render
 plan:
 
 ```elixir
-%Formentation.RenderPlan{
+%Formentation.Render.Plan{
   definition_fingerprint: "...",
-  root: %Formentation.RenderNode{},
+  root: %Formentation.Render.Node{},
   active_branches: %{},
   item_identities: %{},
   diagnostics: []
@@ -152,7 +152,7 @@ The UI does not revisit source declarations or form semantics.
 For example:
 
 ```elixir
-%RenderNode{
+%Render.Node{
   kind: :field,
   role: :date,
   widget: :date_input,

@@ -10,7 +10,7 @@ status: current
 
 # Source adapters
 
-> [!note] As of 2026-08-07 · source-neutral validation dispatch; adapter selection (D-046)
+> [!note] As of 2026-08-08 · source-neutral validation dispatch; adapter selection (D-046); module paths refreshed for the lib-tree restructure (D-047)
 > Describes the two adapters as built. Node shapes are deferred to
 > [[definition-and-node|Definition and Node]], the origin model to
 > [[diagnostics-and-origins|Diagnostics and origins]], and the addressing
@@ -221,12 +221,12 @@ Each adapter additionally carries its own property tests
 
 | Concern | Module | File |
 | --- | --- | --- |
-| Adapter contract | `Formentation.Definition.Source` | `lib/formentation/source.ex` |
-| Shared walk · Context · policy | `Formentation.Definition.Source.Shared` | `lib/formentation/source/shared.ex` |
-| Map adapter | `Formentation.Definition.Source.Map` | `lib/formentation/source/map.ex` |
-| JSON Schema adapter | `Formentation.Definition.Source.JSONSchema` | `lib/formentation/json_schema.ex` |
-| JSV boundary | `Formentation.Definition.Source.JSONSchema.Validator` | `lib/formentation/json_schema/validator.ex` |
-| Differential property | `Formentation.DifferentialTest` | `test/formentation/differential_test.exs` |
+| Adapter contract | `Formentation.Definition.Source` | `lib/formentation/definition/source.ex` |
+| Shared walk · Context · policy | `Formentation.Definition.Source.Shared` | `lib/formentation/definition/source/shared.ex` |
+| Map adapter | `Formentation.Definition.Source.Map` | `lib/formentation/definition/source/map.ex` |
+| JSON Schema adapter | `Formentation.Definition.Source.JSONSchema` | `lib/formentation/definition/source/json_schema.ex` |
+| JSV boundary | `Formentation.Definition.Source.JSONSchema.Validator` | `lib/formentation/definition/source/json_schema/validator.ex` |
+| Differential property | `Formentation.DifferentialTest` | `test/formentation/invariants/differential_test.exs` |
 
 ## Related notes
 
