@@ -25,9 +25,9 @@ produced.
 ```elixir
 %Formentation.Definition{
   format_version: 3,
-  semantic: %Formentation.Semantic.Object{...},
-  semantic_index: %Formentation.Semantic.Index{...},
-  presentation: %Formentation.Presentation.Object{...},
+  semantic: %Formentation.Definition.Semantic.Object{...},
+  semantic_index: %Formentation.Definition.Semantic.Index{...},
+  presentation: %Formentation.Definition.Presentation.Object{...},
   validation: %Formentation.ValidationPlan{} | nil,
   diagnostics: [%Formentation.Diagnostic{...}]
 }
@@ -65,7 +65,7 @@ no authoritative instance validation (the map source, currently).
 | `Semantic.Field` | `id`, `name`, `template_path`, `value_type` | `role`, `required?`, `read_only?`, `constraints`, `options`, `default`, `examples`, `origins` |
 | `Semantic.Unsupported` | `id`, `name`, `template_path` | `required?`, `origins` |
 
-`Formentation.Semantic` now reads `Definition.semantic` when it exists. It
+`Formentation.Definition.Semantic` now reads `Definition.semantic` when it exists. It
 derives current `InstancePath`s from the tree position and node names for
 query results, rather than storing an instance path on each semantic node.
 
@@ -88,7 +88,7 @@ semantic `InstancePath`s, and presentation groups expose layout identity only.
 `Formentation.Info.presentation_root/1` and
 `Formentation.Info.presentation_at/2` are the presentation-query seam.
 They read the native presentation tree and semantic index, then return typed
-descriptors under `Formentation.Info.Presentation`:
+descriptors under `Formentation.Info.Layout`:
 
 - `Object` — root or nested semantic-object layout boundary, carrying a
   normalized `InstancePath`.

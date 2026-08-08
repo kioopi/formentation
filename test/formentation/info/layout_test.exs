@@ -1,10 +1,10 @@
-defmodule Formentation.Info.PresentationTest do
+defmodule Formentation.Info.LayoutTest do
   use ExUnit.Case, async: true
 
   alias Formentation.{Definition, Info, TemplatePath}
-  alias Formentation.Info.Presentation
-  alias Formentation.Presentation, as: Layout
-  alias Formentation.Semantic
+  alias Formentation.Definition.Presentation, as: LayoutStorage
+  alias Formentation.Definition.Semantic
+  alias Formentation.Info.Layout
 
   defp compile!(declaration) do
     {:ok, definition, _diagnostics} =
@@ -13,9 +13,9 @@ defmodule Formentation.Info.PresentationTest do
     definition
   end
 
-  defp paths(%Presentation.Object{children: children}), do: Enum.flat_map(children, &paths/1)
-  defp paths(%Presentation.Group{children: children}), do: Enum.flat_map(children, &paths/1)
-  defp paths(%Presentation.Field{semantic_path: path}), do: [path.segments]
+  defp paths(%Layout.Object{children: children}), do: Enum.flat_map(children, &paths/1)
+  defp paths(%Layout.Group{children: children}), do: Enum.flat_map(children, &paths/1)
+  defp paths(%Layout.Field{semantic_path: path}), do: [path.segments]
 
   defp malformed_definition(semantic, presentation, by_id \\ %{}) do
     %Definition{
@@ -34,7 +34,7 @@ defmodule Formentation.Info.PresentationTest do
 
     root = Info.presentation_root(definition)
 
-    assert %Presentation.Object{semantic_path: %{segments: []}} = root
+    assert %Layout.Object{semantic_path: %{segments: []}} = root
     assert paths(root) == [["a"], ["c"]]
     assert Info.presentation_root(definition) == root
   end
@@ -49,8 +49,8 @@ defmodule Formentation.Info.PresentationTest do
 
     assert definition |> Info.fields() |> Enum.map(& &1.name) == ["a", "c"]
 
-    assert %Presentation.Object{
-             children: [%Presentation.Group{id: "/#reordered"} = group]
+    assert %Layout.Object{
+             children: [%Layout.Group{id: "/#reordered"} = group]
            } = Info.presentation_root(definition)
 
     assert paths(group) == [["c"], ["a"]]
@@ -69,11 +69,11 @@ defmodule Formentation.Info.PresentationTest do
         groups: [%{id: "late", fields: ["d", "b"]}]
       })
 
-    assert %Presentation.Object{
+    assert %Layout.Object{
              children: [
-               %Presentation.Field{semantic_path: %{segments: ["a"]}},
-               %Presentation.Group{id: "/#late"} = group,
-               %Presentation.Field{semantic_path: %{segments: ["c"]}}
+               %Layout.Field{semantic_path: %{segments: ["a"]}},
+               %Layout.Group{id: "/#late"} = group,
+               %Layout.Field{semantic_path: %{segments: ["c"]}}
              ]
            } = Info.presentation_root(definition)
 
@@ -94,11 +94,11 @@ defmodule Formentation.Info.PresentationTest do
         ]
       })
 
-    assert %Presentation.Object{
+    assert %Layout.Object{
              children: [
-               %Presentation.Object{
+               %Layout.Object{
                  semantic_path: %{segments: ["details"]},
-                 children: [%Presentation.Group{id: "/details#technical"} = group]
+                 children: [%Layout.Group{id: "/details#technical"} = group]
                }
              ]
            } = Info.presentation_root(definition)
@@ -128,7 +128,7 @@ defmodule Formentation.Info.PresentationTest do
       })
 
     assert {:ok,
-            %Presentation.Field{
+            %Layout.Field{
               semantic_path: %{segments: ["mode"]},
               label: "Mode",
               help: "Choose carefully.",
@@ -189,16 +189,16 @@ defmodule Formentation.Info.PresentationTest do
         groups: [%{id: "main", fields: ["title"]}]
       })
 
-    assert {:ok, %Presentation.Object{semantic_path: %{segments: []}}} =
+    assert {:ok, %Layout.Object{semantic_path: %{segments: []}}} =
              Info.presentation_at(definition, [])
 
-    assert {:ok, %Presentation.Field{semantic_path: %{segments: ["title"]}}} =
+    assert {:ok, %Layout.Field{semantic_path: %{segments: ["title"]}}} =
              Info.presentation_at(definition, ["title"])
 
-    assert {:ok, %Presentation.Object{semantic_path: %{segments: ["details"]}}} =
+    assert {:ok, %Layout.Object{semantic_path: %{segments: ["details"]}}} =
              Info.presentation_at(definition, ["details"])
 
-    assert {:ok, %Presentation.Field{semantic_path: %{segments: ["details", "width"]}}} =
+    assert {:ok, %Layout.Field{semantic_path: %{segments: ["details", "width"]}}} =
              Info.presentation_at(definition, ["details", "width"])
 
     assert Info.presentation_at(definition, ["missing"]) == :not_found
@@ -209,7 +209,7 @@ defmodule Formentation.Info.PresentationTest do
 
   test "presentation_root/1 raises when the root semantic reference has the wrong kind" do
     semantic = Semantic.Object.new(nil, %TemplatePath{segments: []}, [])
-    presentation = Layout.Object.new("/", [])
+    presentation = LayoutStorage.Object.new("/", [])
 
     definition =
       malformed_definition(semantic, presentation, %{
@@ -225,7 +225,7 @@ defmodule Formentation.Info.PresentationTest do
 
   test "presentation_root/1 raises when the root semantic reference is missing" do
     semantic = Semantic.Object.new(nil, %TemplatePath{segments: []}, [])
-    presentation = Layout.Object.new("/", [])
+    presentation = LayoutStorage.Object.new("/", [])
     definition = malformed_definition(semantic, presentation)
 
     assert_raise ArgumentError,
@@ -249,7 +249,7 @@ defmodule Formentation.Info.PresentationTest do
   test "presentation_at/2 raises when a semantic occurrence has no layout descriptor" do
     field = Semantic.Field.new("name", %TemplatePath{segments: ["name"]}, :string)
     semantic = Semantic.Object.new(nil, %TemplatePath{segments: []}, [field])
-    presentation = Layout.Object.new("/", [])
+    presentation = LayoutStorage.Object.new("/", [])
 
     definition =
       malformed_definition(semantic, presentation, %{
@@ -288,15 +288,15 @@ defmodule Formentation.Info.PresentationTest do
     definition =
       malformed_definition(
         semantic,
-        Layout.Object.new("/", [Layout.Field.new("/name")]),
+        LayoutStorage.Object.new("/", [LayoutStorage.Field.new("/name")]),
         %{
           "/" => %{kind: :object, node: semantic},
           "/name" => %{kind: :field, node: field}
         }
       )
 
-    assert %Presentation.Object{
-             children: [%Presentation.Field{semantic_path: %{segments: ["name"]}}]
+    assert %Layout.Object{
+             children: [%Layout.Field{semantic_path: %{segments: ["name"]}}]
            } = Info.presentation_root(definition)
   end
 
@@ -307,7 +307,7 @@ defmodule Formentation.Info.PresentationTest do
         Semantic.Field.new("name", %TemplatePath{segments: ["name"]}, :string, id: "/other-name")
       ])
 
-    definition = malformed_definition(semantic, Layout.Object.new("/", []))
+    definition = malformed_definition(semantic, LayoutStorage.Object.new("/", []))
 
     assert_raise ArgumentError,
                  ~r/invalid presentation reference \["name"\]: expected exactly one semantic occurrence, found 2/,
@@ -316,15 +316,15 @@ defmodule Formentation.Info.PresentationTest do
                  end
   end
 
-  defp collect_refs(%Presentation.Object{semantic_path: path, children: children}) do
+  defp collect_refs(%Layout.Object{semantic_path: path, children: children}) do
     [{:object, path.segments} | Enum.flat_map(children, &collect_refs/1)]
   end
 
-  defp collect_refs(%Presentation.Group{children: children}) do
+  defp collect_refs(%Layout.Group{children: children}) do
     Enum.flat_map(children, &collect_refs/1)
   end
 
-  defp collect_refs(%Presentation.Field{semantic_path: path}) do
+  defp collect_refs(%Layout.Field{semantic_path: path}) do
     [{:field, path.segments}]
   end
 end

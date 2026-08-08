@@ -1,4 +1,4 @@
-defmodule Formentation.Semantic.Index do
+defmodule Formentation.Definition.Semantic.Index do
   @moduledoc false
 
   alias Formentation.TemplatePath

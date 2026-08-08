@@ -1,9 +1,10 @@
 defmodule Formentation.DifferentialTest do
   use ExUnit.Case, async: true
 
+  alias Formentation.Definition.Semantic
   alias Formentation.Fixtures.{Annotations, FieldAccess, PumpInspection}
-  alias Formentation.{Info, Semantic}
-  alias Formentation.Info.Presentation
+  alias Formentation.Info
+  alias Formentation.Info.Layout
 
   # Every node fact the differential test compares. Origins are excluded
   # deliberately: they are the one sanctioned difference between sources
@@ -104,21 +105,21 @@ defmodule Formentation.DifferentialTest do
     |> Enum.sort()
   end
 
-  defp collect_presentation_facts(%Presentation.Object{} = object) do
+  defp collect_presentation_facts(%Layout.Object{} = object) do
     [
       {:object, object.semantic_path.segments, object.label, object.help}
       | Enum.flat_map(object.children, &collect_presentation_facts/1)
     ]
   end
 
-  defp collect_presentation_facts(%Presentation.Group{} = group) do
+  defp collect_presentation_facts(%Layout.Group{} = group) do
     [
       {:group, group.id, group.label, group.help}
       | Enum.flat_map(group.children, &collect_presentation_facts/1)
     ]
   end
 
-  defp collect_presentation_facts(%Presentation.Field{} = field) do
+  defp collect_presentation_facts(%Layout.Field{} = field) do
     [
       {:field, field.semantic_path.segments, field.label, field.help, field.widget, field.hidden?}
     ]

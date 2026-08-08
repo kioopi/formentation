@@ -11,7 +11,8 @@ defmodule Formentation.Definition do
   currently).
   """
 
-  alias Formentation.{Diagnostic, Presentation, Semantic, ValidationPlan}
+  alias Formentation.Definition.{Presentation, Semantic}
+  alias Formentation.{Diagnostic, ValidationPlan}
 
   @format_version 3
 

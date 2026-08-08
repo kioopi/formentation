@@ -119,8 +119,8 @@ The pipeline stops at `Info`. It produces meaning, not markup: no projection, no
 | Schema validator | `Formentation.JSONSchema.Validator` | `lib/formentation/json_schema/validator.ex` |
 | Shared walk context | `Formentation.Source.Shared` | `lib/formentation/source/shared.ex` |
 | Compiled definition | `Formentation.Definition` | `lib/formentation/definition.ex` |
-| Semantic storage | `Formentation.Semantic.Object` · `Semantic.Field` · `Semantic.Unsupported` | `lib/formentation/semantic/` |
-| Presentation storage | `Formentation.Presentation.Object` · `Presentation.Field` · `Presentation.Group` | `lib/formentation/presentation/` |
+| Semantic storage | `Formentation.Definition.Semantic.Object` · `Semantic.Field` · `Semantic.Unsupported` | `lib/formentation/semantic/` |
+| Presentation storage | `Formentation.Definition.Presentation.Object` · `Presentation.Field` · `Presentation.Group` | `lib/formentation/presentation/` |
 | Query surface | `Formentation.Info` | `lib/formentation/info.ex` |
 
 ## Related notes

@@ -536,7 +536,7 @@ whether a group was a fieldset or a nested Phoenix form. Resolves
 `Formentation.Info`: `presentation_root/1` returns the root layout descriptor
 and `presentation_at/2` returns `{:ok, descriptor}`, `:not_found`, or
 `:unsupported` for a semantic instance path. The descriptor vocabulary lives
-under `Formentation.Info.Presentation` and is deliberately small:
+under `Formentation.Info.Layout` and is deliberately small:
 `Object` for root/nested semantic-object layout boundaries, `Field` for scalar
 field references, and `Group` for presentation-only grouping. Object and field
 descriptors carry normalized `Formentation.InstancePath`s; group descriptors
@@ -879,7 +879,7 @@ unless `summary={true}`/`summary={false}` says otherwise, so composing under
 
 *2026-08-06*
 
-**Context.** `Formentation.Source.Map` previously copied `:one_of` options lists without validating list element types or verifying that `:one_of` was a list. This allowed malformed declarations like `one_of: [%{a: 1}]` or `one_of: "oops"` to compile without error and fail only during downstream rendering. Meanwhile, `Formentation.Semantic.Field` declares `@type option :: String.t() | number() | boolean()`.
+**Context.** `Formentation.Source.Map` previously copied `:one_of` options lists without validating list element types or verifying that `:one_of` was a list. This allowed malformed declarations like `one_of: [%{a: 1}]` or `one_of: "oops"` to compile without error and fail only during downstream rendering. Meanwhile, `Formentation.Definition.Semantic.Field` declares `@type option :: String.t() | number() | boolean()`.
 
 **Decision.** The Map source validates `:one_of` option declarations at the compilation boundary:
 - Valid option values must be scalars (`String.t()`, `number()`, or `boolean()`). Accepted values are retained verbatim without stringification, sorting, or deduplication.
@@ -892,7 +892,7 @@ unless `summary={true}`/`summary={false}` says otherwise, so composing under
 
 *2026-08-07*
 
-**Context.** [[#D-038 — Semantic value type and abstract widget are orthogonal prepared facts|D-038]] added `value_type` to `RenderNode.Field` but explicitly deferred `role` and `required?`, leaving that to [GitHub issue #37](https://github.com/kioopi/formentation/issues/37). `Formentation.Semantic.Field` already carries both facts pre-preparation; only `role` is read in passing (for widget inference) and neither reaches the prepared struct. A custom theme therefore cannot distinguish an `:email`-role field from a plain string, or tell whether a field is genuinely schema-required, without reaching back into the source `Definition` — which the renderer/UI boundary ([[20-renderer-ui-model|Renderer and UI model]]) forbids.
+**Context.** [[#D-038 — Semantic value type and abstract widget are orthogonal prepared facts|D-038]] added `value_type` to `RenderNode.Field` but explicitly deferred `role` and `required?`, leaving that to [GitHub issue #37](https://github.com/kioopi/formentation/issues/37). `Formentation.Definition.Semantic.Field` already carries both facts pre-preparation; only `role` is read in passing (for widget inference) and neither reaches the prepared struct. A custom theme therefore cannot distinguish an `:email`-role field from a plain string, or tell whether a field is genuinely schema-required, without reaching back into the source `Definition` — which the renderer/UI boundary ([[20-renderer-ui-model|Renderer and UI model]]) forbids.
 
 **Decision.** `RenderNode.Field` gains two more flat fields, `role` and `required?`, populated directly from `Semantic.Field` during preparation — the same additive, non-nested shape D-038 used for `value_type`. `required?` is the schema fact only; it is documented on the struct as presentation/accessibility-only (asterisks, `aria-required`, etc.) and must never be used by a theme to emit or infer the native HTML `required` attribute. The HTML constraint attribute continues to come solely from `validations[:required]`, governed unchanged by [[#D-010 — Empty-string, null, and absent-key decode policies|D-010]]'s existing policy of deriving HTML validation attributes from schema plus input policy, never from requiredness alone. The reference theme carries a conformance test asserting it never derives the HTML `required` attribute from `required?`, the same enforcement pattern [[#D-011 — Booleans use the hidden-input transport contract|D-011]] established for the checkbox hidden-input contract.
 

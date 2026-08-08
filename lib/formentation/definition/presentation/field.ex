@@ -1,9 +1,10 @@
-defmodule Formentation.Presentation.Field do
+defmodule Formentation.Definition.Presentation.Field do
   @moduledoc """
   Presentation reference to a semantic scalar field.
   """
 
-  alias Formentation.{Origin, Presentation}
+  alias Formentation.Definition.Presentation
+  alias Formentation.Origin
 
   @enforce_keys [:id, :semantic_id]
   defstruct [:id, :semantic_id, :label, :help, :widget, hidden?: false, origins: []]

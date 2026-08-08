@@ -6,13 +6,13 @@ defmodule Formentation.SubmissionBlocker do
   Distinct from a compile-time `Formentation.Diagnostic` and an
   authoritative runtime `Formentation.Issue`: a blocker relates one or
   more issues — or a directly observable missing required value — to a
-  preserve-only `Formentation.Semantic.Unsupported` node. It is derived at
+  preserve-only `Formentation.Definition.Semantic.Unsupported` node. It is derived at
   runtime from the materialized candidate and source-neutral validation
   issues; it is never stored on `%Formentation.Form{}`.
 
   - `path` — the owning unsupported node's instance path (not necessarily
     a deeper underlying issue's path).
-  - `node_id` — copied from `Formentation.Semantic.Unsupported.id`, so tooling
+  - `node_id` — copied from `Formentation.Definition.Semantic.Unsupported.id`, so tooling
     can relate the blocker to the compiled definition without parsing paths.
   - `code` — `:unsupported_required` when a required preserve-only value is
     absent from an active parent; `:unsupported_invalid` when preserved

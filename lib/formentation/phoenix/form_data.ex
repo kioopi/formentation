@@ -4,7 +4,8 @@ defimpl Phoenix.HTML.FormData, for: Formentation.Form do
   # view so `Phoenix.Component.used_input?/1` keeps working (D-014).
   # Spec: docs/superpowers/specs/2026-07-23-phase1-step5-formdata-design.md
 
-  alias Formentation.{Form, Info, Semantic}
+  alias Formentation.Definition.Semantic
+  alias Formentation.{Form, Info}
   alias Formentation.Phoenix.ProjectedForm
 
   def to_form(form_state, opts) do

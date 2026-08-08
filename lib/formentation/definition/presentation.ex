@@ -1,4 +1,4 @@
-defmodule Formentation.Presentation do
+defmodule Formentation.Definition.Presentation do
   @moduledoc """
   Native presentation layout vocabulary.
 
@@ -7,7 +7,7 @@ defmodule Formentation.Presentation do
   decode participation.
   """
 
-  alias Formentation.Presentation.{Field, Group, Object}
+  alias Formentation.Definition.Presentation.{Field, Group, Object}
 
   @type descriptor :: Object.t() | Field.t() | Group.t()
 

@@ -4,8 +4,9 @@ defmodule Formentation.Phoenix.RenderPreparation.WidgetTest do
 
   doctest Formentation.Phoenix.RenderPreparation.Widget
 
-  alias Formentation.Info.Presentation
-  alias Formentation.{InstancePath, Semantic, TemplatePath}
+  alias Formentation.Definition.Semantic
+  alias Formentation.Info.Layout
+  alias Formentation.{InstancePath, TemplatePath}
   alias Formentation.Phoenix.RenderPreparation.Widget
 
   # These properties deliberately never restate `Widget`'s clause order. An
@@ -72,7 +73,7 @@ defmodule Formentation.Phoenix.RenderPreparation.WidgetTest do
   end
 
   defp presentation_field(hint, hidden?) do
-    %Presentation.Field{
+    %Layout.Field{
       semantic_path: InstancePath.new!(["field"]),
       label: nil,
       help: nil,

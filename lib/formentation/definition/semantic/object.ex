@@ -1,4 +1,4 @@
-defmodule Formentation.Semantic.Object do
+defmodule Formentation.Definition.Semantic.Object do
   @moduledoc """
   Native semantic object occurrence.
 
@@ -6,8 +6,8 @@ defmodule Formentation.Semantic.Object do
   appear in this child list.
   """
 
+  alias Formentation.Definition.Semantic
   alias Formentation.{NodeId, Origin, TemplatePath}
-  alias Formentation.Semantic
 
   @enforce_keys [:id, :template_path]
   defstruct [

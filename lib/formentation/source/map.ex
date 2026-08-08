@@ -14,7 +14,8 @@ defmodule Formentation.Source.Map do
 
   @behaviour Formentation.Source
 
-  alias Formentation.{Diagnostic, NodeId, Presentation, Semantic, TemplatePath}
+  alias Formentation.Definition.{Presentation, Semantic}
+  alias Formentation.{Diagnostic, NodeId, TemplatePath}
   alias Formentation.Source.Shared
 
   @scalar_kinds [:string, :integer, :number, :boolean]

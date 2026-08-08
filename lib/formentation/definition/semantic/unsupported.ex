@@ -1,4 +1,4 @@
-defmodule Formentation.Semantic.Unsupported do
+defmodule Formentation.Definition.Semantic.Unsupported do
   @moduledoc """
   Native semantic preserve-only occurrence.
 

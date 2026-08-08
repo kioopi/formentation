@@ -33,12 +33,12 @@ defmodule Formentation.Form do
     InstancePath,
     Issue,
     Params,
-    Semantic,
     SubmissionBlocker,
     Transport,
     ValidationPlan
   }
 
+  alias Formentation.Definition.Semantic
   alias Formentation.Form.FieldState
 
   @enforce_keys [:definition, :original]
