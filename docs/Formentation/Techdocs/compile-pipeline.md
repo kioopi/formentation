@@ -10,7 +10,7 @@ status: draft
 
 # Compile pipeline
 
-> [!note] As of 2026-08-07 · Wave 3 façade (A3) complete
+> [!note] As of 2026-08-08 · Wave 3 façade (A3) complete; module paths refreshed for the lib-tree restructure ([[18-decisions#D-047 — The lib tree is restructured to state the north-star architecture|D-047]])
 > Describes the compile pipeline as built. The `Node` representation uses one struct per kind ([[18-decisions#D-015 — One struct per node kind|D-015]]); this note stays at pipeline altitude and defers `Node` internals to [[definition-and-node|Definition and Node]].
 
 The **compile pipeline** turns a declarative form description into a static, source-independent [[definition-and-node|`Definition`]] that can be cached, inspected, and queried — with no runtime state attached. It is the first half of Formentation: everything here runs once, ahead of any user interaction. The runtime half consumes the `Definition` and is documented in [[form-state-and-transitions|Form state and transitions]], [[phoenix-form-data|the FormData projection]], and [[rendering|Rendering]]; [[end-to-end-data-flow|End-to-end data flow]] joins both halves into one walk.
@@ -113,14 +113,14 @@ The pipeline stops at `Info`. It produces meaning, not markup: no projection, no
 | Concern | Module | File |
 | --- | --- | --- |
 | Entry point | `Formentation` | `lib/formentation.ex` |
-| Adapter contract | `Formentation.Definition.Source` | `lib/formentation/source.ex` |
-| Map adapter | `Formentation.Definition.Source.Map` | `lib/formentation/source/map.ex` |
-| JSON Schema adapter | `Formentation.Definition.Source.JSONSchema` | `lib/formentation/json_schema.ex` |
-| Schema validator | `Formentation.Definition.Source.JSONSchema.Validator` | `lib/formentation/json_schema/validator.ex` |
-| Shared walk context | `Formentation.Definition.Source.Shared` | `lib/formentation/source/shared.ex` |
+| Adapter contract | `Formentation.Definition.Source` | `lib/formentation/definition/source.ex` |
+| Map adapter | `Formentation.Definition.Source.Map` | `lib/formentation/definition/source/map.ex` |
+| JSON Schema adapter | `Formentation.Definition.Source.JSONSchema` | `lib/formentation/definition/source/json_schema.ex` |
+| Schema validator | `Formentation.Definition.Source.JSONSchema.Validator` | `lib/formentation/definition/source/json_schema/validator.ex` |
+| Shared walk context | `Formentation.Definition.Source.Shared` | `lib/formentation/definition/source/shared.ex` |
 | Compiled definition | `Formentation.Definition` | `lib/formentation/definition.ex` |
-| Semantic storage | `Formentation.Definition.Semantic.Object` · `Semantic.Field` · `Semantic.Unsupported` | `lib/formentation/semantic/` |
-| Presentation storage | `Formentation.Definition.Presentation.Object` · `Presentation.Field` · `Presentation.Group` | `lib/formentation/presentation/` |
+| Semantic storage | `Formentation.Definition.Semantic.Object` · `Semantic.Field` · `Semantic.Unsupported` | `lib/formentation/definition/semantic/` |
+| Presentation storage | `Formentation.Definition.Presentation.Object` · `Presentation.Field` · `Presentation.Group` | `lib/formentation/definition/presentation/` |
 | Query surface | `Formentation.Info` | `lib/formentation/info.ex` |
 
 ## Related notes

@@ -12,24 +12,25 @@ status: current
 
 # Rendering
 
-*As of 2026-08-07 (projection-context resolution and cursor ownership extracted
-to `RenderPreparation.Context`; object-level error-summary entries link to their rendered,
-focusable fieldset, keyed off `RenderNode.Group`'s `kind`/`occurrence_path`
-provenance, [GitHub issue #34](https://github.com/kioopi/formentation/issues/34);
-summary construction extracted to `RenderPreparation.Summary` with entries
-promoted to `RenderPlan.SummaryEntry` structs, widget resolution extracted
-to `RenderPreparation.Widget` behind a typed `resolve/2`, and D-014/D-027
-visibility/submission policy extracted to `RenderPreparation.Visibility`
+*As of 2026-08-08 (projection-context resolution and cursor ownership extracted
+to `Render.Preparation.Context`; object-level error-summary entries link to their rendered,
+focusable fieldset, keyed off `Render.Node.Group`'s `kind`/`occurrence_path`
+provenance, [GitHub issue #34](https://github.com/kioopi/formentation/issues/34); module paths
+refreshed for the lib-tree restructure, [[18-decisions#D-047 — The lib tree is restructured to state the north-star architecture|D-047]];
+summary construction extracted to `Render.Preparation.Summary` with entries
+promoted to `Render.Plan.SummaryEntry` structs, widget resolution extracted
+to `Render.Preparation.Widget` behind a typed `resolve/2`, and D-014/D-027
+visibility/submission policy extracted to `Render.Preparation.Visibility`
 (the sole caller of `Phoenix.Component.used_input?/1`), with field option ids
 consolidated into `DOMIdentity.field_options/3` — internal refactors, no
 behaviour change; validated projection roots, projected native Phoenix
 forms, nested subtree summaries,
 and explicit generic FormData route, [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]; native presentation traversal and semantic-index-backed
-projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]; DOM identity, [[18-decisions#D-034 — Phoenix renderer DOM identities are typed and injective|D-034]]; group help, [[18-decisions#D-036 — Group help uses prepared Phoenix identities|D-036]]; prepared `role`/`required?` on `RenderNode.Field`, [[18-decisions#D-043 — Semantic `role` and schema `required?` join `value_type` as flat prepared facts|D-043]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
+projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]; DOM identity, [[18-decisions#D-034 — Phoenix renderer DOM identities are typed and injective|D-034]]; group help, [[18-decisions#D-036 — Group help uses prepared Phoenix identities|D-036]]; prepared `role`/`required?` on `Render.Node.Field`, [[18-decisions#D-043 — Semantic `role` and schema `required?` join `value_type` as flat prepared facts|D-043]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
 
 ## Render preparation data flow
 
-Internal `RenderPreparation.prepare/2` returns a
+Internal `Render.Preparation.prepare/2` returns a
 `%Formentation.Phoenix.Render.Plan{}`. It is pure — the same form and
 definition context always produce the same plan, with no side effects and no
 mutation of form state. A form projected from `Formentation.Form` carries its
@@ -42,11 +43,11 @@ raising for an unknown or unsupported path. `prepare/1,2` and `prepare_at/2,3`
 accept an explicit `dom_namespace`; otherwise they use `form.id || form.name` and
 raise with an actionable error when neither exists.
 
-`RenderPreparation.Context` owns the projection-context boundary: it selects
+`Render.Preparation.Context` owns the projection-context boundary: it selects
 the native or generic entry branch, validates the projection root, selects the
 DOM namespace, and owns the traversal cursor. It never depends on
 `Phoenix.HTML.FormData`; `cursor_to/2` returns the relative segment descent
-distance and the moved context, while `RenderPreparation` performs the actual
+distance and the moved context, while `Render.Preparation` performs the actual
 form descent and traverses the descriptors. `enter/2` similarly reports the
 direct child segment without coupling context resolution to Phoenix form
 construction.
@@ -79,13 +80,13 @@ question (the transport-side handling stays open for step 7) —
 [[18-decisions#D-019 — Projection is Phoenix-generic|D-019]]. Fields that
 are both presentation-hidden and semantically read-only project to nothing.
 
-## `RenderPlan` and render-node shapes
+## `Render.Plan` and render-node shapes
 
 One struct per render node shape:
 
-- `Formentation.Phoenix.Render.Plan` — `root` (a `RenderNode.Group`),
+- `Formentation.Phoenix.Render.Plan` — `root` (a `Render.Node.Group`),
   `summary` (the submit-gated error-summary entries, each a
-  `RenderPlan.SummaryEntry{id, label, message}`), `diagnostics`
+  `Render.Plan.SummaryEntry{id, label, message}`), `diagnostics`
   (projection-time `Diagnostic`s, e.g. `:widget_fallback`). Planning-note
   fields with no Phase 1 behavior (fingerprint, active branches, item
   identities) are omitted, not stubbed.
@@ -159,7 +160,7 @@ source has no state view and falls back to `Any`, which always answers
 ## Widget resolution
 
 `Formentation.Phoenix.Render.Preparation.Widget` owns this decision —
-`Widget.resolve/2` takes the `Info.Presentation.Field` descriptor and its
+`Widget.resolve/2` takes the `Info.Layout.Field` descriptor and its
 `Semantic.Field` occurrence and returns `{widget, diagnostics}`. First match
 wins:
 
@@ -293,7 +294,7 @@ through `Formentation.Phoenix.StateView`, dispatched on `form.source` with
 `@fallback_to_any` — so any `Phoenix.HTML.FormData` implementation still
 projects, not only `Formentation.Form`; an `AshPhoenix.Form` is just
 another implementation to project, through the `Any` fallback until it
-gets a dedicated state view. Neither `RenderPreparation` nor either component
+gets a dedicated state view. Neither `Render.Preparation` nor either component
 takes an adapter argument — dispatch is entirely on `form.source`. All of this
 lives in `lib/formentation/phoenix/`, behind the
 [[18-decisions#D-017 — Phoenix integration ships in-tree behind a namespace boundary|D-017]]/[[18-decisions#D-018 — Reach is the architecture gate|D-018]] directory boundary —

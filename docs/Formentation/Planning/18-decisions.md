@@ -512,9 +512,12 @@ record of why Phase 1 did not freeze a configurable contract, but its
 `Formentation.Phoenix.Theme.Reference` name is transitional. The current
 `Formentation.Phoenix.Projector` performs render preparation and **was renamed**
 in [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]
-(2026-08-05) to `Formentation.Phoenix.Render.Preparation` and
-`Formentation.Phoenix.Theme.Reference`, so “projection” is available for
-`Form` → `%Phoenix.HTML.Form{}`. Phase 3 must build the second UI and review
+(2026-08-05) to `Formentation.Phoenix.RenderPreparation` and
+`Formentation.Phoenix.ReferenceComponents`, so “projection” is available for
+`Form` → `%Phoenix.HTML.Form{}` (both were renamed again on 2026-08-08 by
+[[18-decisions#D-047 — The lib tree is restructured to state the north-star architecture|D-047]]
+to `Formentation.Phoenix.Render.Preparation` and
+`Formentation.Phoenix.Theme.Reference`). Phase 3 must build the second UI and review
 consumer concurrently with the contract, publish the round-trip conformance
 suite, define capability-failure developer experience, and establish resource
 limits/performance evidence before exposing a stable prepared view.
@@ -1076,6 +1079,102 @@ This is accepted: the adapter is developer-supplied and never user input, and
 validating adapter return shapes is adapter-totality work belonging to
 [GitHub issue #6](https://github.com/kioopi/formentation/issues/6), not to
 selection.
+
+## D-047 — The lib tree is restructured to state the north-star architecture
+
+*2026-08-08*
+
+**Context.** `lib/formentation/` had grown to 29 entries directly under the
+package root and `lib/formentation/phoenix/` to 14 — every source adapter
+module, every semantic/presentation storage struct, every runtime-state
+module (`Codec`, `Params`, `Transport`, `SubmissionBlocker`), and every
+Phoenix render module sitting flat beside the handful of shared kernel
+modules. The tree no longer reflected the layered shape
+[[19-north-star-architecture|the north-star architecture]] describes: a
+caller reading `lib/formentation/`
+could not tell a source-adapter module from a runtime-state module from a
+shared coordinate type by directory alone. Nothing here was a code-behaviour
+bug; it was the directory tree failing to state the architecture it
+implements.
+
+**Decision.** Group the 29 entries under `lib/formentation/` into 14, and the
+14 under `lib/formentation/phoenix/` into 8, by nesting each module under the
+layer that owns it: `Formentation.Definition.Source.*`,
+`Formentation.Definition.Semantic.*`, `Formentation.Definition.Presentation.*`,
+`Formentation.Definition.Validation`/`ValidationPlan` all move under
+`Formentation.Definition.*`; `Formentation.Codec`, `Formentation.Params`,
+`Formentation.Transport`, and `Formentation.SubmissionBlocker` move under
+`Formentation.Form.*`; `Formentation.Info.Presentation` becomes
+`Formentation.Info.Layout` under `Formentation.Info.*`; and
+`Formentation.Phoenix.RenderNode`, `RenderPlan`, `RenderPreparation` collapse
+into `Formentation.Phoenix.Render.{Node, Plan, Preparation}`, with
+`Formentation.Phoenix.ReferenceComponents` renamed to
+`Formentation.Phoenix.Theme.Reference`. This is a **breaking rename of 34
+published modules** — every caller referencing one of these modules by its
+full name must update the reference. It is accepted now, before `0.1.0`,
+specifically because no compatibility guarantee has shipped yet; the same
+rename after `0.1.0` would need a deprecation path this decision deliberately
+avoids paying for.
+
+**Why the shared kernel stays at the top level.** `InstancePath`,
+`TemplatePath`, `JSONPointer`, `NodeId`, `Origin`, `Diagnostic`, and `Issue`
+are not nested under `Definition` or `Form` even though both of those sit
+above them in every data flow — they are the vocabulary every layer,
+including `Definition` and `Form` themselves, depends on. The dependency
+direction settles which way nesting can go: `Formentation.Phoenix.Render.Plan`
+aliases `Formentation.Diagnostic`, and `Formentation.Diagnostic` itself
+aliases `Formentation.Origin`; `Formentation.NodeId` aliases
+`Formentation.JSONPointer` and `Formentation.TemplatePath`. Nesting any of
+these seven under `Formentation.Definition.*` would make kernel modules
+depend on `Definition.*`, inverting that direction — a `Phoenix`-layer struct
+would alias a name that reads as belonging to the `core`/`Definition` layer
+it must not depend on. A module's location under `lib/` is meant to name
+which layer owns it; the kernel's honest location is beside, not under,
+its dependents.
+
+**The `.reach.exs` consequence of nesting `Source` under `Definition`.**
+Reach's layer patterns match module-name prefixes with `*` matching across
+dots, and `forbid_multiple_matches: true` is set so every module must match
+exactly one layer pattern. Before this restructure, `core`'s layer pattern
+could be a single wildcard, `"Formentation.Definition.*"`, because no other
+layer's modules shared that prefix. After nesting `Formentation.Source.*`
+under `Formentation.Definition.Source.*`, that same wildcard would also match
+the `source` and `json_schema` adapter layers, violating
+`forbid_multiple_matches`. The `core`, `source`, and `json_schema` layers
+therefore now enumerate their modules by hand in `.reach.exs` instead of
+matching by wildcard, and every future adapter module needs its own explicit
+`.reach.exs` entry. `require_all_modules: true` makes an unlisted module fail
+`mix reach.check` loudly rather than silently falling through a wildcard into
+the wrong layer, so this is a maintenance cost paid once per new adapter, not
+a correctness risk.
+
+**The legacy-mixed-storage guard was narrowed.** `Formentation.Phoenix.Node`
+does not exist — the module is `Formentation.Phoenix.Render.Node`, aliased to
+the bare name `Node` by convention at every call site inside the `Phoenix`
+namespace. That alias collided with an existing guard clause written to catch
+a since-removed struct: a legacy `%Formentation.Node{}` (the pre-D-033 mixed
+semantic/presentation storage struct) that could still reach rendering code
+through a stale alias, matched by pattern on the bare names `%Node.` and
+`Node.(Field|Group|Unsupported)`. After this restructure, `Formentation.Phoenix.Render.Node`'s
+own struct and submodules (`Node.Field`, `Node.Group`) alias to
+that same bare `Node.*` shape by ordinary convention, so the guard as written
+would now flag legitimate render-node usage as if it were the legacy mixed
+struct. The guard was narrowed to detect the legacy struct's *alias*
+declaration (`alias Formentation.Node`) rather than legacy-*looking* bare
+usage. This is an accepted trade: the guard is a smaller net than before —
+it no longer catches every syntactic shape that merely resembles the old
+struct — but it still catches the one thing it exists to catch, an actual
+alias to the removed `Formentation.Node` module, and a false positive against
+every ordinary `Formentation.Phoenix.Render.Node` reference would have made
+the guard a liability rather than a safeguard.
+
+**Consequences.** `lib/formentation/` now has 14 top-level entries and
+`lib/formentation/phoenix/` has 8; both counts are checked by the vault and
+by the restructure's own verification step. Every renamed module's `mix.exs`
+`groups_for_modules` entry, `.iex.exs` alias, and `.reach.exs` layer pattern
+moved with it — see [[Techdocs|the refreshed Techdocs notes]] for the
+current module-to-file map. The CHANGELOG under `Unreleased` lists the
+user-visible half of the rename table.
 
 ## Related notes
 

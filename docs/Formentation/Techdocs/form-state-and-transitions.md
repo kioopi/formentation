@@ -12,7 +12,7 @@ status: current
 
 # Form state and transitions
 
-> [!note] As of 2026-08-07 · content-derived nested-object presence (D-026); derived submission status (D-028); submit decision result (D-032); form/2 façade (D-046)
+> [!note] As of 2026-08-08 · content-derived nested-object presence (D-026); derived submission status (D-028); submit decision result (D-032); form/2 façade (D-046); module paths refreshed for the lib-tree restructure (D-047)
 > Describes the runtime state layer as built: `Formentation.Form`,
 > `Formentation.Form.Transport`, and `Formentation.Form.Codec` — now including the
 > `validate/2`/`submit/2` LiveView entry points and the derived
@@ -397,11 +397,11 @@ global defaults, and extensibility is [[phase-3-extensibility|Phase 3]].
 | --- | --- | --- |
 | Form state and transitions | `Formentation.Form` | `lib/formentation/form.ex` |
 | Per-field read model | `Formentation.Form.FieldState` | `lib/formentation/form/field_state.ex` |
-| Transition envelope | `Formentation.Form.Params` | `lib/formentation/params.ex` |
-| Transport normalization | `Formentation.Form.Transport` | `lib/formentation/transport.ex` |
-| Scalar codecs | `Formentation.Form.Codec` | `lib/formentation/codec.ex` |
+| Transition envelope | `Formentation.Form.Params` | `lib/formentation/form/params.ex` |
+| Transport normalization | `Formentation.Form.Transport` | `lib/formentation/form/transport.ex` |
+| Scalar codecs | `Formentation.Form.Codec` | `lib/formentation/form/codec.ex` |
 | Runtime issue | `Formentation.Issue` | `lib/formentation/issue.ex` |
-| Derived submission blocker | `Formentation.Form.SubmissionBlocker` | `lib/formentation/submission_blocker.ex` |
+| Derived submission blocker | `Formentation.Form.SubmissionBlocker` | `lib/formentation/form/submission_blocker.ex` |
 
 ## Related notes
 
