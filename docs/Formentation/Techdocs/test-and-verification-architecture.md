@@ -124,10 +124,10 @@ that actually *matters* is asserted semantically instead — see below.
 
 `Formentation.HTMLAssertions` provides Floki helpers — `assert_labelled`,
 `describedby`, `assert_no_duplicate_ids`, `find_one` — shared by the
-theme, component, and snapshot tests, and each maps to a numbered item of
-[[rendering#Reference theme|the accessibility contract]]. Asserting
+UI, component, and snapshot tests, and each maps to a numbered item of
+[[rendering#`UI.Reference` components|the accessibility contract]]. Asserting
 "every control has a non-empty `<label for>` pointing at its id" as a DOM
-query rather than a substring match is what lets the theme's markup be
+query rather than a substring match is what lets the UI's markup be
 restyled freely while its guarantees stay pinned.
 
 ### The demo is where the LiveView lifecycle gets tested
@@ -263,7 +263,7 @@ The property that makes all of the above affordable is the one-directional
 [[end-to-end-data-flow|data flow]]: each layer is testable without the
 next. The compile pipeline is tested with no runtime state; the state
 layer with no Phoenix; the projector against any `FormData` source; the
-theme against a hand-built plan. Nothing needs a `Plug.Conn`, a LiveView
+UI against a hand-built plan. Nothing needs a `Plug.Conn`, a LiveView
 process, or a browser.
 
 That is not a happy accident of the test suite — it is the layering
@@ -335,7 +335,7 @@ exercising a feature no single module owns.
 - [[browser-testing|Browser testing]] — the opt-in Playwright suite this note's mechanism table now includes
 - [[end-to-end-data-flow|End-to-end data flow]] — the layering this exploits
 - [[source-adapters#The differential-equivalence property|Source adapters]] — the differential property in context
-- [[rendering#Reference theme|Rendering]] — the accessibility contract being asserted
+- [[rendering#`UI.Reference` components|Rendering]] — the accessibility contract being asserted
 - [[phoenix-form-data|The FormData projection]] — what the contract tests pin
 - Design (Planning): [[11-testing-strategy|Testing strategy]] · [[02-design-principles|Design principles]]
 - [[Techdocs]] · [[Formentation|Vault entry note]]

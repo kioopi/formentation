@@ -38,7 +38,7 @@ for the reasoning behind each one.
   | `Formentation.Phoenix.RenderPreparation` (and `.Context`/`.Summary`/`.Visibility`/`.Widget`) | `Formentation.Phoenix.Render.Preparation` (`.Context`/`.Summary`/`.Visibility`/`.Widget`) |
   | `Formentation.Phoenix.ReferenceComponents` | `Formentation.Phoenix.UI.Reference` |
 
-  The public API surface (`Formentation.compile/2`, `Formentation.form/2`,
+  The ordinary entry-point API (`Formentation.compile/2`, `Formentation.form/2`,
   `Formentation.Form`, `Formentation.Info`, `Formentation.Phoenix.fields/1`
   and `field/1`, the `:map`/`:json_schema` adapter selectors, and the shared
   kernel — `InstancePath`, `TemplatePath`, `JSONPointer`, `NodeId`, `Origin`,

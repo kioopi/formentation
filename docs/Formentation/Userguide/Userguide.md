@@ -34,7 +34,7 @@ how do I *do* a thing. The internal counterpart is [[Techdocs]].
    supported draft 2020-12 subset and the UI-hints companion document.
 4. [[rendering-with-phoenix|Rendering with Phoenix]] — the two
    components, embedding under a parent form, widgets, and what the
-   reference theme guarantees.
+   reference UI guarantees.
 5. [[using-with-liveview|Using Formentation with LiveView]] — mount,
    the `phx-change`/`phx-submit` handlers, the two rules, error
    visibility, the runnable demo (including its native-validation

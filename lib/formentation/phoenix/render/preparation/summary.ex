@@ -62,7 +62,7 @@ defmodule Formentation.Phoenix.Render.Preparation.Summary do
     Enum.flat_map(children, &field_entries/1)
   end
 
-  # Hidden inputs have no visible, focusable target in the reference theme, so
+  # Hidden inputs have no visible, focusable target in the reference UI, so
   # their errors cannot be actionable summary entries.
   defp field_entries(%Node.Field{widget: :hidden_input}), do: []
 
@@ -79,7 +79,7 @@ defmodule Formentation.Phoenix.Render.Preparation.Summary do
   defp summary_target(%Node.Field{widget: widget, dom: dom}),
     do: Map.fetch!(dom, summary_part(widget))
 
-  # Reference-theme contract: every widget must appear here. Composite widgets
+  # Reference-UI contract: every widget must appear here. Composite widgets
   # target the element their component renders as the group-level control;
   # scalar widgets target their control.
   defp summary_part(:radio_group), do: :container
@@ -147,7 +147,7 @@ defmodule Formentation.Phoenix.Render.Preparation.Summary do
 
   # D-033 guarantees each supported occurrence renders exactly once, so two
   # `:object` groups claiming the same path is an internal invariant failure,
-  # not a case for the theme or a source to trigger.
+  # not a case for the UI or a source to trigger.
   defp put_object_target(index, path, target) do
     if Map.has_key?(index, path) do
       invariant!("two rendered object groups claim the same occurrence #{inspect(path)}")

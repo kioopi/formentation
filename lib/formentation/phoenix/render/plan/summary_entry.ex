@@ -4,7 +4,7 @@ defmodule Formentation.Phoenix.Render.Plan.SummaryEntry do
 
   `id` is the DOM id of the entry's link target, or `nil` for an unlinked
   plain-text entry (a root/object issue with no rendered target, or an
-  issue the reference theme cannot address). `label` is `nil` whenever the
+  issue the reference UI cannot address). `label` is `nil` whenever the
   entry has no meaningful prefix of its own — the message stands alone.
   """
 

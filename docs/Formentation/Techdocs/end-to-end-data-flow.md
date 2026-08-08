@@ -44,7 +44,7 @@ flowchart TD
     State -->|"to_form/2"| PForm
     PForm -->|"native context or definition:"| Plan
     Def -.->|"generic FormData"| Plan
-    Plan -->|"reference theme"| HTML
+    Plan -->|"reference UI"| HTML
     HTML -.->|"POST"| Params
     Params -->|"validate/2 or transition/2"| State
     Params -->|"submit/2"| Decision
@@ -142,7 +142,7 @@ explicitly. **Comes back:** a
 [[rendering|Render preparation]] walks the definition in declaration order and
 pairs each node with the corresponding `Phoenix.HTML.FormField`,
 resolving a widget, a label, and — importantly — computing
-`show_errors?` **once, here**, so no theme ever has to reason about
+`show_errors?` **once, here**, so no UI ever has to reason about
 `_unused_` markers or the form action.
 
 This is the layer where definition and form state meet: the definition knows
@@ -169,10 +169,10 @@ field entries only for a source whose state view reports `:unavailable`.
 
 **Crosses:** render nodes. **Comes back:** markup.
 
-The reference theme is a set of per-widget function components, called
-directly — there is no theme parameter in Phase 1
+The reference UI is a set of per-widget function components, called
+directly — there is no UI parameter in Phase 1
 ([[18-decisions#D-020 — The reference theme is a markup set, not a contract|D-020]]).
-By this point every decision has already been made upstream: the theme
+By this point every decision has already been made upstream: the UI
 picks no widgets, resolves no labels, and inspects no state. It emits
 markup for a plan.
 
@@ -248,7 +248,7 @@ into its predecessor, and no layer receives two different shapes from the
 same neighbour. That is what makes each testable without the next, which
 [[test-and-verification-architecture|the test architecture]] then
 exploits: the compile layer is tested with no state, the state layer with
-no Phoenix, the projector with any `FormData`, and the theme against a
+no Phoenix, the projector with any `FormData`, and the UI against a
 hand-built plan.
 
 **The definition and the state are separately cacheable.** Compilation is
@@ -261,7 +261,7 @@ graph has no arrow that would force them into the same lifetime. Choose
 Everything from the declaration to the candidate is plain Elixir data.
 That is the property [[phase-5-ash-integration|Phase 5]] depends on when
 `AshPhoenix.Form` becomes an alternative source for step 3, and
-[[phase-3-extensibility|Phase 3]] depends on when the theme in step 5
+[[phase-3-extensibility|Phase 3]] depends on when the UI in step 5
 becomes replaceable.
 
 ## Boundaries — where this chain stops
@@ -277,7 +277,7 @@ around the submitted form. `_persistent_id` now joins the metadata
 `_unused_*`, `_csrf_token`, and `_target`. What the chain still does not
 have: collections would add a dimension to steps 1, 4, and 6 (indexed
 instance paths, item identity, add/remove) and arrive with Milestone B;
-a theme parameter for step 5 is [[phase-3-extensibility|Phase 3]].
+a UI parameter for step 5 is [[phase-3-extensibility|Phase 3]].
 
 ## Related notes
 

@@ -134,7 +134,7 @@ Booleans reach the server through the hidden-input transport contract
 ([[18-decisions#D-011 — Booleans use the hidden-input transport contract|D-011]]) —
 an editable checkbox always submits `"false"` or `"true"`, never nothing
 — which is why the codec's vocabulary is exactly those two strings and
-[[rendering|the reference theme]] is obliged to emit the paired hidden
+[[rendering|the reference UI]] is obliged to emit the paired hidden
 input.
 
 ## A transition, end to end

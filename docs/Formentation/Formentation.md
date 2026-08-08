@@ -21,7 +21,7 @@ The project serves a concrete customer need first: expert-defined JSON payloads 
 
 This arrangement permits the same definition to drive:
 
-- Phoenix components and multiple UI themes;
+- Phoenix components and multiple UI integrations;
 - generated rudimentary UI configuration;
 - documentation and form diagrams;
 - support and accessibility reports;
@@ -84,5 +84,5 @@ The statement intentionally does not promise complete support for every JSON Sch
 
 These notes describe an intended architecture and incremental implementation plan. They are not yet an API stability promise. Important unresolved decisions are listed in [[16-open-questions|Open questions]].
 
-Implementation began on 2026-07-21. As of 2026-07-23, [[phase-1-walking-skeleton|Phase 1]] runs end to end for a static render: both source adapters compile to a `Definition`, `Formentation.Form` holds runtime state and applies replace transitions, `Phoenix.HTML.FormData` projects that state, and the projector plus reference theme render it as accessible HTML — [[17-end-to-end-example|the end-to-end example]] is pinned as a reviewed snapshot. The remaining Phase 1 work is the LiveView lifecycle (step 7) and collections (Milestone B). [[Development]] carries the phase-status table; [[Techdocs]] documents what is built and [[Userguide]] how to use it.
+Implementation began on 2026-07-21. As of 2026-07-23, [[phase-1-walking-skeleton|Phase 1]] runs end to end for a static render: both source adapters compile to a `Definition`, `Formentation.Form` holds runtime state and applies replace transitions, `Phoenix.HTML.FormData` projects that state, and the projector plus reference UI render it as accessible HTML — [[17-end-to-end-example|the end-to-end example]] is pinned as a reviewed snapshot. The remaining Phase 1 work is the LiveView lifecycle (step 7) and collections (Milestone B). [[Development]] carries the phase-status table; [[Techdocs]] documents what is built and [[Userguide]] how to use it.
 

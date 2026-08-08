@@ -348,7 +348,7 @@ defmodule Formentation.Phoenix.UI.ReferenceTest do
     test "schema required? never becomes the HTML required attribute by itself" do
       # D-010: a required string field with a schema-valid empty value gets no
       # HTML required attribute. required? carries the schema fact for
-      # presentation (e.g. an asterisk) only — the theme must not derive the
+      # presentation (e.g. an asterisk) only — the UI must not derive the
       # native constraint from it. See D-043.
       doc = render_field(required?: true, validations: [])
 

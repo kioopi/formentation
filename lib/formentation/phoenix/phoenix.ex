@@ -8,8 +8,8 @@ defmodule Formentation.Phoenix do
   ids are separate: `dom_namespace`, then `form.id`, then `form.name`; rendering
   raises with guidance if none is available.
 
-  Phase 1 renders through the reference theme directly; a pluggable
-  theme contract is Phase 3.
+  Phase 1 renders through the reference UI directly; a pluggable
+  UI contract is Phase 3.
   """
 
   use Phoenix.Component

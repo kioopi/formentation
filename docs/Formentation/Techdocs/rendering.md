@@ -26,7 +26,7 @@ consolidated into `DOMIdentity.field_options/3` — internal refactors, no
 behaviour change; validated projection roots, projected native Phoenix
 forms, nested subtree summaries,
 and explicit generic FormData route, [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]; native presentation traversal and semantic-index-backed
-projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]; DOM identity, [[18-decisions#D-034 — Phoenix renderer DOM identities are typed and injective|D-034]]; group help, [[18-decisions#D-036 — Group help uses prepared Phoenix identities|D-036]]; prepared `role`/`required?` on `Render.Node.Field`, [[18-decisions#D-043 — Semantic `role` and schema `required?` join `value_type` as flat prepared facts|D-043]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a theme contract do not exist yet.*
+projection, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; StateView protocol, [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]]; submission blockers normalized through it, [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]; DOM identity, [[18-decisions#D-034 — Phoenix renderer DOM identities are typed and injective|D-034]]; group help, [[18-decisions#D-036 — Group help uses prepared Phoenix identities|D-036]]; prepared `role`/`required?` on `Render.Node.Field`, [[18-decisions#D-043 — Semantic `role` and schema `required?` join `value_type` as flat prepared facts|D-043]]). Layers: definition → state → projection → **rendering**; the LiveView lifecycle now drives this same chain through `Form.validate/2`/`Form.submit/2` — see [[form-state-and-transitions#LiveView entry points|form state and transitions]]. Collections and a UI contract do not exist yet.*
 
 ## Render preparation data flow
 
@@ -114,13 +114,13 @@ One struct per render node shape:
   normalized semantic `value_type`, source `role` (an atom hint like `:email`
   or `:date`, or `nil`), schema `required?`, `help`,
   `options`, `validations` (`Phoenix.HTML.Form.input_validations/2`,
-  precomputed so the theme never calls back), `errors`, `show_errors?`,
+  precomputed so the UI never calls back), `errors`, `show_errors?`,
   `read_only?`. `dom` is a `FieldDOM{control, container, help, errors,
   options}`. `control` names scalar controls (and hidden inputs); `container`
   names a composite widget's container, currently a radio group's fieldset.
   Options retain source scalar values (`String.t() | number() | boolean()`),
   and option ids are positionally parallel to them. `role` and `required?`
-  are prepared meaning facts (D-043): a theme reads them directly, without
+  are prepared meaning facts (D-043): a UI implementation reads them directly, without
   consulting a `Definition` or source adapter. `required?` is the schema fact
   only — it is presentation/accessibility-only and never becomes the native
   HTML `required` attribute, which continues to come solely from
@@ -174,7 +174,7 @@ wins:
 | 6 | `role: :date \| :email \| :uri` | `:date_input` / `:email_input` / `:url_input` |
 | 7 | otherwise | `:text_input` |
 
-A widget hint the theme's widget set does not cover (possible via the
+A widget hint the UI's widget set does not cover (possible via the
 unvalidated map source), or a `:checkbox` hint on a non-boolean field
 (D-011's transport contract is boolean-shaped), falls back to the
 *inferred* widget from the table above and records a `:widget_fallback`
@@ -270,7 +270,7 @@ of the page. When the payload form is embedded after hand-written
 inputs — the pump-inspection demo's shape, and the common LiveView
 pattern — the summary appears mid-page rather than above everything.
 There is no slot to reposition it; that is a
-[[phase-3-extensibility|Phase 3]] theme-contract concern
+[[phase-3-extensibility|Phase 3]] UI-contract concern
 ([[18-decisions#D-021 — LiveView integration is wrappers plus a demo, not framework machinery|D-021]]).
 
 ## Public components and the Phoenix-generic boundary
@@ -385,12 +385,12 @@ renderer ids are the control/label/help/error/fieldset/summary relationship
 surface. Groups render optional help with the already-prepared `GroupDOM.help`
 identity; components never derive help IDs themselves.
 
-## Reference components (`Formentation.Phoenix.UI.Reference`)
+## `UI.Reference` components
 
 Per-widget function components called directly by `fields/1` and
-`field/1` — nothing dispatches through a configurable theme parameter.
-Phase 1 has no theme parameter or contract; this module is a markup set,
-the executable specification a second theme will be measured against
+`field/1` — nothing dispatches through a configurable UI parameter.
+Phase 1 has no UI parameter or contract; this module is a markup set,
+the executable specification a second UI will be measured against
 once [[phase-3-extensibility|Phase 3]] extracts the real contract —
 [[18-decisions#D-020 — The reference theme is a markup set, not a contract|D-020]].
 
@@ -425,7 +425,7 @@ Conformance obligations pinned on top of the contract:
 - The editable checkbox emits the [[18-decisions#D-011 — Booleans use the hidden-input transport contract|D-011]] hidden input (`value="false"` preceding the `value="true"` checkbox).
 - [[18-decisions#D-016 — Participation is definition-driven, not transport-driven|D-016]] read-only rendering: `readonly` on text-like controls (text/textarea/number/date/email/url), `disabled` on selects, checkboxes, and radio groups; no hidden mirrors anywhere. A read-only boolean is a disabled checkbox *without* the hidden input — outside D-011's contract, which binds editable checkboxes only.
 - Selects always lead with a blank option (`<option value=""></option>`).
-- Options retain their declared scalar value. Themes emit each control value
+- Options retain their declared scalar value. UI implementations emit each control value
   and compare it to the current form value through the same canonical string
   representation (`to_string/1`) for `selected`/`checked`; otherwise numeric
   or boolean options submit correctly but fail to re-mark after a round trip.
@@ -449,8 +449,8 @@ LiveView-specific code inside it: `phx-change`/`phx-submit` call
 embedding in a live parent is ordinary `:as`/`:id` namespacing (as in the
 demo's pump-inspection LiveView), and `_persistent_id` is stripped as
 transport metadata by `Transport.normalize/1`. No collections,
-item identity, or add/remove/reorder — Milestone B. No theme parameter,
-component registry, or extracted theme contract — Phase 3. No branch or
+item identity, or add/remove/reorder — Milestone B. No UI parameter,
+component registry, or extracted UI contract — Phase 3. No branch or
 partial-reprojection support — Phase 4. Behavioural widgets (file
 uploads, async option search, JS-hook-driven controls) remain an open
 question; the render-plan model only describes pure, render-time

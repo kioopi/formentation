@@ -154,7 +154,7 @@ Step 6 introduced the first diagnostic produced *after* compilation:
 `:widget_fallback`, emitted by
 [[rendering|`Formentation.Phoenix.Render.Preparation`]] onto
 `Render.Plan.diagnostics` when a declared widget hint cannot render the
-field it names — a widget outside the theme's set, or a `:checkbox` hint
+field it names — a widget outside the UI's set, or a `:checkbox` hint
 on a non-boolean field. The projector falls back to the inferred widget
 and records why.
 
@@ -162,9 +162,9 @@ This generalizes the model in a way worth stating: a diagnostic is
 *anything a layer chose to do differently than the declaration asked*,
 reported at the point of choosing. The compiler is simply where most such
 choices happen. The projector's diagnostics live on the plan rather than
-the definition because they depend on the theme's capabilities — a
-different theme could render the same hint without complaint, and the
-cached, shared `Definition` must not carry one theme's opinion.
+the definition because they depend on the UI's capabilities — a
+different UI could render the same hint without complaint, and the
+cached, shared `Definition` must not carry one UI's opinion.
 
 ## Origins — provenance for resolved values
 

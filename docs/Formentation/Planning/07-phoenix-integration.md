@@ -98,7 +98,7 @@ own decoding. Preparation must describe, and every UI must faithfully emit:
 - environment usage markers such as `_unused_`.
 
 The checkbox hidden `false` control is therefore a semantic invariant, not a
-reference-theme detail. Multiple choices, placeholders, compound controls,
+reference-UI detail. Multiple choices, placeholders, compound controls,
 collections, and uploads require equivalent explicit contracts. Shared UI
 conformance must render controls, feed their emitted params through `Form`, and
 assert the decoded operation/candidate. The canonical ownership and test model is

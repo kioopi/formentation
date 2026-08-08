@@ -5,7 +5,7 @@ defmodule Formentation.Phoenix.Render.Node.Field do
   `role`, schema `required?`, Phoenix form field, and prepared DOM identities.
 
   `role` and `required?` are prepared meaning facts sourced directly from
-  `Formentation.Definition.Semantic.Field` (D-043) — a custom theme can read them without
+  `Formentation.Definition.Semantic.Field` (D-043) — a custom UI implementation can read them without
   consulting a `Definition` or source adapter. `required?` is the schema fact
   only, intended for presentation/accessibility (e.g. an asterisk or
   `aria-required`); it must never be used to emit or infer the native HTML

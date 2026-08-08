@@ -45,7 +45,7 @@ defmodule Formentation.Phoenix.Render.Preparation.WidgetTest do
     checkbox: :checkbox
   }
 
-  # Hints outside the theme's widget set. Reachable via the unvalidated map
+  # Hints outside the UI's widget set. Reachable via the unvalidated map
   # source, and never honorable for any node shape.
   @unrecognized_hints [:fancy_slider, :nonsense]
 

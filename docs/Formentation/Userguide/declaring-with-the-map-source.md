@@ -155,7 +155,7 @@ case being a long string:
 {"notes", %{kind: :string, widget: :textarea, help: "Visible to all technicians."}}
 ```
 
-Widget names the reference theme understands are listed in
+Widget names the reference UI understands are listed in
 [[rendering-with-phoenix#Which widget you get|Rendering with Phoenix]]. A
 widget it cannot render falls back to the inferred one and records a
 diagnostic rather than failing.

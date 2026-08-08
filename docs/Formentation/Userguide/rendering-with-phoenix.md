@@ -122,7 +122,7 @@ A prepared field carries both its resolved `widget` and normalized semantic
 `value_type`; the two are independent. `:integer` and `:number` both resolve
 to `:number_input`, so the widget alone does not distinguish them, while an
 explicit widget hint changes presentation without changing semantic type. A
-custom theme can therefore distinguish them from the prepared field alone,
+custom UI implementation can therefore distinguish them from the prepared field alone,
 without consulting `Definition` or source-adapter metadata
 ([[18-decisions#D-038 — Semantic value type and abstract widget are orthogonal prepared facts|D-038]]).
 
@@ -246,7 +246,7 @@ one that appeared on submit is a navigation aid.
 
 Per-field errors follow a different rule: they show on submit, or once
 that particular field has been interacted with. You get this without
-doing anything; the visibility decision is made before the theme runs, so
+doing anything; the visibility decision is made before the UI runs, so
 there is nothing to configure.
 
 Errors are rendered with a deterministic id and linked from the control
@@ -263,7 +263,7 @@ attributes for numeric fields.
 
 ## Accessibility
 
-The built-in theme is written to a contract that is asserted by tests
+The built-in UI is written to a contract that is asserted by tests
 against the rendered DOM, not merely intended:
 
 1. Every control has a non-empty `<label for>` pointing at its id.
@@ -311,19 +311,19 @@ not transitional; it is how a source with its own state semantics
 ([[../Techdocs/rendering|a `StateView` implementation]]) participates in
 rendering.
 
-## Styling and replacing the theme
+## Styling and replacing the UI
 
-There is no CSS. The theme is markup plus class hooks, and it is
+There is no CSS. The UI is markup plus class hooks, and it is
 deliberately unpolished — it exists to be correct and legible, not
 pretty.
 
-> [!warning] There is no theme API yet
-> The components call the built-in theme directly. There is no theme
+> [!warning] There is no UI API yet
+> The components call the built-in UI directly. There is no UI
 > parameter, no component registry, and no documented contract for
 > writing your own. Style it with CSS against the class names above; if
 > you need different markup today, your option is to build your own
 > components on `Formentation.Info` and `Formentation.Form`. A real
-> theme contract is planned for [[phase-3-extensibility|Phase 3]].
+> UI contract is planned for [[phase-3-extensibility|Phase 3]].
 
 ## Related
 

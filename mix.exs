@@ -116,7 +116,7 @@ defmodule Formentation.MixProject do
   # its moduledocs on purpose (`h Formentation.Phoenix.Render.Plan` in IEx is
   # supported) and this filter is the only thing holding it back from the
   # published surface. Formentation.Phoenix.UI.Reference is the reference
-  # theme, shipped as an example rather than as API.
+  # UI, shipped as an example rather than as API.
   #
   # The single prefix replaces a hand-maintained module list: a new module
   # under Render.* is covered without a mix.exs edit, so the directory

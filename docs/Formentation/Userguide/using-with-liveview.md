@@ -258,7 +258,7 @@ output and redisplays the returned submitted form.
 
 The pump-inspection page (`/`) opens with a checkbox above the form,
 labeled "Native browser validation" and checked by default. It flips
-`novalidate` on `<.form>`. Checked (the default), the reference theme's
+`novalidate` on `<.form>`. Checked (the default), the reference UI's
 HTML5 `required`/`minlength` attributes do their normal job: a browser
 blocks a Save click on a blank required field before it is ever sent, and
 you see the browser's own native error bubble. Uncheck it and Save again

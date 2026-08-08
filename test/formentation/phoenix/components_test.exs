@@ -278,7 +278,7 @@ defmodule Formentation.Phoenix.ComponentsTest do
       assert_all_references_resolve(doc)
     end
 
-    test "every reference-theme widget with an error has one resolvable summary target" do
+    test "every reference-UI widget with an error has one resolvable summary target" do
       widgets = [
         {"text", :text, %{kind: :string}, :control},
         {"textarea", :textarea, %{kind: :string, widget: :textarea}, :control},
