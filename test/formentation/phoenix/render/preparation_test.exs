@@ -1770,10 +1770,12 @@ defmodule Formentation.Phoenix.Render.PreparationTest do
 
         refute source =~ "nests_data?", "#{file} branches on nests_data?"
         # The %Node.Group{} bare-name check that used to live here is gone:
-        # superseded by boundary_test.exs's legacy-alias check, since
-        # %Render.Node.Group{} is sanctioned (Task 5) and this file's alias
-        # of Formentation.Phoenix.Render.Node to the bare name `Node` would
-        # otherwise false-positive.
+        # superseded by boundary_test.exs's legacy-alias check. The scan
+        # here reads @preparation_sources (render/preparation.ex and
+        # render/preparation/context.ex), not this test file; the false
+        # positive came from lib/formentation/phoenix/render/preparation.ex's
+        # own %Node.Group{} literal, since Render.Node is sanctioned (Task 5)
+        # to alias to the bare name `Node`.
       end
     end
 

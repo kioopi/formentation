@@ -68,7 +68,7 @@ defmodule Formentation.Phoenix.BoundaryTest do
   # qualified pattern alone would miss the brace form.
   defp legacy_mixed_storage_reference?(source) do
     Regex.match?(~r/\bFormentation\.Node\b/, source) or
-      Regex.match?(~r/alias\s+Formentation\.\{[^}]*\bNode\b/, source) or
+      Regex.match?(~r/alias[\s(]+(Elixir\.)?Formentation\.\{[^}]*\bNode\b/, source) or
       String.contains?(source, ["nests_data?", "stamp_declaration_order", "definition.root"]) or
       String.contains?(source, "%Definition{root:")
   end

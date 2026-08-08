@@ -230,7 +230,8 @@
   ],
   tests: [
     hints: [
-      {"lib/formentation/phoenix/**", ["test/formentation/phoenix"]},
+      {"lib/formentation/phoenix/**",
+       ["test/formentation/phoenix", "test/formentation/invariants"]},
       {"lib/formentation/definition/source/json_schema/**",
        ["test/formentation/definition/source/json_schema"]},
       {"lib/formentation/definition/source/**", ["test/formentation/definition/source"]},
