@@ -42,7 +42,7 @@ rather than invented for this page.
 def mount(_params, _session, socket) do
   {:ok, definition, _diagnostics} =
     Formentation.compile(PumpInspection.json_schema(),
-      adapter: Formentation.Definition.Source.JSONSchema,
+      adapter: Formentation.Source.JSONSchema,
       ui: PumpInspection.ui_hints()
     )
 

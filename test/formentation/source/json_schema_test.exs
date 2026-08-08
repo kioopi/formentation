@@ -1,4 +1,4 @@
-defmodule Formentation.Definition.Source.JSONSchemaTest do
+defmodule Formentation.Source.JSONSchemaTest do
   use ExUnit.Case, async: true
 
   alias Formentation.Definition.{Presentation, Semantic}
@@ -7,7 +7,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
 
   defp compile!(schema, opts \\ []) do
     {:ok, definition, _diagnostics} =
-      Formentation.compile(schema, [adapter: Formentation.Definition.Source.JSONSchema] ++ opts)
+      Formentation.compile(schema, [adapter: Formentation.Source.JSONSchema] ++ opts)
 
     definition
   end
@@ -199,7 +199,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
       }
 
       {:ok, definition, []} =
-        Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
+        Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
       for {name, expected} <- [
             {"name", :string},
@@ -219,7 +219,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
     test "a non-map schema is an invalid_schema error" do
       assert {:error, [%Formentation.Diagnostic{severity: :error, code: :invalid_schema}]} =
                Formentation.compile("not a schema",
-                 adapter: Formentation.Definition.Source.JSONSchema
+                 adapter: Formentation.Source.JSONSchema
                )
     end
 
@@ -233,7 +233,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
       }
 
       assert {:error, diagnostics} =
-               Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
+               Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
       assert Enum.count(diagnostics) >= 2
       assert Enum.all?(diagnostics, &(&1.code == :invalid_schema and &1.severity == :error))
@@ -247,7 +247,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
       }
 
       assert {:error, [%Formentation.Diagnostic{code: :unsupported_dialect} = diagnostic]} =
-               Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
+               Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
       assert diagnostic.origin == {:json_schema, "/$schema"}
     end
@@ -256,7 +256,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
       assert {:ok, _definition, []} =
                Formentation.compile(
                  %{"type" => "object", "properties" => %{"a" => %{"type" => "string"}}},
-                 adapter: Formentation.Definition.Source.JSONSchema
+                 adapter: Formentation.Source.JSONSchema
                )
     end
 
@@ -268,7 +268,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
                    "type" => "object",
                    "properties" => %{"a" => %{"type" => "string"}}
                  },
-                 adapter: Formentation.Definition.Source.JSONSchema
+                 adapter: Formentation.Source.JSONSchema
                )
     end
   end
@@ -349,7 +349,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
               "notes" => %{"type" => "string"}
             }
           },
-          adapter: Formentation.Definition.Source.JSONSchema
+          adapter: Formentation.Source.JSONSchema
         )
 
       assert [%Formentation.Diagnostic{severity: :warning, code: :unsupported_type} = diagnostic] =
@@ -369,7 +369,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
               "either" => %{"oneOf" => [%{"type" => "string"}, %{"type" => "integer"}]}
             }
           },
-          adapter: Formentation.Definition.Source.JSONSchema
+          adapter: Formentation.Source.JSONSchema
         )
 
       assert [%Formentation.Diagnostic{severity: :warning, code: :unsupported_keyword}] =
@@ -385,7 +385,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
             "type" => "object",
             "properties" => %{"rating" => %{"type" => "integer", "enum" => [1, 2, 3]}}
           },
-          adapter: Formentation.Definition.Source.JSONSchema
+          adapter: Formentation.Source.JSONSchema
         )
 
       assert [%Formentation.Diagnostic{severity: :warning, code: :unsupported_keyword}] =
@@ -402,7 +402,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
             "required" => ["tags"],
             "properties" => %{"tags" => %{"type" => "array"}}
           },
-          adapter: Formentation.Definition.Source.JSONSchema
+          adapter: Formentation.Source.JSONSchema
         )
 
       assert %Semantic.Unsupported{required?: true} = Info.node_at(definition, ["tags"])
@@ -411,7 +411,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
     test "a non-object root is an unsupported_type error" do
       assert {:error, [%Formentation.Diagnostic{severity: :error, code: :unsupported_type}]} =
                Formentation.compile(%{"type" => "string"},
-                 adapter: Formentation.Definition.Source.JSONSchema
+                 adapter: Formentation.Source.JSONSchema
                )
     end
   end
@@ -457,7 +457,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
 
       assert {:error, [%Formentation.Diagnostic{code: :max_nodes_exceeded}]} =
                Formentation.compile(schema,
-                 adapter: Formentation.Definition.Source.JSONSchema,
+                 adapter: Formentation.Source.JSONSchema,
                  max_nodes: 0
                )
     end
@@ -476,13 +476,13 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
 
       assert {:error, [%Formentation.Diagnostic{code: :max_nodes_exceeded}]} =
                Formentation.compile(schema,
-                 adapter: Formentation.Definition.Source.JSONSchema,
+                 adapter: Formentation.Source.JSONSchema,
                  max_nodes: 3
                )
 
       {:ok, definition, diagnostics} =
         Formentation.compile(schema,
-          adapter: Formentation.Definition.Source.JSONSchema,
+          adapter: Formentation.Source.JSONSchema,
           max_nodes: 4
         )
 
@@ -589,7 +589,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
 
       {:ok, _definition, diagnostics} =
         Formentation.compile(schema_with_group(),
-          adapter: Formentation.Definition.Source.JSONSchema,
+          adapter: Formentation.Source.JSONSchema,
           ui: hints
         )
 
@@ -610,7 +610,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
 
       {:ok, definition, diagnostics} =
         Formentation.compile(schema,
-          adapter: Formentation.Definition.Source.JSONSchema,
+          adapter: Formentation.Source.JSONSchema,
           ui: hints
         )
 
@@ -704,7 +704,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
 
       {:ok, definition, diagnostics} =
         Formentation.compile(schema_with_group(),
-          adapter: Formentation.Definition.Source.JSONSchema,
+          adapter: Formentation.Source.JSONSchema,
           ui: hints
         )
 
@@ -719,7 +719,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
 
       {:ok, _definition, diagnostics} =
         Formentation.compile(schema_with_group(),
-          adapter: Formentation.Definition.Source.JSONSchema,
+          adapter: Formentation.Source.JSONSchema,
           ui: hints
         )
 
@@ -752,7 +752,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
 
       {:ok, definition, diagnostics} =
         Formentation.compile(schema,
-          adapter: Formentation.Definition.Source.JSONSchema,
+          adapter: Formentation.Source.JSONSchema,
           ui: hints
         )
 
@@ -773,7 +773,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
           ] do
         assert {:error, [%Formentation.Diagnostic{severity: :error, code: :invalid_ui_hints}]} =
                  Formentation.compile(schema_with_group(),
-                   adapter: Formentation.Definition.Source.JSONSchema,
+                   adapter: Formentation.Source.JSONSchema,
                    ui: bad
                  )
       end
@@ -821,7 +821,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
 
       {:ok, definition, diagnostics} =
         Formentation.compile(schema_with_group(),
-          adapter: Formentation.Definition.Source.JSONSchema,
+          adapter: Formentation.Source.JSONSchema,
           ui: hints
         )
 
@@ -938,7 +938,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
             "type" => "object",
             "properties" => %{"name" => %{"type" => "string", "examples" => "oops"}}
           },
-          adapter: Formentation.Definition.Source.JSONSchema
+          adapter: Formentation.Source.JSONSchema
         )
 
       assert Enum.any?(diagnostics, &(&1.code == :invalid_schema))
@@ -1044,7 +1044,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
       }
 
       {:ok, _definition, diagnostics} =
-        Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
+        Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
       assert [%Formentation.Diagnostic{severity: :warning, code: :required_permits_empty} = d] =
                diagnostics
@@ -1064,7 +1064,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
         }
 
         {:ok, _definition, diagnostics} =
-          Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
+          Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
         assert diagnostics == []
       end
@@ -1081,7 +1081,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
       }
 
       {:ok, _definition, diagnostics} =
-        Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
+        Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
       codes = Enum.map(diagnostics, & &1.code)
       assert Enum.count(codes, &(&1 == :reserved_property_name)) == 2
@@ -1092,23 +1092,23 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
     {:ok, from_json, []} =
       Formentation.compile(
         %{"type" => "object", "properties" => %{"name" => %{"type" => "string"}}},
-        adapter: Formentation.Definition.Source.JSONSchema
+        adapter: Formentation.Source.JSONSchema
       )
 
     assert %Formentation.Definition.ValidationPlan{
-             module: Formentation.Definition.Source.JSONSchema.Validator,
+             module: Formentation.Source.JSONSchema.Validator,
              artifact: artifact
            } =
              from_json.validation
 
-    assert Formentation.Definition.Source.JSONSchema.Validator.validate(artifact, %{
+    assert Formentation.Source.JSONSchema.Validator.validate(artifact, %{
              "name" => "ok"
            }) == []
 
     {:ok, from_map, []} =
       Formentation.compile(
         %{kind: :object, properties: [{"name", %{kind: :string}}]},
-        adapter: Formentation.Definition.Source.Map
+        adapter: Formentation.Source.Map
       )
 
     assert from_map.validation == nil
@@ -1127,7 +1127,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
     test "a dangling local $ref still compiles, with a validator_unavailable warning" do
       assert {:ok, definition, diagnostics} =
                Formentation.compile(dangling_ref_schema(),
-                 adapter: Formentation.Definition.Source.JSONSchema
+                 adapter: Formentation.Source.JSONSchema
                )
 
       assert definition.validation == nil
@@ -1150,7 +1150,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
       }
 
       assert {:ok, definition, diagnostics} =
-               Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
+               Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
       assert definition.validation == nil
       assert Enum.any?(diagnostics, &(&1.code == :validator_unavailable))
@@ -1172,7 +1172,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
     test "boolean hints compile to node flags with ui-hints origins" do
       {:ok, definition, []} =
         Formentation.compile(flags_schema(),
-          adapter: Formentation.Definition.Source.JSONSchema,
+          adapter: Formentation.Source.JSONSchema,
           ui: %{
             "fields" => %{
               "serial" => %{"read_only" => true},
@@ -1201,7 +1201,7 @@ defmodule Formentation.Definition.Source.JSONSchemaTest do
     test "a non-boolean hint value warns and is ignored" do
       {:ok, definition, diagnostics} =
         Formentation.compile(flags_schema(),
-          adapter: Formentation.Definition.Source.JSONSchema,
+          adapter: Formentation.Source.JSONSchema,
           ui: %{"fields" => %{"serial" => %{"hidden" => "yes"}}}
         )
 

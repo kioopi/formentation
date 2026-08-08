@@ -10,7 +10,7 @@ defmodule Formentation.FormTest do
   defp pump_definition do
     {:ok, definition, []} =
       Formentation.compile(PumpInspection.map_source(),
-        adapter: Formentation.Definition.Source.Map
+        adapter: Formentation.Source.Map
       )
 
     definition
@@ -19,7 +19,7 @@ defmodule Formentation.FormTest do
   defp json_pump_definition do
     {:ok, definition, []} =
       Formentation.compile(PumpInspection.json_schema(),
-        adapter: Formentation.Definition.Source.JSONSchema,
+        adapter: Formentation.Source.JSONSchema,
         ui: PumpInspection.ui_hints()
       )
 
@@ -64,7 +64,7 @@ defmodule Formentation.FormTest do
       }
 
       {:ok, definition, []} =
-        Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
+        Formentation.compile(declaration, adapter: Formentation.Source.Map)
 
       definition
     end
@@ -112,7 +112,7 @@ defmodule Formentation.FormTest do
       }
 
       {:ok, definition, []} =
-        Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
+        Formentation.compile(declaration, adapter: Formentation.Source.Map)
 
       form = Form.new(definition, %{}, defaults: :apply)
 
@@ -370,7 +370,7 @@ defmodule Formentation.FormTest do
       }
 
       {:ok, definition, []} =
-        Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
+        Formentation.compile(declaration, adapter: Formentation.Source.Map)
 
       definition
     end
@@ -409,7 +409,7 @@ defmodule Formentation.FormTest do
       }
 
       {:ok, definition, [_unsupported_warning]} =
-        Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
+        Formentation.compile(declaration, adapter: Formentation.Source.Map)
 
       form =
         Form.transition(
@@ -472,7 +472,7 @@ defmodule Formentation.FormTest do
       }
 
       {:ok, definition, diagnostics} =
-        Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
+        Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
       assert Enum.any?(diagnostics, &(&1.code == :validator_unavailable))
       assert definition.validation == nil
@@ -634,7 +634,7 @@ defmodule Formentation.FormTest do
               {"gadget", %{kind: :file}}
             ]
           },
-          adapter: Formentation.Definition.Source.Map
+          adapter: Formentation.Source.Map
         )
 
       definition
@@ -686,7 +686,7 @@ defmodule Formentation.FormTest do
       }
 
       {:ok, definition, []} =
-        Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
+        Formentation.compile(declaration, adapter: Formentation.Source.Map)
 
       definition
     end
@@ -749,7 +749,7 @@ defmodule Formentation.FormTest do
       # diagnostics are non-empty here (:required_permits_empty advisory) — expected
       {:ok, definition, _diagnostics} =
         Formentation.compile(schema,
-          adapter: Formentation.Definition.Source.JSONSchema,
+          adapter: Formentation.Source.JSONSchema,
           ui: %{"fields" => %{"serial_number" => %{"read_only" => true}}}
         )
 
@@ -770,7 +770,7 @@ defmodule Formentation.FormTest do
       }
 
       {:ok, definition, []} =
-        Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
+        Formentation.compile(declaration, adapter: Formentation.Source.Map)
 
       form = Form.new(definition, %{"revision" => 4})
 

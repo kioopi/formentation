@@ -8,7 +8,7 @@ defmodule Formentation.Info.LayoutTest do
 
   defp compile!(declaration) do
     {:ok, definition, _diagnostics} =
-      Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
+      Formentation.compile(declaration, adapter: Formentation.Source.Map)
 
     definition
   end

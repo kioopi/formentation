@@ -46,7 +46,7 @@ Running log of architecture decisions, ADR-style but lightweight. Each entry rec
 
 **Context.** "Source-independent definition" was the central claim, but the original roadmap would not have tested it against a second source until Ash integration in the final phase. An IR validated against one source quietly mirrors that source.
 
-**Decision.** Phase 1 ships two source adapters: the JSON Schema adapter and a plain Elixir data source (`Formentation.Definition.Source.Map`, working name) living in core with zero dependencies. The same fixture form compiles from both, and a differential test asserts the definitions answer `Info` queries identically apart from origins. See [[17-end-to-end-example|the end-to-end example]] for both declarations.
+**Decision.** Phase 1 ships two source adapters: the JSON Schema adapter and a plain Elixir data source (`Formentation.Source.Map`, working name) living in core with zero dependencies. The same fixture form compiles from both, and a differential test asserts the definitions answer `Info` queries identically apart from origins. See [[17-end-to-end-example|the end-to-end example]] for both declarations.
 
 **Consequences.** The map source doubles as the reference adapter, the cheapest fixture format for tests, and a useful escape hatch for application-defined forms. Cost: a second (small) vocabulary to keep honest. The differential test must define equivalence explicitly (ordering, origins, defaults).
 
@@ -94,7 +94,7 @@ Running log of architecture decisions, ADR-style but lightweight. Each entry rec
 
 **Context.** [[phase-1-walking-skeleton|Phase 1]] required choosing one validator after evaluating ex_json_schema and JSV against the criteria in [[12-ecosystem-and-dependencies#JSON Schema|Ecosystem and dependencies]]. The fixture pins dialect 2020-12.
 
-**Decision.** JSV (`~> 0.21`). The dialect criterion was dispositive: ex_json_schema supports drafts 4/6/7 only, while JSV has compliance-suite-verified 2020-12 support, ships the metaschema family embedded (offline schema-document validation), returns structured errors with instance and schema locations, has a build-once API, and makes remote `$ref` fetching opt-in behind an allowlist. It sits behind `Formentation.Definition.Source.JSONSchema.Validator` — the swap point — with contract tests in `test/formentation/json_schema/validator_test.exs`.
+**Decision.** JSV (`~> 0.21`). The dialect criterion was dispositive: ex_json_schema supports drafts 4/6/7 only, while JSV has compliance-suite-verified 2020-12 support, ships the metaschema family embedded (offline schema-document validation), returns structured errors with instance and schema locations, has a build-once API, and makes remote `$ref` fetching opt-in behind an allowlist. It sits behind `Formentation.Source.JSONSchema.Validator` — the swap point — with contract tests in `test/formentation/json_schema/validator_test.exs`.
 
 **Consequences.** Three extra runtime dependencies (`abnf_parsec`, `texture`, `idna`). `atoms: false` is explicit in the validator module; format enforcement stays at JSV's default (off). Instance validation (implementation strategy step 4 onwards) reuses the same build/validate flow.
 
@@ -289,7 +289,7 @@ unproven).
 
 *2026-07-25*
 
-**Context.** `Definition.validator` was an opaque artifact whose executor `Form` hard-coded to `Formentation.Definition.Source.JSONSchema.Validator`, creating the core↔json_schema layer cycle that [[#D-018 — Reach is the architecture gate|D-018]] baselined, and blocking any other source from supplying authoritative validation without editing core.
+**Context.** `Definition.validator` was an opaque artifact whose executor `Form` hard-coded to `Formentation.Source.JSONSchema.Validator`, creating the core↔json_schema layer cycle that [[#D-018 — Reach is the architecture gate|D-018]] baselined, and blocking any other source from supplying authoritative validation without editing core.
 
 **Decision.** Introduce the core-owned `Formentation.Definition.Validation` behaviour (`@callback validate(artifact :: term(), instance :: map()) :: [Issue.t()]`) plus `Formentation.Definition.ValidationPlan{module, artifact}` carried on `Definition.validation`; `Form` dispatches `plan.module.validate(plan.artifact, instance)` and names no adapter; `Issue.source` is now `:decode | :validation`; JSON Schema is just one implementer ([[#D-008 — JSV is the JSON Schema validator|D-008]]); `format_version` bumped 1→2; the D-018 baseline and the `core→json_schema` exception are removed. Links: [[#D-008 — JSV is the JSON Schema validator|D-008]], [[#D-012 — Schema validation defers while any decode fails|D-012]], [[#D-018 — Reach is the architecture gate|D-018]].
 
@@ -517,7 +517,7 @@ in [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering i
 `Form` → `%Phoenix.HTML.Form{}` (both were renamed again on 2026-08-08 by
 [[18-decisions#D-047 — The lib tree is restructured to state the north-star architecture|D-047]]
 to `Formentation.Phoenix.Render.Preparation` and
-`Formentation.Phoenix.Theme.Reference`). Phase 3 must build the second UI and review
+`Formentation.Phoenix.UI.Reference`). Phase 3 must build the second UI and review
 consumer concurrently with the contract, publish the round-trip conformance
 suite, define capability-failure developer experience, and establish resource
 limits/performance evidence before exposing a stable prepared view.
@@ -882,7 +882,7 @@ unless `summary={true}`/`summary={false}` says otherwise, so composing under
 
 *2026-08-06*
 
-**Context.** `Formentation.Definition.Source.Map` previously copied `:one_of` options lists without validating list element types or verifying that `:one_of` was a list. This allowed malformed declarations like `one_of: [%{a: 1}]` or `one_of: "oops"` to compile without error and fail only during downstream rendering. Meanwhile, `Formentation.Definition.Semantic.Field` declares `@type option :: String.t() | number() | boolean()`.
+**Context.** `Formentation.Source.Map` previously copied `:one_of` options lists without validating list element types or verifying that `:one_of` was a list. This allowed malformed declarations like `one_of: [%{a: 1}]` or `one_of: "oops"` to compile without error and fail only during downstream rendering. Meanwhile, `Formentation.Definition.Semantic.Field` declares `@type option :: String.t() | number() | boolean()`.
 
 **Decision.** The Map source validates `:one_of` option declarations at the compilation boundary:
 - Valid option values must be scalars (`String.t()`, `number()`, or `boolean()`). Accepted values are retained verbatim without stringification, sorting, or deduplication.
@@ -1009,7 +1009,7 @@ unrescued; adapter exception totality remains a separate contract (see
 [GitHub issue #6](https://github.com/kioopi/formentation/issues/6)).
 
 Symbolic selection is a closed, explicit mapping (`:map` →
-`Formentation.Definition.Source.Map`, `:json_schema` → `Formentation.Definition.Source.JSONSchema`), not a
+`Formentation.Source.Map`, `:json_schema` → `Formentation.Source.JSONSchema`), not a
 registry or source-shape inference — plain maps are inherently ambiguous
 between a map declaration and a decoded JSON Schema, so the adapter stays
 mandatory. Any other atom is accepted as a custom adapter module only when
@@ -1046,7 +1046,7 @@ any `FunctionClauseError` from invalid `data:` — unrescued.
 deterministically and legibly on adapter misconfiguration, replacing
 accidental exception types with an intentional one. Built-in adapter usage no
 longer needs to name an implementation module (`adapter: :map` instead of
-`adapter: Formentation.Definition.Source.Map`), while module adapters remain fully
+`adapter: Formentation.Source.Map`), while module adapters remain fully
 supported for both built-in and third-party sources. `Formentation.form/2`
 gives single-shot callers a compile-once-and-initialize path without
 duplicating `Form.new/3`'s default/apply/revalidate logic; callers who need
@@ -1062,7 +1062,7 @@ names an adapter" — the boundary
 [[#D-018 — Reach is the architecture gate|D-018]] and
 [[#D-025 — Instance validation dispatches through a source-neutral behaviour|D-025]]
 established. The closed selector mapping lives in core and therefore mentions
-`Formentation.Definition.Source.Map` and `Formentation.Definition.Source.JSONSchema` literally. The gate
+`Formentation.Source.Map` and `Formentation.Source.JSONSchema` literally. The gate
 still passes, but only because a module literal returned as a value is not a
 call edge that Reach can see — not because the invariant is untouched. The
 rule's comments were corrected to record this as a deliberate, name-only
@@ -1071,7 +1071,7 @@ function directly) is unchanged, and no cycle is introduced.
 
 *The accepted adapter set is wider than "modules that look like adapters".*
 Because the check is `exports compile/2` rather than `implements
-Formentation.Definition.Source`, unrelated modules that happen to export `compile/2` —
+Formentation.Source`, unrelated modules that happen to export `compile/2` —
 `Regex` and `:re` among them — resolve successfully and then return a shape
 that violates the documented three-element contract, surfacing as a
 `MatchError`/`CaseClauseError` at the call site rather than a clear rejection.
@@ -1097,10 +1097,10 @@ shared coordinate type by directory alone. Nothing here was a code-behaviour
 bug; it was the directory tree failing to state the architecture it
 implements.
 
-**Decision.** Group the 29 entries under `lib/formentation/` into 14, and the
+**Decision.** Group the 29 entries under `lib/formentation/` into 16, and the
 14 under `lib/formentation/phoenix/` into 8, by nesting each module under the
-layer that owns it: `Formentation.Definition.Source.*`,
-`Formentation.Definition.Semantic.*`, `Formentation.Definition.Presentation.*`,
+layer that owns it: `Formentation.Definition.Semantic.*`,
+`Formentation.Definition.Presentation.*`,
 `Formentation.Definition.Validation`/`ValidationPlan` all move under
 `Formentation.Definition.*`; `Formentation.Codec`, `Formentation.Params`,
 `Formentation.Transport`, and `Formentation.SubmissionBlocker` move under
@@ -1109,12 +1109,20 @@ layer that owns it: `Formentation.Definition.Source.*`,
 `Formentation.Phoenix.RenderNode`, `RenderPlan`, `RenderPreparation` collapse
 into `Formentation.Phoenix.Render.{Node, Plan, Preparation}`, with
 `Formentation.Phoenix.ReferenceComponents` renamed to
-`Formentation.Phoenix.Theme.Reference`. This is a **breaking rename of 34
-published modules** — every caller referencing one of these modules by its
-full name must update the reference. It is accepted now, before `0.1.0`,
-specifically because no compatibility guarantee has shipped yet; the same
-rename after `0.1.0` would need a deprecation path this decision deliberately
-avoids paying for.
+`Formentation.Phoenix.UI.Reference` — not `Theme.Reference`:
+[[20-renderer-ui-model|the renderer/UI model note]] narrows *theme* to visual
+configuration inside one UI (light/dark, colour tokens, density, sizing,
+radius, typography), and this module renders fieldsets, labels, inputs,
+selects, radio groups, and validation attributes — a UI integration by that
+same definition, not a theme. The source adapters (`Source`, `Source.Map`,
+`Source.Shared`, `Source.JSONSchema`, `Source.JSONSchema.Validator`) move to
+their own top-level `Formentation.Source.*` namespace, a sibling of
+`Formentation.Definition` rather than nested under it — see below. This is a
+**breaking rename of 31 published modules** — every caller referencing one of
+these modules by its full name must update the reference. It is accepted now,
+before `0.1.0`, specifically because no compatibility guarantee has shipped
+yet; the same rename after `0.1.0` would need a deprecation path this
+decision deliberately avoids paying for.
 
 **Why the shared kernel stays at the top level.** `InstancePath`,
 `TemplatePath`, `JSONPointer`, `NodeId`, `Origin`, `Diagnostic`, and `Issue`
@@ -1132,21 +1140,34 @@ it must not depend on. A module's location under `lib/` is meant to name
 which layer owns it; the kernel's honest location is beside, not under,
 its dependents.
 
-**The `.reach.exs` consequence of nesting `Source` under `Definition`.**
-Reach's layer patterns match module-name prefixes with `*` matching across
-dots, and `forbid_multiple_matches: true` is set so every module must match
-exactly one layer pattern. Before this restructure, `core`'s layer pattern
-could be a single wildcard, `"Formentation.Definition.*"`, because no other
-layer's modules shared that prefix. After nesting `Formentation.Source.*`
-under `Formentation.Definition.Source.*`, that same wildcard would also match
-the `source` and `json_schema` adapter layers, violating
-`forbid_multiple_matches`. The `core`, `source`, and `json_schema` layers
-therefore now enumerate their modules by hand in `.reach.exs` instead of
-matching by wildcard, and every future adapter module needs its own explicit
-`.reach.exs` entry. `require_all_modules: true` makes an unlisted module fail
-`mix reach.check` loudly rather than silently falling through a wildcard into
-the wrong layer, so this is a maintenance cost paid once per new adapter, not
-a correctness risk.
+**Why `Source` is a sibling of `Definition`, not nested under it.**
+`Semantic` and `Presentation` are constituents of a compiled `Definition`, so
+nesting them under `Definition` states real ownership. A source adapter sits
+*upstream* of a `Definition` and *produces* one; nesting it under `Definition`
+would invert that relationship. This was tried during the restructure and
+reverted after review: Reach's layer patterns match module-name prefixes with
+`*` matching across dots, and `forbid_multiple_matches: true` requires every
+module to match exactly one layer pattern. With `Formentation.Source.*`
+nested under `Formentation.Definition.Source.*`, `core`'s layer pattern could
+no longer be the single wildcard `"Formentation.Definition.*"` — it would
+also match the `source` and `json_schema` adapter layers — so `core` had to
+enumerate every `Definition` submodule by hand, needing a new `.reach.exs`
+entry for each. That manual enumeration was the signal, not just a cost to
+accept: the namespace hierarchy had stopped tracking the layer hierarchy, and
+Reach needing hand-maintained exceptions to cope was symptomatic of that, not
+a reason to keep the nesting. `Formentation.Source` therefore sits at the top
+level beside `Formentation.Definition` and `Formentation.Form`, and `core`'s
+layer pattern is the single wildcard `"Formentation.Definition.*"` again.
+
+The `source` layer itself still enumerates its four modules by hand
+(`Source`, `Source.Map`, `Source.Shared`, `Source.Shared.*`) rather than
+wildcarding `Formentation.Source.*`, because `Formentation.Source.JSONSchema`
+must remain the distinct `json_schema` layer
+([[#D-008 — JSV is the JSON Schema validator|D-008]]); a
+`Formentation.Source.*` wildcard on `source` would swallow `Source.JSONSchema`
+and violate `forbid_multiple_matches`. This is accepted — it is the same
+shape the source adapters already had before this restructure, not a new
+cost.
 
 **The legacy-mixed-storage guard was narrowed.** `Formentation.Phoenix.Node`
 does not exist — the module is `Formentation.Phoenix.Render.Node`, aliased to
@@ -1168,7 +1189,7 @@ alias to the removed `Formentation.Node` module, and a false positive against
 every ordinary `Formentation.Phoenix.Render.Node` reference would have made
 the guard a liability rather than a safeguard.
 
-**Consequences.** `lib/formentation/` now has 14 top-level entries and
+**Consequences.** `lib/formentation/` now has 16 top-level entries and
 `lib/formentation/phoenix/` has 8; both counts are checked by the vault and
 by the restructure's own verification step. Every renamed module's `mix.exs`
 `groups_for_modules` entry, `.iex.exs` alias, and `.reach.exs` layer pattern

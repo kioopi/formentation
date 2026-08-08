@@ -18,7 +18,7 @@ defmodule Formentation.Phoenix.SnapshotTest do
   test "the end-to-end example renders as reviewed" do
     {:ok, definition, _diagnostics} =
       Formentation.compile(PumpInspection.map_source(),
-        adapter: Formentation.Definition.Source.Map
+        adapter: Formentation.Source.Map
       )
 
     data = %{

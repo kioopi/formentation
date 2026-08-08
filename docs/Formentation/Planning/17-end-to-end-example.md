@@ -54,7 +54,7 @@ Note what the hints do: they impose an order (JSON object member order is not re
 
 ## Source 2: plain Elixir data
 
-The same form declared through the core map source (working name `Formentation.Definition.Source.Map`), with no JSON Schema involved:
+The same form declared through the core map source (working name `Formentation.Source.Map`), with no JSON Schema involved:
 
 ```elixir
 %{
@@ -81,7 +81,7 @@ Two instructive differences from JSON Schema: the property list is *natively ord
 
 ```elixir
 {:ok, definition, _diagnostics} =
-  Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema, ui: ui_hints)
+  Formentation.compile(schema, adapter: Formentation.Source.JSONSchema, ui: ui_hints)
 
 Info.fields(definition) |> Enum.map(& &1.name)
 #=> ["serial_number", "condition", "mounting", "last_service", "operating_hours",

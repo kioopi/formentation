@@ -48,7 +48,7 @@ defmodule Formentation do
       ["name", "age"]
 
   Built-in adapters have stable symbolic selectors — `:map` for
-  `Formentation.Definition.Source.Map`, `:json_schema` for `Formentation.Definition.Source.JSONSchema`.
+  `Formentation.Source.Map`, `:json_schema` for `Formentation.Source.JSONSchema`.
   Third-party adapters remain reachable by module.
   """
   @spec compile(term(), keyword()) ::
@@ -101,8 +101,8 @@ defmodule Formentation do
     end
   end
 
-  defp resolve_adapter!(:map), do: Formentation.Definition.Source.Map
-  defp resolve_adapter!(:json_schema), do: Formentation.Definition.Source.JSONSchema
+  defp resolve_adapter!(:map), do: Formentation.Source.Map
+  defp resolve_adapter!(:json_schema), do: Formentation.Source.JSONSchema
 
   defp resolve_adapter!(adapter) when is_atom(adapter) do
     if adapter_obtainable?(adapter) and function_exported?(adapter, :compile, 2) do

@@ -14,19 +14,16 @@ for the reasoning behind each one.
 
 - **Breaking:** the `lib/formentation/` tree was restructured so a module's
   location states which architectural layer owns it, taking
-  `lib/formentation/` from 29 entries down to 14 and
+  `lib/formentation/` from 29 entries down to 16 and
   `lib/formentation/phoenix/` from 14 down to 8
   ([D-047](docs/Formentation/Planning/18-decisions.md#d-047--the-lib-tree-is-restructured-to-state-the-north-star-architecture)).
-  This renames 34 published modules. If your application references any of
+  This renames 31 published modules. If your application references any of
   the following by full module name, update the reference:
 
   | Old name | New name |
   | --- | --- |
-  | `Formentation.JSONSchema` | `Formentation.Definition.Source.JSONSchema` |
-  | `Formentation.JSONSchema.Validator` | `Formentation.Definition.Source.JSONSchema.Validator` |
-  | `Formentation.Source` | `Formentation.Definition.Source` |
-  | `Formentation.Source.Map` | `Formentation.Definition.Source.Map` |
-  | `Formentation.Source.Shared` | `Formentation.Definition.Source.Shared` |
+  | `Formentation.JSONSchema` | `Formentation.Source.JSONSchema` |
+  | `Formentation.JSONSchema.Validator` | `Formentation.Source.JSONSchema.Validator` |
   | `Formentation.Presentation` (and `Presentation.Field`/`.Group`/`.Object`) | `Formentation.Definition.Presentation` (`.Field`/`.Group`/`.Object`) |
   | `Formentation.Semantic` (and `Semantic.Field`/`.Object`/`.Unsupported`/`.Index`) | `Formentation.Definition.Semantic` (`.Field`/`.Object`/`.Unsupported`/`.Index`) |
   | `Formentation.Validation` | `Formentation.Definition.Validation` |

@@ -32,7 +32,7 @@ defmodule Formentation.FormNestedPresenceTest do
     }
 
     {:ok, definition, _diagnostics} =
-      Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
+      Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
     definition
   end
@@ -170,7 +170,7 @@ defmodule Formentation.FormNestedPresenceTest do
 
   defp compile_map(declaration) do
     {:ok, definition, _diagnostics} =
-      Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
+      Formentation.compile(declaration, adapter: Formentation.Source.Map)
 
     definition
   end

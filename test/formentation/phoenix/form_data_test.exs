@@ -12,7 +12,7 @@ defmodule Formentation.Phoenix.FormDataTest do
   defp pump_definition do
     {:ok, definition, []} =
       Formentation.compile(PumpInspection.map_source(),
-        adapter: Formentation.Definition.Source.Map
+        adapter: Formentation.Source.Map
       )
 
     definition
@@ -22,7 +22,7 @@ defmodule Formentation.Phoenix.FormDataTest do
 
   defp compile!(declaration) do
     {:ok, definition, _diagnostics} =
-      Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
+      Formentation.compile(declaration, adapter: Formentation.Source.Map)
 
     definition
   end
@@ -46,7 +46,7 @@ defmodule Formentation.Phoenix.FormDataTest do
     }
 
     {:ok, definition, []} =
-      Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
+      Formentation.compile(declaration, adapter: Formentation.Source.Map)
 
     definition
   end
@@ -221,7 +221,7 @@ defmodule Formentation.Phoenix.FormDataTest do
     test "read-only fields display original data, not submitted values (D-016)" do
       {:ok, definition, []} =
         Formentation.compile(Formentation.Fixtures.FieldAccess.map_source(),
-          adapter: Formentation.Definition.Source.Map
+          adapter: Formentation.Source.Map
         )
 
       form_state =
@@ -252,7 +252,7 @@ defmodule Formentation.Phoenix.FormDataTest do
   defp json_pump_form(data \\ %{}) do
     {:ok, definition, []} =
       Formentation.compile(PumpInspection.json_schema(),
-        adapter: Formentation.Definition.Source.JSONSchema,
+        adapter: Formentation.Source.JSONSchema,
         ui: PumpInspection.ui_hints()
       )
 
@@ -298,7 +298,7 @@ defmodule Formentation.Phoenix.FormDataTest do
       {:ok, definition, []} =
         Formentation.compile(
           %{kind: :object, properties: [{name, %{kind: :integer}}]},
-          adapter: Formentation.Definition.Source.Map
+          adapter: Formentation.Source.Map
         )
 
       form_state =
@@ -346,7 +346,7 @@ defmodule Formentation.Phoenix.FormDataTest do
       }
 
       {:ok, definition, []} =
-        Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
+        Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
       form_state = submitted_form(Form.new(definition), %{"title" => "t"})
       form = FormData.to_form(form_state, [])
@@ -490,7 +490,7 @@ defmodule Formentation.Phoenix.FormDataTest do
       {:ok, definition, [diagnostic]} =
         Formentation.compile(
           %{kind: :object, required: ["note"], properties: [{"note", %{kind: :string}}]},
-          adapter: Formentation.Definition.Source.Map
+          adapter: Formentation.Source.Map
         )
 
       assert diagnostic.code == :required_permits_empty
@@ -503,7 +503,7 @@ defmodule Formentation.Phoenix.FormDataTest do
       {:ok, definition, []} =
         Formentation.compile(
           %{kind: :object, required: ["count"], properties: [{"count", %{kind: :integer}}]},
-          adapter: Formentation.Definition.Source.Map
+          adapter: Formentation.Source.Map
         )
 
       form = FormData.to_form(Form.new(definition), [])
@@ -532,7 +532,7 @@ defmodule Formentation.Phoenix.FormDataTest do
               {"quantity", %{kind: :integer, max: 99}}
             ]
           },
-          adapter: Formentation.Definition.Source.Map
+          adapter: Formentation.Source.Map
         )
 
       form = FormData.to_form(Form.new(definition), [])

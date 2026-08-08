@@ -187,10 +187,10 @@ defmodule Formentation.MixProject do
           Formentation.Phoenix.StateView.Issue
         ],
         Sources: [
-          Formentation.Definition.Source,
-          Formentation.Definition.Source.Map,
-          Formentation.Definition.Source.JSONSchema,
-          Formentation.Definition.Source.JSONSchema.Validator
+          Formentation.Source,
+          Formentation.Source.Map,
+          Formentation.Source.JSONSchema,
+          Formentation.Source.JSONSchema.Validator
         ]
       ]
     ]

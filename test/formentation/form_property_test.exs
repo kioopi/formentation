@@ -12,7 +12,7 @@ defmodule Formentation.FormPropertyTest do
   defp pump_definition do
     {:ok, definition, []} =
       Formentation.compile(PumpInspection.map_source(),
-        adapter: Formentation.Definition.Source.Map
+        adapter: Formentation.Source.Map
       )
 
     definition
@@ -137,7 +137,7 @@ defmodule Formentation.FormPropertyTest do
       }
 
       {:ok, definition, []} =
-        Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
+        Formentation.compile(declaration, adapter: Formentation.Source.Map)
 
       definition
     end

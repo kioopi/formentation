@@ -147,7 +147,7 @@ The context should carry inputs that affect compilation but do not belong in the
 ```elixir
 %Formentation.Compiler.Context{
   mode: :strict,
-  adapter: Formentation.Definition.Source.JSONSchema,
+  adapter: Formentation.Source.JSONSchema,
   validator: Formentation.Validator.JSV,
   extensions: [],
   capabilities: nil,

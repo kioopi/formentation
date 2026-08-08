@@ -74,8 +74,8 @@ compilation — `diagnostics` may carry warnings even on success — or
 case no form is created.
 
 The `adapter:` option is mandatory and selects your source:
-- `:map` for `Formentation.Definition.Source.Map` — plain Elixir declarations
-- `:json_schema` for `Formentation.Definition.Source.JSONSchema` — JSON Schema 2020-12 documents
+- `:map` for `Formentation.Source.Map` — plain Elixir declarations
+- `:json_schema` for `Formentation.Source.JSONSchema` — JSON Schema 2020-12 documents
 - Any module exporting `compile/2` for third-party sources
 
 A **bad `adapter:`** — one that is missing, unknown, or invalid — raises

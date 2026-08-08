@@ -1,9 +1,9 @@
-defmodule Formentation.Definition.Source.JSONSchema.ValidatorTest do
+defmodule Formentation.Source.JSONSchema.ValidatorTest do
   use ExUnit.Case, async: true
 
-  alias Formentation.Definition.Source.JSONSchema.Validator
   alias Formentation.Diagnostic
   alias Formentation.{InstancePath, Issue}
+  alias Formentation.Source.JSONSchema.Validator
 
   @dialect "https://json-schema.org/draft/2020-12/schema"
 

@@ -15,7 +15,7 @@ defmodule Formentation.Info do
       iex> {:ok, definition, []} =
       ...>   Formentation.compile(
       ...>     %{kind: :object, properties: [{"name", %{kind: :string}}]},
-      ...>     adapter: Formentation.Definition.Source.Map
+      ...>     adapter: Formentation.Source.Map
       ...>   )
       iex> Formentation.Info.role(definition, ["name"])
       :text
@@ -49,7 +49,7 @@ defmodule Formentation.Info do
       iex> {:ok, definition, _} =
       ...>   Formentation.compile(
       ...>     %{kind: :object, properties: [{"attachment", %{kind: :file}}]},
-      ...>     adapter: Formentation.Definition.Source.Map
+      ...>     adapter: Formentation.Source.Map
       ...>   )
       iex> definition |> Formentation.Info.unsupported_nodes() |> Enum.map(& &1.name)
       ["attachment"]

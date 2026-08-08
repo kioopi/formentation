@@ -13,14 +13,14 @@ defmodule Formentation.Phoenix.ComponentsTest do
 
   defp compile!(declaration) do
     {:ok, definition, _diagnostics} =
-      Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
+      Formentation.compile(declaration, adapter: Formentation.Source.Map)
 
     definition
   end
 
   defp compile_json!(schema) do
     {:ok, definition, _diagnostics} =
-      Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
+      Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
     definition
   end

@@ -47,14 +47,14 @@ defmodule Formentation.Phoenix.Render.PreparationTest do
 
   defp compile!(declaration) do
     {:ok, definition, _diagnostics} =
-      Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
+      Formentation.compile(declaration, adapter: Formentation.Source.Map)
 
     definition
   end
 
   defp compile_json!(schema) do
     {:ok, definition, _diagnostics} =
-      Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
+      Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
     definition
   end
@@ -1057,7 +1057,7 @@ defmodule Formentation.Phoenix.Render.PreparationTest do
       }
 
       {:ok, definition, []} =
-        Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
+        Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
       form_state = submitted_form(Form.new(definition), %{"title" => "t"})
       plan = Projector.project(definition, FormData.to_form(form_state, as: "payload"))
@@ -1500,7 +1500,7 @@ defmodule Formentation.Phoenix.Render.PreparationTest do
   describe "submission blockers reach the summary through the state view" do
     defp blocked_plan(schema, data, params) do
       {:ok, definition, _diagnostics} =
-        Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
+        Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
       form_state = definition |> Form.new(data) |> submitted_form(params)
       Projector.project(definition, FormData.to_form(form_state, as: "payload"))
@@ -1559,7 +1559,7 @@ defmodule Formentation.Phoenix.Render.PreparationTest do
       }
 
       {:ok, definition, _diagnostics} =
-        Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
+        Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
       form_state = Form.validate(Form.new(definition), %{})
 
@@ -1594,7 +1594,7 @@ defmodule Formentation.Phoenix.Render.PreparationTest do
       }
 
       {:ok, definition, []} =
-        Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
+        Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
       form_state =
         Form.transition(Form.new(definition), %Formentation.Form.Params{
@@ -1850,7 +1850,7 @@ defmodule Formentation.Phoenix.Render.PreparationTest do
       }
 
       {:ok, definition, []} =
-        Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
+        Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
       form_state =
         Form.transition(

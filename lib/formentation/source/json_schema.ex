@@ -1,4 +1,4 @@
-defmodule Formentation.Definition.Source.JSONSchema do
+defmodule Formentation.Source.JSONSchema do
   @moduledoc """
   JSON Schema declaration source (D-004): compiles a decoded draft
   2020-12 schema document — string keys, as returned by `JSON.decode!/1`
@@ -9,7 +9,7 @@ defmodule Formentation.Definition.Source.JSONSchema do
   (docs/superpowers/specs/2026-07-21-phase1-annotations-mini-slice-design.md).
   """
 
-  @behaviour Formentation.Definition.Source
+  @behaviour Formentation.Source
 
   alias Formentation.{
     Definition,
@@ -20,8 +20,8 @@ defmodule Formentation.Definition.Source.JSONSchema do
   }
 
   alias Formentation.Definition.{Finalizer, Presentation, Semantic, ValidationPlan}
-  alias Formentation.Definition.Source.JSONSchema.Validator
-  alias Formentation.Definition.Source.Shared
+  alias Formentation.Source.JSONSchema.Validator
+  alias Formentation.Source.Shared
 
   @scalar_types %{
     "string" => {:text, :string_default},

@@ -40,7 +40,7 @@ defmodule Formentation.Phoenix do
       iex> {:ok, definition, []} =
       ...>   Formentation.compile(
       ...>     %{kind: :object, properties: [{"email", %{kind: :string, role: :email}}]},
-      ...>     adapter: Formentation.Definition.Source.Map
+      ...>     adapter: Formentation.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(Formentation.Form.new(definition), as: "payload")
       iex> import Phoenix.LiveViewTest

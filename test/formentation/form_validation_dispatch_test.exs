@@ -25,7 +25,7 @@ defmodule Formentation.FormValidationDispatchTest do
     {:ok, definition, []} =
       Formentation.compile(
         %{kind: :object, properties: [{"a", %{kind: :string}}, {"b", %{kind: :string}}]},
-        adapter: Formentation.Definition.Source.Map
+        adapter: Formentation.Source.Map
       )
 
     definition
@@ -84,7 +84,7 @@ defmodule Formentation.FormValidationDispatchTest do
     {:ok, int_def, []} =
       Formentation.compile(
         %{kind: :object, properties: [{"age", %{kind: :integer}}]},
-        adapter: Formentation.Definition.Source.Map
+        adapter: Formentation.Source.Map
       )
 
     definition = %{

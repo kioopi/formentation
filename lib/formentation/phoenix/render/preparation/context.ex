@@ -73,7 +73,7 @@ defmodule Formentation.Phoenix.Render.Preparation.Context do
       iex> {:ok, definition, []} =
       ...>   Formentation.compile(
       ...>     %{kind: :object, properties: [{"email", %{kind: :string}}]},
-      ...>     adapter: Formentation.Definition.Source.Map
+      ...>     adapter: Formentation.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
       iex> ctx = Formentation.Phoenix.Render.Preparation.Context.resolve(form, definition: definition)
@@ -113,7 +113,7 @@ defmodule Formentation.Phoenix.Render.Preparation.Context do
       iex> {:ok, definition, []} =
       ...>   Formentation.compile(
       ...>     %{kind: :object, properties: [{"address", %{kind: :object, properties: [{"street", %{kind: :string}}]}}]},
-      ...>     adapter: Formentation.Definition.Source.Map
+      ...>     adapter: Formentation.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
       iex> ctx = Formentation.Phoenix.Render.Preparation.Context.resolve(form, definition: definition)
@@ -149,7 +149,7 @@ defmodule Formentation.Phoenix.Render.Preparation.Context do
       iex> {:ok, definition, []} =
       ...>   Formentation.compile(
       ...>     %{kind: :object, properties: [{"address", %{kind: :object, properties: [{"street", %{kind: :string}}]}}]},
-      ...>     adapter: Formentation.Definition.Source.Map
+      ...>     adapter: Formentation.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
       iex> ctx = Formentation.Phoenix.Render.Preparation.Context.resolve(form, definition: definition)
@@ -160,7 +160,7 @@ defmodule Formentation.Phoenix.Render.Preparation.Context do
       iex> {:ok, definition, []} =
       ...>   Formentation.compile(
       ...>     %{kind: :object, properties: [{"address", %{kind: :object, properties: [{"street", %{kind: :string}}]}}]},
-      ...>     adapter: Formentation.Definition.Source.Map
+      ...>     adapter: Formentation.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
       iex> ctx = Formentation.Phoenix.Render.Preparation.Context.resolve(form, definition: definition)
@@ -194,7 +194,7 @@ defmodule Formentation.Phoenix.Render.Preparation.Context do
       iex> {:ok, definition, []} =
       ...>   Formentation.compile(
       ...>     %{kind: :object, properties: [{"email", %{kind: :string}}]},
-      ...>     adapter: Formentation.Definition.Source.Map
+      ...>     adapter: Formentation.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
       iex> ctx = Formentation.Phoenix.Render.Preparation.Context.resolve(form, definition: definition)
@@ -223,7 +223,7 @@ defmodule Formentation.Phoenix.Render.Preparation.Context do
       iex> {:ok, definition, []} =
       ...>   Formentation.compile(
       ...>     %{kind: :object, properties: [{"email", %{kind: :string}}]},
-      ...>     adapter: Formentation.Definition.Source.Map
+      ...>     adapter: Formentation.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
       iex> ctx = Formentation.Phoenix.Render.Preparation.Context.resolve(form, definition: definition)

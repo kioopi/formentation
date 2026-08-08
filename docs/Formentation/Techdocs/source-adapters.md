@@ -25,7 +25,7 @@ downstream sees nodes, not schemas or maps. Two exist today, and a
 to producing the same tree from the same form. This note is the deep-dive
 beneath the [[compile-pipeline|Compile pipeline]] overview.
 
-## The `Formentation.Definition.Source` behaviour
+## The `Formentation.Source` behaviour
 
 The behaviour declares one callback:
 
@@ -34,7 +34,7 @@ The behaviour declares one callback:
             {:ok, Definition.t(), [Diagnostic.t()]} | {:error, [Diagnostic.t()]}
 ```
 
-This is the **documented contract** and the dialyzer surface. In practice, adapter *acceptance* uses a **callable-contract check**: a module is accepted if it exports `compile/2`, without requiring `@behaviour Formentation.Definition.Source`. This means the accepted set is deliberately wider than the declaring set — which is fine, since adapters are developer-supplied code, never user input.
+This is the **documented contract** and the dialyzer surface. In practice, adapter *acceptance* uses a **callable-contract check**: a module is accepted if it exports `compile/2`, without requiring `@behaviour Formentation.Source`. This means the accepted set is deliberately wider than the declaring set — which is fine, since adapters are developer-supplied code, never user input.
 
 This is the *same* contract as the public `Formentation.compile/2`. The public
 entry point takes the adapter option, resolves it to an adapter (built-in selector or module),
@@ -46,7 +46,7 @@ definition at all. The behaviour is what makes "source-independent" a
 structural fact rather than a slogan ([[18-decisions#D-004 — Two declaration sources from the start|D-004]]).
 
 > [!info] A recorded gap: no shared input format
-> `Formentation.Definition.Source`'s moduledoc deferred a shared *normalized
+> `Formentation.Source`'s moduledoc deferred a shared *normalized
 > compiler-input* format until a second source showed what it must
 > contain. Both sources now exist and none was introduced: each adapter
 > walks its own raw vocabulary directly. The sharing happens one level
@@ -56,15 +56,15 @@ structural fact rather than a slogan ([[18-decisions#D-004 — Two declaration s
 
 ## Selecting an adapter
 
-Adapters are resolved by `Formentation.compile/2` and `Formentation.form/2` from the mandatory `:adapter` option. The selection is **explicit and closed**: pass `:map` for `Formentation.Definition.Source.Map`, `:json_schema` for `Formentation.Definition.Source.JSONSchema`, or a module to use as an adapter. A plain map is ambiguous — it could be either a map-source form declaration or a decoded JSON Schema — so the source is never inferred; adapter selection is always required.
+Adapters are resolved by `Formentation.compile/2` and `Formentation.form/2` from the mandatory `:adapter` option. The selection is **explicit and closed**: pass `:map` for `Formentation.Source.Map`, `:json_schema` for `Formentation.Source.JSONSchema`, or a module to use as an adapter. A plain map is ambiguous — it could be either a map-source form declaration or a decoded JSON Schema — so the source is never inferred; adapter selection is always required.
 
 Third-party adapters are reachable by module. A module is accepted as an
 adapter if `Code.ensure_compiled!/1` obtains it and it exports `compile/2` —
 a callable-contract check, not a behaviour requirement. The contract is the
-same as `Formentation.Definition.Source`, so modules implementing the behaviour are
+same as `Formentation.Source`, so modules implementing the behaviour are
 valid, but the acceptance rule is wider: any module exporting a `compile/2`
 will be **accepted by the resolver**, even if it never declared
-`@behaviour Formentation.Definition.Source`.
+`@behaviour Formentation.Source`.
 
 Accepted is not the same as working. The resolver checks obtainability and
 function name/arity — nothing about what `compile/2` returns. Unrelated
@@ -91,7 +91,7 @@ adapter outright
 ## The shared walk
 
 The two adapters converge on one set of building blocks in
-`Formentation.Definition.Source.Shared`, which is why two vocabularies yield
+`Formentation.Source.Shared`, which is why two vocabularies yield
 structurally identical trees.
 
 ```mermaid
@@ -133,7 +133,7 @@ build every node through these, so node shape never diverges by source.
 
 ## The two adapters, side by side
 
-| Axis | `Source.Map` | `Formentation.Definition.Source.JSONSchema` |
+| Axis | `Source.Map` | `Formentation.Source.JSONSchema` |
 | --- | --- | --- |
 | Input | map with `:kind`, atom keys | decoded draft 2020-12 doc, string keys |
 | Property container | ordered `{name, spec}` list — **order is data** | `properties` map — keys **sorted** alphabetically |
@@ -148,7 +148,7 @@ build every node through these, so node shape never diverges by source.
 plain Elixir, zero dependencies. Because properties are an ordered list of
 `{name, spec}` tuples, ordering is never left to map-enumeration order.
 
-**`Formentation.Definition.Source.JSONSchema`** compiles a decoded schema document (string
+**`Formentation.Source.JSONSchema`** compiles a decoded schema document (string
 keys, as returned by `JSON.decode!/1`) over a pinned 2020-12 subset. JSON
 object keys are unordered, so it sorts property names for a deterministic
 walk and defers presentation order to the `order` hint. It is gated and
@@ -162,7 +162,7 @@ and hidden intent; anything outside the subset becomes a
 
 ## The JSV metaschema pre-pass
 
-`Formentation.Definition.Source.JSONSchema.Validator` is the single boundary to JSV
+`Formentation.Source.JSONSchema.Validator` is the single boundary to JSV
 ([[18-decisions#D-008 — JSV is the JSON Schema validator|D-008]]) and runs
 two distinct gates, both offline against JSV's embedded metaschemas:
 
@@ -245,11 +245,11 @@ Each adapter additionally carries its own property tests
 
 | Concern | Module | File |
 | --- | --- | --- |
-| Adapter contract | `Formentation.Definition.Source` | `lib/formentation/definition/source.ex` |
-| Shared walk · Context · policy | `Formentation.Definition.Source.Shared` | `lib/formentation/definition/source/shared.ex` |
-| Map adapter | `Formentation.Definition.Source.Map` | `lib/formentation/definition/source/map.ex` |
-| JSON Schema adapter | `Formentation.Definition.Source.JSONSchema` | `lib/formentation/definition/source/json_schema.ex` |
-| JSV boundary | `Formentation.Definition.Source.JSONSchema.Validator` | `lib/formentation/definition/source/json_schema/validator.ex` |
+| Adapter contract | `Formentation.Source` | `lib/formentation/source.ex` |
+| Shared walk · Context · policy | `Formentation.Source.Shared` | `lib/formentation/source/shared.ex` |
+| Map adapter | `Formentation.Source.Map` | `lib/formentation/source/map.ex` |
+| JSON Schema adapter | `Formentation.Source.JSONSchema` | `lib/formentation/source/json_schema.ex` |
+| JSV boundary | `Formentation.Source.JSONSchema.Validator` | `lib/formentation/source/json_schema/validator.ex` |
 | Differential property | `Formentation.DifferentialTest` | `test/formentation/invariants/differential_test.exs` |
 
 ## Related notes

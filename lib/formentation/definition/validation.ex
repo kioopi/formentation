@@ -12,7 +12,7 @@ defmodule Formentation.Definition.Validation do
   issue.
 
   This contract belongs to core; implementations belong to integrations
-  (for example `Formentation.Definition.Source.JSONSchema.Validator`). It concerns only
+  (for example `Formentation.Source.JSONSchema.Validator`). It concerns only
   runtime candidate validation — declaration/metaschema checking produces
   `Formentation.Diagnostic` values and is not part of this behaviour.
   """

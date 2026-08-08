@@ -62,7 +62,7 @@ defmodule Formentation.Phoenix.StateViewTest do
       }
 
       {:ok, definition, _diagnostics} =
-        Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
+        Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
       definition
     end
@@ -168,7 +168,7 @@ defmodule Formentation.Phoenix.StateViewTest do
       }
 
       {:ok, definition, _diagnostics} =
-        Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
+        Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
       definition
     end
@@ -209,7 +209,7 @@ defmodule Formentation.Phoenix.StateViewTest do
   describe "Formentation.Form submission blockers in issues/2" do
     defp blocked_pair(schema, data, params) do
       {:ok, definition, _diagnostics} =
-        Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
+        Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
 
       form_state = definition |> Form.new(data) |> submitted_form(params)
       {form_state, Phoenix.HTML.FormData.to_form(form_state, [])}
@@ -295,7 +295,7 @@ defmodule Formentation.Phoenix.StateViewTest do
             required: ["attachment"],
             properties: [{"attachment", %{kind: :file}}]
           },
-          adapter: Formentation.Definition.Source.Map
+          adapter: Formentation.Source.Map
         )
 
       form_state = definition |> Form.new(%{}) |> submitted_form(%{})
