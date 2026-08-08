@@ -8,7 +8,9 @@ defmodule Formentation.PumpInspectionTest do
 
   setup do
     {:ok, definition, []} =
-      Formentation.compile(PumpInspection.map_source(), adapter: Formentation.Source.Map)
+      Formentation.compile(PumpInspection.map_source(),
+        adapter: Formentation.Definition.Source.Map
+      )
 
     %{definition: definition}
   end
@@ -54,7 +56,9 @@ defmodule Formentation.PumpInspectionTest do
 
   test "compilation is deterministic", %{definition: definition} do
     {:ok, again, []} =
-      Formentation.compile(PumpInspection.map_source(), adapter: Formentation.Source.Map)
+      Formentation.compile(PumpInspection.map_source(),
+        adapter: Formentation.Definition.Source.Map
+      )
 
     assert again == definition
   end

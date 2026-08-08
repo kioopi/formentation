@@ -198,7 +198,7 @@ defmodule Formentation.InfoTest do
           ],
           groups: [%{id: "main", fields: ["legacy", "title"]}]
         },
-        adapter: Formentation.Source.Map
+        adapter: Formentation.Definition.Source.Map
       )
 
     root = Semantic.root(definition)

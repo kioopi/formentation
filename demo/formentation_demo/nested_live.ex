@@ -29,7 +29,7 @@ defmodule FormentationDemo.NestedLive do
   @impl true
   def mount(_params, _session, socket) do
     {:ok, definition, _diagnostics} =
-      Formentation.compile(@schema, adapter: Formentation.JSONSchema)
+      Formentation.compile(@schema, adapter: Formentation.Definition.Source.JSONSchema)
 
     {:ok,
      socket

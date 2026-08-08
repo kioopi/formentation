@@ -271,7 +271,7 @@ defmodule Formentation.LayoutInvarianceTest do
     {:ok, definition, diagnostics} =
       root_groups
       |> declaration(details_groups)
-      |> Formentation.compile(adapter: Formentation.Source.Map)
+      |> Formentation.compile(adapter: Formentation.Definition.Source.Map)
 
     assert Enum.map(diagnostics, & &1.code) == [:unsupported_kind]
 

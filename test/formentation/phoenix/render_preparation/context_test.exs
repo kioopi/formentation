@@ -10,7 +10,7 @@ defmodule Formentation.Phoenix.RenderPreparation.ContextTest do
 
   defp compile!(declaration) do
     {:ok, definition, _diagnostics} =
-      Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
 
     definition
   end

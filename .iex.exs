@@ -92,13 +92,15 @@ defmodule Formentation.IExHelpers do
     end
   end
 
-  defp detect_adapter(%{kind: _kind}), do: Formentation.Source.Map
-  defp detect_adapter(_declaration), do: Formentation.JSONSchema
+  defp detect_adapter(%{kind: _kind}), do: Formentation.Definition.Source.Map
+  defp detect_adapter(_declaration), do: Formentation.Definition.Source.JSONSchema
 end
 
 import Formentation.IExHelpers
 
-alias Formentation.{Definition, Diagnostic, Info, JSONSchema, Node, Source}
+alias Formentation.{Definition, Diagnostic, Info}
+alias Formentation.Definition.Source
+alias Formentation.Definition.Source.JSONSchema
 
 IO.puts("""
 

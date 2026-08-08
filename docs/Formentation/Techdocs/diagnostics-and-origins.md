@@ -235,8 +235,8 @@ is [[phase-2-compiler-diagnostics|Phase 2]] territory.
 | Compile-time diagnostic | `Formentation.Diagnostic` | `lib/formentation/diagnostic.ex` |
 | Runtime issue | `Formentation.Issue` | `lib/formentation/issue.ex` |
 | Origin struct | `Formentation.Origin` | `lib/formentation/origin.ex` |
-| Guards · policy pass · `origin_entries/1` | `Formentation.Source.Shared` | `lib/formentation/source/shared.ex` |
-| Metaschema translation | `Formentation.JSONSchema.Validator` | `lib/formentation/json_schema/validator.ex` |
+| Guards · policy pass · `origin_entries/1` | `Formentation.Definition.Source.Shared` | `lib/formentation/source/shared.ex` |
+| Metaschema translation | `Formentation.Definition.Source.JSONSchema.Validator` | `lib/formentation/json_schema/validator.ex` |
 | Projection-time diagnostic | `Formentation.Phoenix.RenderPreparation` | `lib/formentation/phoenix/render_preparation.ex` |
 
 ## Related notes

@@ -14,7 +14,7 @@ status: current
 
 *Covers Formentation as of 2026-08-07.*
 
-`Formentation.JSONSchema` compiles a **decoded** draft 2020-12 schema
+`Formentation.Definition.Source.JSONSchema` compiles a **decoded** draft 2020-12 schema
 document — the map you get from `JSON.decode!/1`, with string keys — into
 the same kind of definition the
 [[declaring-with-the-map-source|map source]] produces. Presentation intent

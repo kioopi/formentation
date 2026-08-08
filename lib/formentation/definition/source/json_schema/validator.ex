@@ -1,4 +1,4 @@
-defmodule Formentation.JSONSchema.Validator do
+defmodule Formentation.Definition.Source.JSONSchema.Validator do
   @moduledoc """
   Thin adapter around the chosen JSON Schema validator, JSV (D-008).
   Validates a schema document against the draft 2020-12 metaschema —

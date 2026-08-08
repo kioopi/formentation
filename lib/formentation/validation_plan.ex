@@ -9,11 +9,11 @@ defmodule Formentation.ValidationPlan do
   one plan.
 
       iex> plan = %Formentation.ValidationPlan{
-      ...>   module: Formentation.JSONSchema.Validator,
+      ...>   module: Formentation.Definition.Source.JSONSchema.Validator,
       ...>   artifact: {:opaque, 1}
       ...> }
       iex> {plan.module, plan.artifact}
-      {Formentation.JSONSchema.Validator, {:opaque, 1}}
+      {Formentation.Definition.Source.JSONSchema.Validator, {:opaque, 1}}
   """
 
   @enforce_keys [:module, :artifact]

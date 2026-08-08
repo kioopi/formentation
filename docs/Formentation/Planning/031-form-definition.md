@@ -392,7 +392,7 @@ It may require a `:money_input` widget. It does not contain the Phoenix componen
 
 ### It is the compiler’s product
 
-The compiler’s primary responsibility is to produce a valid definition (the `Formentation.Source` adapter contract — [[18-decisions#D-004 — Two declaration sources from the start|D-004]]):
+The compiler’s primary responsibility is to produce a valid definition (the `Formentation.Definition.Source` adapter contract — [[18-decisions#D-004 — Two declaration sources from the start|D-004]]):
 
 ```elixir
 {:ok, definition, diagnostics} | {:error, diagnostics}

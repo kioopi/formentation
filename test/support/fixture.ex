@@ -2,7 +2,7 @@ defmodule Formentation.Fixture do
   @moduledoc """
   Contract every differential fixture implements: one form declared
   through each declaration source (D-004), so tests can compile the same
-  fixture via `Formentation.Source.Map` and `Formentation.JSONSchema`
+  fixture via `Formentation.Definition.Source.Map` and `Formentation.Definition.Source.JSONSchema`
   and compare the results fact by fact.
   """
 

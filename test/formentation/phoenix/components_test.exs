@@ -12,14 +12,14 @@ defmodule Formentation.Phoenix.ComponentsTest do
 
   defp compile!(declaration) do
     {:ok, definition, _diagnostics} =
-      Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
 
     definition
   end
 
   defp compile_json!(schema) do
     {:ok, definition, _diagnostics} =
-      Formentation.compile(schema, adapter: Formentation.JSONSchema)
+      Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
 
     definition
   end
@@ -683,7 +683,9 @@ defmodule Formentation.Phoenix.ComponentsTest do
 
       form =
         FormData.to_form(
-          %Formentation.SourceFixture{params: %{"serial_number" => "PX-1", "address" => %{}}},
+          %Formentation.SourceFixture{
+            params: %{"serial_number" => "PX-1", "address" => %{}}
+          },
           as: "payload"
         )
 

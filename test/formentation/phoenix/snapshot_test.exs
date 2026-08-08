@@ -17,7 +17,9 @@ defmodule Formentation.Phoenix.SnapshotTest do
   # rendered markup remains significant; editor formatting should fail this test.
   test "the end-to-end example renders as reviewed" do
     {:ok, definition, _diagnostics} =
-      Formentation.compile(PumpInspection.map_source(), adapter: Formentation.Source.Map)
+      Formentation.compile(PumpInspection.map_source(),
+        adapter: Formentation.Definition.Source.Map
+      )
 
     data = %{
       "serial_number" => "PX-2044",

@@ -29,7 +29,7 @@ defmodule Formentation.FormSubmissionTest do
     }
 
     {:ok, definition, _diagnostics} =
-      Formentation.compile(schema, adapter: Formentation.JSONSchema)
+      Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
 
     definition
   end
@@ -240,7 +240,7 @@ defmodule Formentation.FormSubmissionTest do
       }
 
       {:ok, definition, _diagnostics} =
-        Formentation.compile(schema, adapter: Formentation.JSONSchema)
+        Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
 
       assert {:error, submitted_form} = Form.submit(Form.new(definition), %{"title" => "No"})
 
@@ -363,7 +363,7 @@ defmodule Formentation.FormSubmissionTest do
             kind: :object,
             properties: [{"age", %{kind: :integer}}, {"attachment", %{kind: :file}}]
           },
-          adapter: Formentation.Source.Map
+          adapter: Formentation.Definition.Source.Map
         )
 
       form = definition |> Form.new(%{}) |> submitted_form(%{"age" => "not-a-number"})
@@ -378,7 +378,7 @@ defmodule Formentation.FormSubmissionTest do
   # source-neutral missing-required fallback (issues: []).
   defp compile_map(declaration) do
     {:ok, definition, _diagnostics} =
-      Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
 
     definition
   end

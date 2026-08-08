@@ -5,25 +5,31 @@ defmodule Formentation.FacadeTest do
 
   defmodule SpyAdapter do
     @moduledoc false
-    @behaviour Formentation.Source
+    @behaviour Formentation.Definition.Source
 
     @impl true
     def compile(source, opts) do
       if pid = opts[:notify], do: send(pid, {:spy_adapter_opts, opts})
 
       case Keyword.fetch(opts, :result) do
-        {:ok, result} -> result
-        :error -> Formentation.Source.Map.compile(source, Keyword.drop(opts, [:notify, :result]))
+        {:ok, result} ->
+          result
+
+        :error ->
+          Formentation.Definition.Source.Map.compile(
+            source,
+            Keyword.drop(opts, [:notify, :result])
+          )
       end
     end
   end
 
   defmodule BareAdapter do
     @moduledoc false
-    # Deliberately does NOT declare `@behaviour Formentation.Source`: the
+    # Deliberately does NOT declare `@behaviour Formentation.Definition.Source`: the
     # resolver checks the callable contract, not behaviour metadata, so a
     # third-party module need not retain that metadata at runtime.
-    def compile(source, opts), do: Formentation.Source.Map.compile(source, opts)
+    def compile(source, opts), do: Formentation.Definition.Source.Map.compile(source, opts)
   end
 
   defp form_declaration do
@@ -37,7 +43,7 @@ defmodule Formentation.FacadeTest do
   end
 
   describe "compile/2 symbolic selectors" do
-    test ":map selector produces the same result as the Formentation.Source.Map module" do
+    test ":map selector produces the same result as the Formentation.Definition.Source.Map module" do
       declaration = %{
         kind: :object,
         properties: [{"name", %{kind: :string}}]
@@ -46,10 +52,12 @@ defmodule Formentation.FacadeTest do
       result = Formentation.compile(declaration, adapter: :map)
 
       assert {:ok, %Definition{}, []} = result
-      assert result == Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
+      assert result ==
+               Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
     end
 
-    test ":json_schema selector produces the same result as the Formentation.JSONSchema module, including ui hints" do
+    test ":json_schema selector produces the same result as the Formentation.Definition.Source.JSONSchema module, including ui hints" do
       schema = %{
         "type" => "object",
         "properties" => %{
@@ -71,7 +79,12 @@ defmodule Formentation.FacadeTest do
       result = Formentation.compile(schema, adapter: :json_schema, ui: ui)
 
       assert {:ok, %Definition{}, []} = result
-      assert result == Formentation.compile(schema, adapter: Formentation.JSONSchema, ui: ui)
+
+      assert result ==
+               Formentation.compile(schema,
+                 adapter: Formentation.Definition.Source.JSONSchema,
+                 ui: ui
+               )
     end
 
     test "both routes fail identically for an invalid declaration" do
@@ -80,7 +93,7 @@ defmodule Formentation.FacadeTest do
       result = Formentation.compile(invalid, adapter: :map)
 
       assert {:error, [_ | _]} = result
-      assert result == Formentation.compile(invalid, adapter: Formentation.Source.Map)
+      assert result == Formentation.compile(invalid, adapter: Formentation.Definition.Source.Map)
     end
   end
 
@@ -143,14 +156,14 @@ defmodule Formentation.FacadeTest do
       declaration = %{kind: :object, properties: [{"name", %{kind: :string}}]}
 
       assert Formentation.compile(declaration, adapter: SpyAdapter) ==
-               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+               Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
     end
 
     test "accepts a module exporting compile/2 without declaring the behaviour" do
       declaration = %{kind: :object, properties: [{"name", %{kind: :string}}]}
 
       assert Formentation.compile(declaration, adapter: BareAdapter) ==
-               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+               Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
     end
 
     test "forwards only the non-:adapter options to compile/2" do

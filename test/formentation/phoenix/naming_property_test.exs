@@ -29,7 +29,7 @@ defmodule Formentation.Phoenix.NamingPropertyTest do
 
       {:ok, definition, []} =
         Formentation.compile(%{kind: :object, properties: properties},
-          adapter: Formentation.Source.Map
+          adapter: Formentation.Definition.Source.Map
         )
 
       {definition, as_name}

@@ -1,4 +1,4 @@
-defmodule Formentation.Source.Shared do
+defmodule Formentation.Definition.Source.Shared do
   @moduledoc false
 
   alias Formentation.Definition.{Finalizer, Presentation, Semantic}

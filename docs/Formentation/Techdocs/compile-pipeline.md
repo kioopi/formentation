@@ -50,7 +50,7 @@ flowchart TD
 
 ### 1. Entry — `Formentation.compile/2` and `Formentation.form/2`
 
-`compile(declaration, adapter: :map)` is one public entry point. It resolves `:adapter` — a stable built-in selector (`:map` for `Formentation.Source.Map`, `:json_schema` for `Formentation.JSONSchema`), or any module exporting `compile/2` (the extension route for third-party adapters) — passes the rest through, and delegates to that adapter. Resolution failures (a missing, unsupported, or invalid `:adapter`) raise `ArgumentError` at this boundary rather than producing a diagnostic, since no adapter has run yet. Beyond that resolution, it carries no logic of its own — source selection is the only decision made here. ([[18-decisions#D-046 — Adapter resolution failures raise; compilation failures stay diagnostics|D-046]])
+`compile(declaration, adapter: :map)` is one public entry point. It resolves `:adapter` — a stable built-in selector (`:map` for `Formentation.Definition.Source.Map`, `:json_schema` for `Formentation.Definition.Source.JSONSchema`), or any module exporting `compile/2` (the extension route for third-party adapters) — passes the rest through, and delegates to that adapter. Resolution failures (a missing, unsupported, or invalid `:adapter`) raise `ArgumentError` at this boundary rather than producing a diagnostic, since no adapter has run yet. Beyond that resolution, it carries no logic of its own — source selection is the only decision made here. ([[18-decisions#D-046 — Adapter resolution failures raise; compilation failures stay diagnostics|D-046]])
 
 `Formentation.form/2` is the second public entry point: a compile-and-initialize façade. It extracts `data:` (defaulting to `%{}`) and `defaults:` from the option list for `Formentation.Form.new/3`, partitions them so an adapter can never receive `:data` or `:defaults` even if it takes options by those names (the escape hatch for that case is `compile/2` + `Form.new/3`), and forwards every other option to `compile/2` in original order. It only initializes a form after successful compilation; if compilation fails, the form is never built and `Form.new/3` is not called.
 
@@ -68,12 +68,12 @@ A successful `compile/2` still returns diagnostics (warnings, unsupported constr
 
 ### 2. Source adapter — declaration → `Definition`
 
-The adapter is where the real work happens. Every adapter implements the [[source-adapters|`Formentation.Source`]] behaviour (`compile/2`, the same contract as above) and performs a recursive descent over the declaration, building the node tree top-down. A shared `Formentation.Source.Shared.Context` threads the current [[paths-and-identity|template path]], the remaining depth, and a node budget through the walk, so every adapter enforces the same structural guards and stamps [[diagnostics-and-origins|origins]] the same way.
+The adapter is where the real work happens. Every adapter implements the [[source-adapters|`Formentation.Definition.Source`]] behaviour (`compile/2`, the same contract as above) and performs a recursive descent over the declaration, building the node tree top-down. A shared `Formentation.Definition.Source.Shared.Context` threads the current [[paths-and-identity|template path]], the remaining depth, and a node budget through the walk, so every adapter enforces the same structural guards and stamps [[diagnostics-and-origins|origins]] the same way.
 
 Two adapters exist today:
 
-- **`Formentation.Source.Map`** — a plain-Elixir data source, zero dependencies. The reference adapter and the cheapest fixture format.
-- **`Formentation.JSONSchema`** — the JSON Schema adapter for a pinned 2020-12 subset, gated by a JSV metaschema pre-pass (`JSONSchema.Validator`) and carrying the UI-hints vocabulary (`order`, `groups`, `fields.*.widget|help`).
+- **`Formentation.Definition.Source.Map`** — a plain-Elixir data source, zero dependencies. The reference adapter and the cheapest fixture format.
+- **`Formentation.Definition.Source.JSONSchema`** — the JSON Schema adapter for a pinned 2020-12 subset, gated by a JSV metaschema pre-pass (`JSONSchema.Validator`) and carrying the UI-hints vocabulary (`order`, `groups`, `fields.*.widget|help`).
 
 Both are held to a **differential property**: compiling the same form through either adapter yields `Info`-equivalent definitions, differing only in origins. That test is what makes "source-independent" a checked claim rather than an aspiration ([[18-decisions#D-004 — Two declaration sources from the start|D-004]] — design/roadmap).
 
@@ -113,11 +113,11 @@ The pipeline stops at `Info`. It produces meaning, not markup: no projection, no
 | Concern | Module | File |
 | --- | --- | --- |
 | Entry point | `Formentation` | `lib/formentation.ex` |
-| Adapter contract | `Formentation.Source` | `lib/formentation/source.ex` |
-| Map adapter | `Formentation.Source.Map` | `lib/formentation/source/map.ex` |
-| JSON Schema adapter | `Formentation.JSONSchema` | `lib/formentation/json_schema.ex` |
-| Schema validator | `Formentation.JSONSchema.Validator` | `lib/formentation/json_schema/validator.ex` |
-| Shared walk context | `Formentation.Source.Shared` | `lib/formentation/source/shared.ex` |
+| Adapter contract | `Formentation.Definition.Source` | `lib/formentation/source.ex` |
+| Map adapter | `Formentation.Definition.Source.Map` | `lib/formentation/source/map.ex` |
+| JSON Schema adapter | `Formentation.Definition.Source.JSONSchema` | `lib/formentation/json_schema.ex` |
+| Schema validator | `Formentation.Definition.Source.JSONSchema.Validator` | `lib/formentation/json_schema/validator.ex` |
+| Shared walk context | `Formentation.Definition.Source.Shared` | `lib/formentation/source/shared.ex` |
 | Compiled definition | `Formentation.Definition` | `lib/formentation/definition.ex` |
 | Semantic storage | `Formentation.Definition.Semantic.Object` · `Semantic.Field` · `Semantic.Unsupported` | `lib/formentation/semantic/` |
 | Presentation storage | `Formentation.Definition.Presentation.Object` · `Presentation.Field` · `Presentation.Group` | `lib/formentation/presentation/` |
