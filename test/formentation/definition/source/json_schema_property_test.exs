@@ -1,4 +1,4 @@
-defmodule Formentation.JSONSchemaPropertyTest do
+defmodule Formentation.Definition.Source.JSONSchemaPropertyTest do
   # async: false — the atom-count assertion measures the global VM atom
   # table, which would otherwise race against atoms allocated by
   # concurrently running async test suites.
@@ -9,7 +9,7 @@ defmodule Formentation.JSONSchemaPropertyTest do
     check all(depth <- StreamData.integer(1..30)) do
       result =
         Formentation.compile(nested(depth),
-          adapter: Formentation.JSONSchema,
+          adapter: Formentation.Definition.Source.JSONSchema,
           max_depth: 16
         )
 
@@ -30,7 +30,7 @@ defmodule Formentation.JSONSchemaPropertyTest do
 
       result =
         Formentation.compile(%{"type" => "object", "properties" => properties},
-          adapter: Formentation.JSONSchema,
+          adapter: Formentation.Definition.Source.JSONSchema,
           max_nodes: 20
         )
 
@@ -58,7 +58,7 @@ defmodule Formentation.JSONSchemaPropertyTest do
     {:ok, _, _} =
       Formentation.compile(
         %{"type" => "object", "properties" => %{"warmup" => %{"type" => "string"}}},
-        adapter: Formentation.JSONSchema,
+        adapter: Formentation.Definition.Source.JSONSchema,
         ui: %{
           "order" => ["warmup", "bogus"],
           "groups" => [%{"id" => "g", "title" => "G", "fields" => ["warmup"]}],
@@ -95,7 +95,7 @@ defmodule Formentation.JSONSchemaPropertyTest do
 
     {:ok, definition, _diagnostics} =
       Formentation.compile(%{"type" => "object", "properties" => properties},
-        adapter: Formentation.JSONSchema,
+        adapter: Formentation.Definition.Source.JSONSchema,
         ui: ui
       )
 
@@ -114,7 +114,7 @@ defmodule Formentation.JSONSchemaPropertyTest do
 
       {:ok, definition, _diagnostics} =
         Formentation.compile(%{"type" => "object", "properties" => properties},
-          adapter: Formentation.JSONSchema
+          adapter: Formentation.Definition.Source.JSONSchema
         )
 
       assert Enum.map(Formentation.Info.fields(definition), & &1.name) == Enum.sort(names)
@@ -126,7 +126,7 @@ defmodule Formentation.JSONSchemaPropertyTest do
       compile = fn ->
         {:ok, definition, []} =
           Formentation.compile(fixture.json_schema(),
-            adapter: Formentation.JSONSchema,
+            adapter: Formentation.Definition.Source.JSONSchema,
             ui: fixture.ui_hints()
           )
 

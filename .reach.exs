@@ -8,11 +8,23 @@
   layers: [
     # Pure structural core: paths, nodes, definition, diagnostics, runtime
     # form state, codecs, transport. Source-independent and framework-free.
+    #
+    # NOTE: `Formentation.Definition.*` cannot be used as a wildcard here.
+    # The source adapters now live under Formentation.Definition.Source, and
+    # `forbid_multiple_matches: true` rejects a module that matches both this
+    # layer and :source/:json_schema. Each Definition sub-namespace is listed
+    # explicitly instead; a new one must be added here or layer_coverage's
+    # require_all_modules fails the build.
     core: [
       "Formentation",
       "Formentation.Codec",
       "Formentation.Definition",
-      "Formentation.Definition.*",
+      "Formentation.Definition.Finalizer",
+      "Formentation.Definition.Finalizer.*",
+      "Formentation.Definition.Presentation",
+      "Formentation.Definition.Presentation.*",
+      "Formentation.Definition.Semantic",
+      "Formentation.Definition.Semantic.*",
       "Formentation.Diagnostic",
       "Formentation.Form",
       "Formentation.Form.*",
@@ -33,9 +45,19 @@
     ],
     # Declaration-source adapters. The map source is the in-core reference
     # adapter (D-004); Source.Shared holds adapter-generic compile helpers.
-    source: ["Formentation.Source", "Formentation.Source.*"],
+    # Enumerated rather than wildcarded so the JSON Schema adapter below
+    # stays a distinct layer — see the note on :core.
+    source: [
+      "Formentation.Definition.Source",
+      "Formentation.Definition.Source.Map",
+      "Formentation.Definition.Source.Shared",
+      "Formentation.Definition.Source.Shared.*"
+    ],
     # JSON Schema adapter — the only namespace allowed to touch JSV (D-008).
-    json_schema: ["Formentation.JSONSchema", "Formentation.JSONSchema.*"],
+    json_schema: [
+      "Formentation.Definition.Source.JSONSchema",
+      "Formentation.Definition.Source.JSONSchema.*"
+    ],
     # Phoenix projection layer (D-017). The FormData protocol impl is named
     # Phoenix.HTML.FormData.Formentation.Form by defimpl, hence the second
     # pattern. Formentation.Phoenix itself (the public component surface)
@@ -96,7 +118,8 @@
       # "zero Phoenix dependency").
       {"Formentation.*", ["Phoenix.*"], except: ["Formentation.Phoenix.*"]},
       # JSV never leaks past its swap point (D-008).
-      {"Formentation.*", ["JSV.*"], except: ["Formentation.JSONSchema.Validator"]},
+      {"Formentation.*", ["JSV.*"],
+       except: ["Formentation.Definition.Source.JSONSchema.Validator"]},
       # Render preparation dispatches state-dependent decisions only through
       # Formentation.Phoenix.StateView (D-027); it must never call into
       # Formentation.Form directly. The {:phoenix, :core} layer dependency
@@ -152,10 +175,10 @@
   ],
   boundaries: [
     # Shared compile helpers are implementation detail of the adapters.
-    internal: ["Formentation.Source.Shared"],
+    internal: ["Formentation.Definition.Source.Shared"],
     internal_callers: [
-      {"Formentation.Source.Shared",
-       ["Formentation.Source.*", "Formentation.JSONSchema", "Formentation.JSONSchema.*"]}
+      {"Formentation.Definition.Source.Shared",
+       ["Formentation.Definition.Source.*"]}
     ]
   ],
   smells: [
@@ -213,8 +236,9 @@
   tests: [
     hints: [
       {"lib/formentation/phoenix/**", ["test/formentation/phoenix"]},
-      {"lib/formentation/json_schema/**", ["test/formentation/json_schema"]},
-      {"lib/formentation/source/**", ["test/formentation/source"]},
+      {"lib/formentation/definition/source/json_schema/**",
+       ["test/formentation/definition/source/json_schema"]},
+      {"lib/formentation/definition/source/**", ["test/formentation/definition/source"]},
       {"lib/formentation/form.ex",
        ["test/formentation/form_test.exs", "test/formentation/form_property_test.exs"]}
     ]

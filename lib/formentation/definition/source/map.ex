@@ -1,4 +1,4 @@
-defmodule Formentation.Source.Map do
+defmodule Formentation.Definition.Source.Map do
   @moduledoc """
   Plain Elixir data declaration source — the reference adapter and
   cheapest fixture format (D-004). Lives in core with zero dependencies.
@@ -12,11 +12,11 @@ defmodule Formentation.Source.Map do
   `:one_of` produce an `:invalid_declaration` error.
   """
 
-  @behaviour Formentation.Source
+  @behaviour Formentation.Definition.Source
 
   alias Formentation.Definition.{Presentation, Semantic}
+  alias Formentation.Definition.Source.Shared
   alias Formentation.{Diagnostic, NodeId, TemplatePath}
-  alias Formentation.Source.Shared
 
   @scalar_kinds [:string, :integer, :number, :boolean]
 

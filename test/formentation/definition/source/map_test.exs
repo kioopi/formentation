@@ -1,4 +1,4 @@
-defmodule Formentation.Source.MapTest do
+defmodule Formentation.Definition.Source.MapTest do
   use ExUnit.Case, async: true
 
   alias Formentation.Definition.{Presentation, Semantic}
@@ -7,7 +7,7 @@ defmodule Formentation.Source.MapTest do
 
   defp compile!(declaration, opts \\ []) do
     {:ok, definition, _diagnostics} =
-      Formentation.compile(declaration, [adapter: Formentation.Source.Map] ++ opts)
+      Formentation.compile(declaration, [adapter: Formentation.Definition.Source.Map] ++ opts)
 
     definition
   end
@@ -178,7 +178,8 @@ defmodule Formentation.Source.MapTest do
         ]
       }
 
-      {:ok, definition, []} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      {:ok, definition, []} =
+        Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
 
       for {name, expected} <- [
             {"name", :string},
@@ -251,7 +252,7 @@ defmodule Formentation.Source.MapTest do
       }
 
       assert {:ok, definition, diagnostics} =
-               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+               Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
 
       assert [
                %Formentation.Diagnostic{
@@ -306,7 +307,7 @@ defmodule Formentation.Source.MapTest do
                   origin: {:map_source, [:properties, "condition", :one_of, 1]},
                   template_path: %{segments: ["condition"]}
                 }
-              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+              ]} = Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
     end
 
     test "a non-list non-nil one_of value fails compilation with structured diagnostic" do
@@ -326,7 +327,7 @@ defmodule Formentation.Source.MapTest do
                   origin: {:map_source, [:properties, "condition", :one_of]},
                   template_path: %{segments: ["condition"]}
                 }
-              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+              ]} = Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
     end
 
     test "unsupported option values return invalid_declaration diagnostic" do
@@ -353,7 +354,8 @@ defmodule Formentation.Source.MapTest do
                     origin: {:map_source, [:properties, "field", :one_of, 0]},
                     message: msg
                   }
-                ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+                ]} =
+                 Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
 
         assert msg =~ desc
       end
@@ -375,7 +377,7 @@ defmodule Formentation.Source.MapTest do
                   origin: {:map_source, [:properties, "choice", :one_of, 1]},
                   message: msg
                 }
-              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+              ]} = Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
 
       assert msg =~ "one_of option 1"
       assert msg =~ "%{first: 1}"
@@ -389,7 +391,7 @@ defmodule Formentation.Source.MapTest do
         ]
       }
 
-      result = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      result = Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
 
       assert {:error,
               [
@@ -606,7 +608,7 @@ defmodule Formentation.Source.MapTest do
       }
 
       {:ok, definition, diagnostics} =
-        Formentation.compile(declaration, adapter: Formentation.Source.Map)
+        Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
 
       assert [
                %Formentation.Diagnostic{
@@ -645,7 +647,7 @@ defmodule Formentation.Source.MapTest do
       }
 
       {:ok, definition, diagnostics} =
-        Formentation.compile(declaration, adapter: Formentation.Source.Map)
+        Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
 
       assert [
                %Formentation.Diagnostic{
@@ -966,14 +968,14 @@ defmodule Formentation.Source.MapTest do
   describe "invalid and unsupported declarations" do
     test "a non-object root is an invalid_declaration error" do
       assert {:error, [%Formentation.Diagnostic{severity: :error, code: :invalid_declaration}]} =
-               Formentation.compile(%{kind: :string}, adapter: Formentation.Source.Map)
+               Formentation.compile(%{kind: :string}, adapter: Formentation.Definition.Source.Map)
     end
 
     test "a property spec without a kind is an invalid_declaration error" do
       declaration = %{kind: :object, properties: [{"broken", %{title: "No kind"}}]}
 
       assert {:error, [%Formentation.Diagnostic{code: :invalid_declaration}]} =
-               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+               Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
     end
 
     test "a non-list properties value is an invalid_declaration error" do
@@ -983,7 +985,7 @@ defmodule Formentation.Source.MapTest do
       }
 
       assert {:error, [%Formentation.Diagnostic{severity: :error, code: :invalid_declaration}]} =
-               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+               Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
     end
 
     test "duplicate property names are a duplicate_property error" do
@@ -1001,7 +1003,7 @@ defmodule Formentation.Source.MapTest do
                   origin: {:map_source, [:properties, "x"]},
                   template_path: %{segments: ["x"]}
                 }
-              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+              ]} = Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
     end
 
     test "nested duplicate property names report the nested path" do
@@ -1025,7 +1027,7 @@ defmodule Formentation.Source.MapTest do
                   origin: {:map_source, [:properties, "outer", :properties, "x"]},
                   template_path: %{segments: ["outer", "x"]}
                 }
-              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+              ]} = Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
     end
 
     test "a non-list required value is an invalid_declaration error" do
@@ -1036,7 +1038,7 @@ defmodule Formentation.Source.MapTest do
       }
 
       assert {:error, [%Formentation.Diagnostic{severity: :error, code: :invalid_declaration}]} =
-               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+               Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
     end
 
     test "a non-list groups value is an invalid_declaration error" do
@@ -1047,7 +1049,7 @@ defmodule Formentation.Source.MapTest do
       }
 
       assert {:error, [%Formentation.Diagnostic{severity: :error, code: :invalid_declaration}]} =
-               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+               Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
     end
 
     test "a group entry missing :fields is an invalid_declaration error" do
@@ -1058,7 +1060,7 @@ defmodule Formentation.Source.MapTest do
       }
 
       assert {:error, [%Formentation.Diagnostic{severity: :error, code: :invalid_declaration}]} =
-               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+               Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
     end
 
     test "an unknown kind compiles to an unsupported node plus a warning" do
@@ -1068,7 +1070,7 @@ defmodule Formentation.Source.MapTest do
       }
 
       {:ok, definition, diagnostics} =
-        Formentation.compile(declaration, adapter: Formentation.Source.Map)
+        Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
 
       assert [%Formentation.Diagnostic{severity: :warning, code: :unsupported_kind}] =
                diagnostics
@@ -1086,7 +1088,7 @@ defmodule Formentation.Source.MapTest do
       }
 
       {:ok, definition, _diagnostics} =
-        Formentation.compile(declaration, adapter: Formentation.Source.Map)
+        Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
 
       assert %Semantic.Unsupported{required?: true} = Info.node_at(definition, ["gadget"])
     end
@@ -1097,14 +1099,20 @@ defmodule Formentation.Source.MapTest do
       declaration = %{kind: :object, properties: [{"a", %{kind: :string}}]}
 
       assert {:error, [%Formentation.Diagnostic{code: :max_nodes_exceeded}]} =
-               Formentation.compile(declaration, adapter: Formentation.Source.Map, max_nodes: 0)
+               Formentation.compile(declaration,
+                 adapter: Formentation.Definition.Source.Map,
+                 max_nodes: 0
+               )
     end
 
     test "a negative max_nodes errors immediately with max_nodes_exceeded" do
       declaration = %{kind: :object, properties: [{"a", %{kind: :string}}]}
 
       assert {:error, [%Formentation.Diagnostic{code: :max_nodes_exceeded}]} =
-               Formentation.compile(declaration, adapter: Formentation.Source.Map, max_nodes: -1)
+               Formentation.compile(declaration,
+                 adapter: Formentation.Definition.Source.Map,
+                 max_nodes: -1
+               )
     end
   end
 
@@ -1140,7 +1148,7 @@ defmodule Formentation.Source.MapTest do
       {:error, [diagnostic]} =
         Formentation.compile(
           %{kind: :object, properties: [{"name", %{kind: :string, examples: "oops"}}]},
-          adapter: Formentation.Source.Map
+          adapter: Formentation.Definition.Source.Map
         )
 
       assert diagnostic.code == :invalid_declaration
@@ -1211,7 +1219,7 @@ defmodule Formentation.Source.MapTest do
       {:error, [diagnostic]} =
         Formentation.compile(
           %{kind: :object, properties: [{"name", %{kind: :string, examples: nil}}]},
-          adapter: Formentation.Source.Map
+          adapter: Formentation.Definition.Source.Map
         )
 
       assert diagnostic.code == :invalid_declaration
@@ -1238,7 +1246,7 @@ defmodule Formentation.Source.MapTest do
       }
 
       {:ok, _definition, diagnostics} =
-        Formentation.compile(declaration, adapter: Formentation.Source.Map)
+        Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
 
       assert [%Formentation.Diagnostic{severity: :warning, code: :required_permits_empty} = d] =
                diagnostics
@@ -1254,7 +1262,7 @@ defmodule Formentation.Source.MapTest do
         declaration = %{kind: :object, required: ["name"], properties: properties}
 
         {:ok, _definition, diagnostics} =
-          Formentation.compile(declaration, adapter: Formentation.Source.Map)
+          Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
 
         assert diagnostics == []
       end
@@ -1262,7 +1270,7 @@ defmodule Formentation.Source.MapTest do
       {:ok, _definition, []} =
         Formentation.compile(
           %{kind: :object, properties: [{"name", %{kind: :string}}]},
-          adapter: Formentation.Source.Map
+          adapter: Formentation.Definition.Source.Map
         )
     end
 
@@ -1274,7 +1282,7 @@ defmodule Formentation.Source.MapTest do
       }
 
       {:ok, _definition, diagnostics} =
-        Formentation.compile(declaration, adapter: Formentation.Source.Map)
+        Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
 
       assert [%Formentation.Diagnostic{code: :required_permits_empty}] = diagnostics
     end
@@ -1290,7 +1298,7 @@ defmodule Formentation.Source.MapTest do
       }
 
       {:ok, _definition, diagnostics} =
-        Formentation.compile(declaration, adapter: Formentation.Source.Map)
+        Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
 
       codes = Enum.map(diagnostics, & &1.code)
       assert Enum.count(codes, &(&1 == :reserved_property_name)) == 2

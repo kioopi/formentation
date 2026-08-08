@@ -46,7 +46,7 @@ Running log of architecture decisions, ADR-style but lightweight. Each entry rec
 
 **Context.** "Source-independent definition" was the central claim, but the original roadmap would not have tested it against a second source until Ash integration in the final phase. An IR validated against one source quietly mirrors that source.
 
-**Decision.** Phase 1 ships two source adapters: the JSON Schema adapter and a plain Elixir data source (`Formentation.Source.Map`, working name) living in core with zero dependencies. The same fixture form compiles from both, and a differential test asserts the definitions answer `Info` queries identically apart from origins. See [[17-end-to-end-example|the end-to-end example]] for both declarations.
+**Decision.** Phase 1 ships two source adapters: the JSON Schema adapter and a plain Elixir data source (`Formentation.Definition.Source.Map`, working name) living in core with zero dependencies. The same fixture form compiles from both, and a differential test asserts the definitions answer `Info` queries identically apart from origins. See [[17-end-to-end-example|the end-to-end example]] for both declarations.
 
 **Consequences.** The map source doubles as the reference adapter, the cheapest fixture format for tests, and a useful escape hatch for application-defined forms. Cost: a second (small) vocabulary to keep honest. The differential test must define equivalence explicitly (ordering, origins, defaults).
 
@@ -94,7 +94,7 @@ Running log of architecture decisions, ADR-style but lightweight. Each entry rec
 
 **Context.** [[phase-1-walking-skeleton|Phase 1]] required choosing one validator after evaluating ex_json_schema and JSV against the criteria in [[12-ecosystem-and-dependencies#JSON Schema|Ecosystem and dependencies]]. The fixture pins dialect 2020-12.
 
-**Decision.** JSV (`~> 0.21`). The dialect criterion was dispositive: ex_json_schema supports drafts 4/6/7 only, while JSV has compliance-suite-verified 2020-12 support, ships the metaschema family embedded (offline schema-document validation), returns structured errors with instance and schema locations, has a build-once API, and makes remote `$ref` fetching opt-in behind an allowlist. It sits behind `Formentation.JSONSchema.Validator` — the swap point — with contract tests in `test/formentation/json_schema/validator_test.exs`.
+**Decision.** JSV (`~> 0.21`). The dialect criterion was dispositive: ex_json_schema supports drafts 4/6/7 only, while JSV has compliance-suite-verified 2020-12 support, ships the metaschema family embedded (offline schema-document validation), returns structured errors with instance and schema locations, has a build-once API, and makes remote `$ref` fetching opt-in behind an allowlist. It sits behind `Formentation.Definition.Source.JSONSchema.Validator` — the swap point — with contract tests in `test/formentation/json_schema/validator_test.exs`.
 
 **Consequences.** Three extra runtime dependencies (`abnf_parsec`, `texture`, `idna`). `atoms: false` is explicit in the validator module; format enforcement stays at JSV's default (off). Instance validation (implementation strategy step 4 onwards) reuses the same build/validate flow.
 
@@ -289,7 +289,7 @@ unproven).
 
 *2026-07-25*
 
-**Context.** `Definition.validator` was an opaque artifact whose executor `Form` hard-coded to `Formentation.JSONSchema.Validator`, creating the core↔json_schema layer cycle that [[#D-018 — Reach is the architecture gate|D-018]] baselined, and blocking any other source from supplying authoritative validation without editing core.
+**Context.** `Definition.validator` was an opaque artifact whose executor `Form` hard-coded to `Formentation.Definition.Source.JSONSchema.Validator`, creating the core↔json_schema layer cycle that [[#D-018 — Reach is the architecture gate|D-018]] baselined, and blocking any other source from supplying authoritative validation without editing core.
 
 **Decision.** Introduce the core-owned `Formentation.Validation` behaviour (`@callback validate(artifact :: term(), instance :: map()) :: [Issue.t()]`) plus `Formentation.ValidationPlan{module, artifact}` carried on `Definition.validation`; `Form` dispatches `plan.module.validate(plan.artifact, instance)` and names no adapter; `Issue.source` is now `:decode | :validation`; JSON Schema is just one implementer ([[#D-008 — JSV is the JSON Schema validator|D-008]]); `format_version` bumped 1→2; the D-018 baseline and the `core→json_schema` exception are removed. Links: [[#D-008 — JSV is the JSON Schema validator|D-008]], [[#D-012 — Schema validation defers while any decode fails|D-012]], [[#D-018 — Reach is the architecture gate|D-018]].
 
@@ -879,7 +879,7 @@ unless `summary={true}`/`summary={false}` says otherwise, so composing under
 
 *2026-08-06*
 
-**Context.** `Formentation.Source.Map` previously copied `:one_of` options lists without validating list element types or verifying that `:one_of` was a list. This allowed malformed declarations like `one_of: [%{a: 1}]` or `one_of: "oops"` to compile without error and fail only during downstream rendering. Meanwhile, `Formentation.Definition.Semantic.Field` declares `@type option :: String.t() | number() | boolean()`.
+**Context.** `Formentation.Definition.Source.Map` previously copied `:one_of` options lists without validating list element types or verifying that `:one_of` was a list. This allowed malformed declarations like `one_of: [%{a: 1}]` or `one_of: "oops"` to compile without error and fail only during downstream rendering. Meanwhile, `Formentation.Definition.Semantic.Field` declares `@type option :: String.t() | number() | boolean()`.
 
 **Decision.** The Map source validates `:one_of` option declarations at the compilation boundary:
 - Valid option values must be scalars (`String.t()`, `number()`, or `boolean()`). Accepted values are retained verbatim without stringification, sorting, or deduplication.
@@ -1006,7 +1006,7 @@ unrescued; adapter exception totality remains a separate contract (see
 [GitHub issue #6](https://github.com/kioopi/formentation/issues/6)).
 
 Symbolic selection is a closed, explicit mapping (`:map` →
-`Formentation.Source.Map`, `:json_schema` → `Formentation.JSONSchema`), not a
+`Formentation.Definition.Source.Map`, `:json_schema` → `Formentation.Definition.Source.JSONSchema`), not a
 registry or source-shape inference — plain maps are inherently ambiguous
 between a map declaration and a decoded JSON Schema, so the adapter stays
 mandatory. Any other atom is accepted as a custom adapter module only when
@@ -1031,7 +1031,7 @@ any `FunctionClauseError` from invalid `data:` — unrescued.
 deterministically and legibly on adapter misconfiguration, replacing
 accidental exception types with an intentional one. Built-in adapter usage no
 longer needs to name an implementation module (`adapter: :map` instead of
-`adapter: Formentation.Source.Map`), while module adapters remain fully
+`adapter: Formentation.Definition.Source.Map`), while module adapters remain fully
 supported for both built-in and third-party sources. `Formentation.form/2`
 gives single-shot callers a compile-once-and-initialize path without
 duplicating `Form.new/3`'s default/apply/revalidate logic; callers who need
@@ -1047,7 +1047,7 @@ names an adapter" — the boundary
 [[#D-018 — Reach is the architecture gate|D-018]] and
 [[#D-025 — Instance validation dispatches through a source-neutral behaviour|D-025]]
 established. The closed selector mapping lives in core and therefore mentions
-`Formentation.Source.Map` and `Formentation.JSONSchema` literally. The gate
+`Formentation.Definition.Source.Map` and `Formentation.Definition.Source.JSONSchema` literally. The gate
 still passes, but only because a module literal returned as a value is not a
 call edge that Reach can see — not because the invariant is untouched. The
 rule's comments were corrected to record this as a deliberate, name-only
@@ -1056,7 +1056,7 @@ function directly) is unchanged, and no cycle is introduced.
 
 *The accepted adapter set is wider than "modules that look like adapters".*
 Because the check is `exports compile/2` rather than `implements
-Formentation.Source`, unrelated modules that happen to export `compile/2` —
+Formentation.Definition.Source`, unrelated modules that happen to export `compile/2` —
 `Regex` and `:re` among them — resolve successfully and then return a shape
 that violates the documented three-element contract, surfacing as a
 `MatchError`/`CaseClauseError` at the call site rather than a clear rejection.

@@ -1,4 +1,4 @@
-defmodule Formentation.Source do
+defmodule Formentation.Definition.Source do
   @moduledoc """
   Contract for declaration source adapters (D-004). An adapter translates
   source vocabulary into a compiled definition while stamping origins.

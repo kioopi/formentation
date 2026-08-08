@@ -4,7 +4,7 @@ Formentation compiles declarative descriptions of forms (JSON Schema, plain Elix
 
 **Status: pre-release, under active development.** Phase 1 (walking skeleton) is in progress, and the round trip — including the LiveView lifecycle — now runs end to end.
 
-`Formentation.compile/2` compiles plain Elixir data (`Formentation.Source.Map`) or a JSON Schema document — draft 2020-12, validated offline against the metaschema, with a UI-hints channel for ordering, presentation groups, and widget/help overrides (`Formentation.JSONSchema`) — into a `Formentation.Definition` queried through `Formentation.Info`, with origin provenance on every resolved value, structured diagnostics, and depth/node guards. A differential test asserts both sources answer `Info` queries identically apart from origins. `Formentation.Form` holds runtime state with pure replace transitions, typed decode policies, whole-instance validation deferred while any decode fails, and derived submission blockers for preserve-only nodes. That state implements `Phoenix.HTML.FormData`, and `Formentation.Phoenix.fields/1` renders it as accessible HTML through a reference theme — composing inside a form you wrote yourself. `Formentation.Form.validate/2` is the `phx-change` entry point; `Formentation.Form.submit/2` is the ordinary `phx-submit` entry point and returns `{:ok, candidate, submitted_form}` only when the submitted state is application-ready, otherwise `{:error, submitted_form}` for redisplay. Run `mix demo` to see it live: a pump-inspection form at `/`, a nested-object form at `/nested`, both backed by the same LiveViews `test/formentation_demo/` exercises.
+`Formentation.compile/2` compiles plain Elixir data (`Formentation.Definition.Source.Map`) or a JSON Schema document — draft 2020-12, validated offline against the metaschema, with a UI-hints channel for ordering, presentation groups, and widget/help overrides (`Formentation.Definition.Source.JSONSchema`) — into a `Formentation.Definition` queried through `Formentation.Info`, with origin provenance on every resolved value, structured diagnostics, and depth/node guards. A differential test asserts both sources answer `Info` queries identically apart from origins. `Formentation.Form` holds runtime state with pure replace transitions, typed decode policies, whole-instance validation deferred while any decode fails, and derived submission blockers for preserve-only nodes. That state implements `Phoenix.HTML.FormData`, and `Formentation.Phoenix.fields/1` renders it as accessible HTML through a reference theme — composing inside a form you wrote yourself. `Formentation.Form.validate/2` is the `phx-change` entry point; `Formentation.Form.submit/2` is the ordinary `phx-submit` entry point and returns `{:ok, candidate, submitted_form}` only when the submitted state is application-ready, otherwise `{:error, submitted_form}` for redisplay. Run `mix demo` to see it live: a pump-inspection form at `/`, a nested-object form at `/nested`, both backed by the same LiveViews `test/formentation_demo/` exercises.
 
 Remaining in Phase 1: collections. See [what isn't supported yet](docs/Formentation/Userguide/limitations.md) for the honest list.
 
@@ -36,7 +36,7 @@ all on Hex and resolve automatically.
 A form passes through a small number of named stages:
 
 - **Declaration** — what you write: a description of the form in some source vocabulary — plain Elixir data, or a JSON Schema document (draft 2020-12) with an optional UI-hints companion. See the [conceptual model](docs/Formentation/Planning/03-conceptual-model.md).
-- **Source adapter** — a module implementing the `Formentation.Source` behaviour that compiles a declaration into a definition. `Formentation.Source.Map` is the reference adapter; `Formentation.JSONSchema` compiles JSON Schema. See [source adapters](docs/Formentation/Techdocs/source-adapters.md).
+- **Source adapter** — a module implementing the `Formentation.Definition.Source` behaviour that compiles a declaration into a definition. `Formentation.Definition.Source.Map` is the reference adapter; `Formentation.Definition.Source.JSONSchema` compiles JSON Schema. See [source adapters](docs/Formentation/Techdocs/source-adapters.md).
 - **Definition** — the compiled result: static semantic storage plus a presentation layout tree, queried through `Formentation.Info`. See [Definition and Node](docs/Formentation/Techdocs/definition-and-node.md).
 - **Info** — the stable query surface. Renderers, tooling, and tests ask `Formentation.Info` questions (`fields/1`, `role/2`, `required?/2`, …) instead of pattern-matching definition internals.
 - **Form state** — a definition paired with the data, params, and interaction history of one filling-in. Pure and Phoenix-free. See [form state and transitions](docs/Formentation/Techdocs/form-state-and-transitions.md).
@@ -96,7 +96,7 @@ Transitions are pure and usable from IEx — no Phoenix required:
 
 ```elixir
 {:ok, definition, []} =
-  Formentation.compile(schema, adapter: Formentation.JSONSchema, ui: ui_hints)
+  Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema, ui: ui_hints)
 
 form = Formentation.Form.new(definition, %{"serial_number" => "PX-2044"})
 

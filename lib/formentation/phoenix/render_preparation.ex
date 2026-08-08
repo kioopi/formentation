@@ -28,7 +28,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
       iex> {:ok, definition, []} =
       ...>   Formentation.compile(
       ...>     %{kind: :object, properties: [{"email", %{kind: :string, role: :email}}]},
-      ...>     adapter: Formentation.Source.Map
+      ...>     adapter: Formentation.Definition.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
       iex> plan = Formentation.Phoenix.RenderPreparation.prepare(form, definition: definition)
@@ -47,7 +47,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
       iex> {:ok, definition, []} =
       ...>   Formentation.compile(
       ...>     %{kind: :object, properties: [{"email", %{kind: :string, role: :email}}]},
-      ...>     adapter: Formentation.Source.Map
+      ...>     adapter: Formentation.Definition.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
       iex> [field] = Formentation.Phoenix.RenderPreparation.prepare(form, definition: definition, dom_namespace: "asset_payload").root.children
@@ -80,7 +80,7 @@ defmodule Formentation.Phoenix.RenderPreparation do
       iex> {:ok, definition, []} =
       ...>   Formentation.compile(
       ...>     %{kind: :object, properties: [{"email", %{kind: :string, role: :email}}]},
-      ...>     adapter: Formentation.Source.Map
+      ...>     adapter: Formentation.Definition.Source.Map
       ...>   )
       iex> form = Phoenix.HTML.FormData.to_form(%{}, as: "payload")
       iex> node = Formentation.Phoenix.RenderPreparation.prepare_at(form, ["email"], definition: definition)

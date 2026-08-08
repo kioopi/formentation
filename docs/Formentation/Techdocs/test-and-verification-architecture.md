@@ -219,7 +219,7 @@ themselves are not this gate's business; they run under `mix test`.
 project with two adapters translating different vocabularies into the
 same tree, near-duplicate walks are the natural failure mode; the zero
 threshold is what pushed the shared logic into
-`Formentation.Source.Shared` rather than letting the adapters drift into
+`Formentation.Definition.Source.Shared` rather than letting the adapters drift into
 parallel copies.
 
 **`mix reach.check --arch --smells`** is the architecture gate
@@ -246,7 +246,7 @@ Instance validation used to be the one sanctioned core→adapter edge
 (`Formentation.Form` → `JSONSchema.Validator`), which forced a baselined
 core/`json_schema` layer cycle; that dispatch now goes through the
 core-owned `Formentation.Validation` behaviour, so the edge, its named
-exception, and the baseline file are all gone ([[18-decisions#D-025 — Instance validation dispatches through a source-neutral behaviour|D-025]]). Core now names both adapter modules (`Formentation.Source.Map` and `Formentation.JSONSchema`) literally, as values returned by `resolve_adapter!/1`; the gate stays green because a module literal returned as a value is not a call edge the reach tool can see — the invariant's essence still holds: core resolves an adapter but never names one in a call position.
+exception, and the baseline file are all gone ([[18-decisions#D-025 — Instance validation dispatches through a source-neutral behaviour|D-025]]). Core now names both adapter modules (`Formentation.Definition.Source.Map` and `Formentation.Definition.Source.JSONSchema`) literally, as values returned by `resolve_adapter!/1`; the gate stays green because a module literal returned as a value is not a call edge the reach tool can see — the invariant's essence still holds: core resolves an adapter but never names one in a call position.
 
 **The Phoenix boundary is checked twice, differently.** `reach` checks it
 by module pattern; `boundary_test.exs` walks the AST of every file

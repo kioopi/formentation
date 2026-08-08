@@ -18,7 +18,7 @@ A declaration source supplies facts from which a form can be described.
 Initial sources (two from the start, so source-independence is tested rather than assumed — [[18-decisions#D-004 — Two declaration sources from the start|D-004]]):
 
 - a JSON Schema document;
-- a plain Elixir data structure (`Formentation.Source.Map`, working name);
+- a plain Elixir data structure (`Formentation.Definition.Source.Map`, working name);
 - a UI-hints or `uiSchema`-style document accompanying either.
 
 Possible later sources:

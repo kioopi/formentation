@@ -14,7 +14,7 @@ status: current
 
 *Covers Formentation as of 2026-08-07.*
 
-`Formentation.Source.Map` takes a plain Elixir map. It has no
+`Formentation.Definition.Source.Map` takes a plain Elixir map. It has no
 dependencies, no separate hints document, and no schema validation — you
 write structure and presentation together, inline. It is the easiest
 source to start with and the one to use when your form is defined in

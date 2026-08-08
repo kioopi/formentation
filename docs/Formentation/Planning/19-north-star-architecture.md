@@ -355,7 +355,7 @@ Module selection stays valid everywhere and is what a third-party adapter uses:
 
 ```elixir
 Formentation.compile(schema,
-  adapter: Formentation.JSONSchema,
+  adapter: Formentation.Definition.Source.JSONSchema,
   ui: ui_hints
 )
 ```

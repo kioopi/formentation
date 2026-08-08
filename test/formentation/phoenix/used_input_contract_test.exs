@@ -25,7 +25,9 @@ defmodule Formentation.Phoenix.UsedInputContractTest do
       ]
     }
 
-    {:ok, definition, []} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    {:ok, definition, []} =
+      Formentation.compile(declaration, adapter: Formentation.Definition.Source.Map)
+
     definition
   end
 
@@ -176,7 +178,8 @@ defmodule Formentation.Phoenix.UsedInputContractTest do
       }
     }
 
-    {:ok, definition, []} = Formentation.compile(schema, adapter: Formentation.JSONSchema)
+    {:ok, definition, []} =
+      Formentation.compile(schema, adapter: Formentation.Definition.Source.JSONSchema)
 
     form_t1 =
       Form.transition(Form.new(definition), %Params{

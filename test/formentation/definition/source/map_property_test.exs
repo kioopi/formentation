@@ -1,4 +1,4 @@
-defmodule Formentation.Source.MapPropertyTest do
+defmodule Formentation.Definition.Source.MapPropertyTest do
   # async: false — the assertion measures the global VM atom table, which
   # would otherwise race against atoms allocated by concurrently running
   # async test suites.
@@ -10,7 +10,7 @@ defmodule Formentation.Source.MapPropertyTest do
     {:ok, _, _} =
       Formentation.compile(
         %{kind: :object, properties: [{"warmup", %{kind: :string}}]},
-        adapter: Formentation.Source.Map
+        adapter: Formentation.Definition.Source.Map
       )
 
     names = for i <- 1..50, do: "prop_#{System.unique_integer([:positive])}_#{i}"
@@ -32,7 +32,7 @@ defmodule Formentation.Source.MapPropertyTest do
 
     {:ok, definition, []} =
       Formentation.compile(%{kind: :object, properties: properties},
-        adapter: Formentation.Source.Map
+        adapter: Formentation.Definition.Source.Map
       )
 
     assert :erlang.system_info(:atom_count) == atoms_before
@@ -43,7 +43,7 @@ defmodule Formentation.Source.MapPropertyTest do
     check all(depth <- StreamData.integer(1..30)) do
       result =
         Formentation.compile(nested(depth),
-          adapter: Formentation.Source.Map,
+          adapter: Formentation.Definition.Source.Map,
           max_depth: 16
         )
 
@@ -64,7 +64,7 @@ defmodule Formentation.Source.MapPropertyTest do
 
       result =
         Formentation.compile(%{kind: :object, properties: properties},
-          adapter: Formentation.Source.Map,
+          adapter: Formentation.Definition.Source.Map,
           max_nodes: 20
         )
 

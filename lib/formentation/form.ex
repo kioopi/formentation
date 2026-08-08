@@ -15,7 +15,7 @@ defmodule Formentation.Form do
       iex> {:ok, definition, []} =
       ...>   Formentation.compile(
       ...>     %{kind: :object, properties: [{"age", %{kind: :integer}}]},
-      ...>     adapter: Formentation.Source.Map
+      ...>     adapter: Formentation.Definition.Source.Map
       ...>   )
       iex> form = Formentation.Form.new(definition)
       iex> {:ok, candidate, submitted_form} =
@@ -167,7 +167,7 @@ defmodule Formentation.Form do
       ...>   Formentation.compile(
       ...>     %{kind: :object, required: ["attachment"],
       ...>       properties: [{"attachment", %{kind: :file}}]},
-      ...>     adapter: Formentation.Source.Map
+      ...>     adapter: Formentation.Definition.Source.Map
       ...>   )
       iex> form = Formentation.Form.new(definition, %{})
       iex> match?({:blocked, [%Formentation.SubmissionBlocker{code: :unsupported_required}]},
@@ -228,7 +228,7 @@ defmodule Formentation.Form do
       iex> {:ok, definition, []} =
       ...>   Formentation.compile(
       ...>     %{kind: :object, properties: [{"a", %{kind: :string}}]},
-      ...>     adapter: Formentation.Source.Map
+      ...>     adapter: Formentation.Definition.Source.Map
       ...>   )
       iex> form = Formentation.Form.new(definition)
       iex> {:ok, _candidate, submitted_form} =
@@ -276,7 +276,7 @@ defmodule Formentation.Form do
       iex> {:ok, definition, []} =
       ...>   Formentation.compile(
       ...>     %{kind: :object, properties: [{"age", %{kind: :integer}}]},
-      ...>     adapter: Formentation.Source.Map
+      ...>     adapter: Formentation.Definition.Source.Map
       ...>   )
       iex> form = Formentation.Form.validate(Formentation.Form.new(definition), %{"age" => "42"})
       iex> {form.action, Formentation.Form.candidate(form)}
@@ -297,7 +297,7 @@ defmodule Formentation.Form do
       iex> {:ok, definition, []} =
       ...>   Formentation.compile(
       ...>     %{kind: :object, properties: [{"age", %{kind: :integer}}]},
-      ...>     adapter: Formentation.Source.Map
+      ...>     adapter: Formentation.Definition.Source.Map
       ...>   )
       iex> {:ok, candidate, submitted_form} =
       ...>   Formentation.Form.submit(Formentation.Form.new(definition), %{"age" => "42"})

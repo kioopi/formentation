@@ -29,11 +29,11 @@ defmodule Formentation.DifferentialTest do
     describe "#{fixture |> Module.split() |> List.last()}" do
       setup do
         {:ok, from_map, []} =
-          Formentation.compile(@fixture.map_source(), adapter: Formentation.Source.Map)
+          Formentation.compile(@fixture.map_source(), adapter: Formentation.Definition.Source.Map)
 
         {:ok, from_json, []} =
           Formentation.compile(@fixture.json_schema(),
-            adapter: Formentation.JSONSchema,
+            adapter: Formentation.Definition.Source.JSONSchema,
             ui: @fixture.ui_hints()
           )
 
