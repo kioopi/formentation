@@ -1,14 +1,14 @@
-defmodule Formentation.ValidationPlan do
+defmodule Formentation.Definition.ValidationPlan do
   @moduledoc """
   Executable identity plus an opaque, implementation-owned validation
   artifact.
 
-  `module` implements `Formentation.Validation` and is the sole
+  `module` implements `Formentation.Definition.Validation` and is the sole
   interpreter of `artifact`; core stores the pair verbatim and never
   inspects the artifact. A definition carries exactly zero (`nil`) or
   one plan.
 
-      iex> plan = %Formentation.ValidationPlan{
+      iex> plan = %Formentation.Definition.ValidationPlan{
       ...>   module: Formentation.Definition.Source.JSONSchema.Validator,
       ...>   artifact: {:opaque, 1}
       ...> }

@@ -5,10 +5,10 @@ defmodule Formentation.Definition.Source.JSONSchema.Validator do
   offline, via JSV's embedded metaschemas — and translates structured
   validator output into diagnostics. The single swap point if the
   validator choice is ever revisited.
-  Implements `Formentation.Validation` for runtime instance checking.
+  Implements `Formentation.Definition.Validation` for runtime instance checking.
   """
 
-  @behaviour Formentation.Validation
+  @behaviour Formentation.Definition.Validation
 
   alias Formentation.{Diagnostic, InstancePath, Issue, TemplatePath}
 
@@ -108,7 +108,7 @@ defmodule Formentation.Definition.Source.JSONSchema.Validator do
   because JSV kinds are library compile-time literals, never derived
   from input.
   """
-  @impl Formentation.Validation
+  @impl Formentation.Definition.Validation
   @spec validate(term(), map()) :: [Issue.t()]
   def validate(artifact, instance) do
     case JSV.validate(instance, artifact, cast: false) do

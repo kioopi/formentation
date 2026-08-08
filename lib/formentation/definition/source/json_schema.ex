@@ -16,11 +16,10 @@ defmodule Formentation.Definition.Source.JSONSchema do
     Diagnostic,
     JSONPointer,
     NodeId,
-    TemplatePath,
-    ValidationPlan
+    TemplatePath
   }
 
-  alias Formentation.Definition.{Finalizer, Presentation, Semantic}
+  alias Formentation.Definition.{Finalizer, Presentation, Semantic, ValidationPlan}
   alias Formentation.Definition.Source.JSONSchema.Validator
   alias Formentation.Definition.Source.Shared
 

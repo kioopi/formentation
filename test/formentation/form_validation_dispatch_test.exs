@@ -3,13 +3,14 @@ defmodule Formentation.FormValidationDispatchTest do
 
   import Formentation.Test.FormHelpers
 
-  alias Formentation.{Form, InstancePath, Issue, ValidationPlan}
+  alias Formentation.Definition.ValidationPlan
+  alias Formentation.{Form, InstancePath, Issue}
 
   # A Validation implementation with no relationship to JSON Schema or JSV.
   # Its artifact reports invocations back to the test process and carries
   # the issues to return, proving core dispatch is source-neutral.
   defmodule Fake do
-    @behaviour Formentation.Validation
+    @behaviour Formentation.Definition.Validation
 
     @impl true
     def validate(:boom, _instance), do: raise("boom")

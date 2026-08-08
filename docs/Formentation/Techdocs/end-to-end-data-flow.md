@@ -87,7 +87,7 @@ Info.required?(definition, ["condition"]) #=> true
 ```
 
 **What does not cross:** values, params, errors, DOM ids. The
-`Definition` holds a `validation` plan (`Formentation.ValidationPlan`)
+`Definition` holds a `validation` plan (`Formentation.Definition.ValidationPlan`)
 for the JSON Schema source, but that plan's validator is only *built*
 here — it is consumed two layers later.
 

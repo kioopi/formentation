@@ -245,7 +245,7 @@ forbidden from depending on `json_schema` **outright, with no exception**.
 Instance validation used to be the one sanctioned core→adapter edge
 (`Formentation.Form` → `JSONSchema.Validator`), which forced a baselined
 core/`json_schema` layer cycle; that dispatch now goes through the
-core-owned `Formentation.Validation` behaviour, so the edge, its named
+core-owned `Formentation.Definition.Validation` behaviour, so the edge, its named
 exception, and the baseline file are all gone ([[18-decisions#D-025 — Instance validation dispatches through a source-neutral behaviour|D-025]]). Core now names both adapter modules (`Formentation.Definition.Source.Map` and `Formentation.Definition.Source.JSONSchema`) literally, as values returned by `resolve_adapter!/1`; the gate stays green because a module literal returned as a value is not a call edge the reach tool can see — the invariant's essence still holds: core resolves an adapter but never names one in a call position.
 
 **The Phoenix boundary is checked twice, differently.** `reach` checks it

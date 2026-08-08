@@ -34,11 +34,11 @@ defmodule Formentation.Form do
     Issue,
     Params,
     SubmissionBlocker,
-    Transport,
-    ValidationPlan
+    Transport
   }
 
   alias Formentation.Definition.Semantic
+  alias Formentation.Definition.ValidationPlan
   alias Formentation.Form.FieldState
 
   @enforce_keys [:definition, :original]

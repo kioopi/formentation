@@ -163,6 +163,8 @@ defmodule Formentation.MixProject do
         "Compile & query": [
           Formentation,
           Formentation.Definition,
+          Formentation.Definition.Validation,
+          Formentation.Definition.ValidationPlan,
           Formentation.Info,
           Formentation.Info.Layout,
           Formentation.Diagnostic

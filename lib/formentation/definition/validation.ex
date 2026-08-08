@@ -1,4 +1,4 @@
-defmodule Formentation.Validation do
+defmodule Formentation.Definition.Validation do
   @moduledoc """
   Source-neutral contract for authoritative validation of a decoded form
   instance.
