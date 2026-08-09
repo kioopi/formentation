@@ -264,18 +264,82 @@ defmodule Formentation.Source.Map do
 
   defp validate_groups(groups, ctx) do
     groups
-    |> Enum.reduce_while({:ok, []}, fn
-      %{id: _id, fields: _fields} = group, {:ok, acc} ->
-        {:cont, {:ok, [group | acc]}}
-
-      other, _acc ->
-        {:halt,
-         {:error, invalid("group declaration missing :id or :fields: #{inspect(other)}", ctx)}}
+    |> Enum.with_index()
+    |> Enum.reduce_while({:ok, [], MapSet.new()}, fn {group, index}, {:ok, acc, seen_ids} ->
+      case validate_group(group, index, seen_ids, ctx) do
+        {:ok, id} -> {:cont, {:ok, [group | acc], MapSet.put(seen_ids, id)}}
+        {:error, diagnostic} -> {:halt, {:error, diagnostic}}
+      end
     end)
     |> case do
-      {:ok, acc} -> {:ok, Enum.reverse(acc)}
+      {:ok, acc, _seen_ids} -> {:ok, Enum.reverse(acc)}
       {:error, diagnostic} -> {:error, diagnostic}
     end
+  end
+
+  defp validate_group(%{id: id, fields: fields}, index, seen_ids, ctx) do
+    with :ok <- validate_group_id(id, index, seen_ids, ctx),
+         :ok <- validate_group_fields(fields, index, ctx) do
+      {:ok, id}
+    end
+  end
+
+  defp validate_group(other, index, _seen_ids, ctx) do
+    {:error,
+     invalid(
+       "group #{index}: missing :id or :fields: #{inspect(other)}",
+       ctx,
+       ctx.source_path ++ [:groups, index]
+     )}
+  end
+
+  defp validate_group_id(id, index, _seen_ids, ctx) when not is_binary(id) do
+    {:error,
+     invalid(
+       "group #{index}: :id must be a string, got: #{inspect(id)}",
+       ctx,
+       ctx.source_path ++ [:groups, index, :id]
+     )}
+  end
+
+  defp validate_group_id(id, index, seen_ids, ctx) do
+    if MapSet.member?(seen_ids, id) do
+      {:error,
+       invalid(
+         "group #{index}: duplicate group id #{inspect(id)}",
+         ctx,
+         ctx.source_path ++ [:groups, index, :id]
+       )}
+    else
+      :ok
+    end
+  end
+
+  defp validate_group_fields(fields, index, ctx) when not is_list(fields) do
+    {:error,
+     invalid(
+       "group #{index}: :fields must be a list, got: #{inspect(fields)}",
+       ctx,
+       ctx.source_path ++ [:groups, index, :fields]
+     )}
+  end
+
+  defp validate_group_fields(fields, index, ctx) do
+    fields
+    |> Enum.with_index()
+    |> Enum.reduce_while(:ok, fn {name, field_index}, :ok ->
+      if is_binary(name) do
+        {:cont, :ok}
+      else
+        {:halt,
+         {:error,
+          invalid(
+            "group #{index}: field #{field_index} must be a string, got: #{inspect(name)}",
+            ctx,
+            ctx.source_path ++ [:groups, index, :fields, field_index]
+          )}}
+      end
+    end)
   end
 
   defp compile_property(name, %{kind: :object} = spec, required?, ctx) do

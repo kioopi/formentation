@@ -504,6 +504,13 @@ defmodule Formentation.Source.MapTest do
       }
     end
 
+    test "valid groups with unique ids still compile unchanged" do
+      definition = compile!(grouped_declaration())
+
+      assert %Presentation.Object{children: children} = definition.presentation
+      assert Enum.any?(children, &match?(%Presentation.Group{}, &1))
+    end
+
     test "a group nests members in markup position without nesting data" do
       definition = compile!(grouped_declaration())
 
@@ -1078,6 +1085,77 @@ defmodule Formentation.Source.MapTest do
       }
 
       assert {:error, [%Formentation.Diagnostic{severity: :error, code: :invalid_declaration}]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-binary group id is an invalid_declaration error, not a crash" do
+      declaration = %{
+        kind: :object,
+        properties: [{"voltage", %{kind: :number}}],
+        groups: [%{id: :electrical, fields: ["voltage"]}]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:groups, 0, :id]}
+                }
+              ]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-list group fields value is an invalid_declaration error, not a crash" do
+      declaration = %{
+        kind: :object,
+        properties: [{"voltage", %{kind: :number}}],
+        groups: [%{id: "electrical", fields: "voltage"}]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:groups, 0, :fields]}
+                }
+              ]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-binary group field member is an invalid_declaration error, not a crash" do
+      declaration = %{
+        kind: :object,
+        properties: [{"voltage", %{kind: :number}}],
+        groups: [%{id: "electrical", fields: [:voltage]}]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:groups, 0, :fields, 0]}
+                }
+              ]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a duplicate group id is an invalid_declaration error, not a finalizer crash" do
+      declaration = %{
+        kind: :object,
+        properties: [{"voltage", %{kind: :number}}, {"current", %{kind: :number}}],
+        groups: [
+          %{id: "electrical", fields: ["voltage"]},
+          %{id: "electrical", fields: ["current"]}
+        ]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:groups, 1, :id]}
+                }
+              ]} =
                Formentation.compile(declaration, adapter: Formentation.Source.Map)
     end
 
