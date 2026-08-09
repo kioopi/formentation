@@ -425,12 +425,17 @@ defmodule Formentation.Source.Map do
   end
 
   defp validate_constraints(spec, kind, name, source_path, template_path, ctx) do
-    spec
-    |> Map.take(@constraint_keys)
-    |> Enum.reduce_while({:ok, %{}}, fn {key, value}, {:ok, acc} ->
-      case validate_constraint(key, value, kind, name, source_path, template_path, ctx) do
-        :ok -> {:cont, {:ok, Map.put(acc, key, value)}}
-        {:error, diagnostic} -> {:halt, {:error, diagnostic}}
+    @constraint_keys
+    |> Enum.reduce_while({:ok, %{}}, fn key, {:ok, acc} ->
+      case Map.fetch(spec, key) do
+        :error ->
+          {:cont, {:ok, acc}}
+
+        {:ok, value} ->
+          case validate_constraint(key, value, kind, name, source_path, template_path, ctx) do
+            :ok -> {:cont, {:ok, Map.put(acc, key, value)}}
+            {:error, diagnostic} -> {:halt, {:error, diagnostic}}
+          end
       end
     end)
     |> case do

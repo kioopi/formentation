@@ -577,6 +577,25 @@ defmodule Formentation.Source.MapTest do
                Formentation.compile(declaration, adapter: Formentation.Source.Map)
     end
 
+    test "multiple inapplicable constraints report min_length first, deterministically" do
+      # Keys are written in reverse of @constraint_keys order on purpose, so this
+      # can't pass by coincidentally matching literal declaration order.
+      declaration = %{
+        kind: :object,
+        properties: [{"flag", %{kind: :boolean, max: 1, min: 2, max_length: 3, min_length: 4}}]
+      }
+
+      for _ <- 1..20 do
+        assert {:error,
+                [
+                  %Formentation.Diagnostic{
+                    code: :invalid_declaration,
+                    origin: {:map_source, [:properties, "flag", :min_length]}
+                  }
+                ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      end
+    end
+
     test "valid, applicable constraints still compile unchanged" do
       definition =
         compile!(%{
