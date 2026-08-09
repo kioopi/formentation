@@ -57,8 +57,23 @@ def mount(_params, _session, socket) do
 end
 ```
 
-paired with a private helper that does the `Formentation.Form` →
-`Phoenix.HTML.Form` projection every handler below calls back into:
+The demo matches a literal `[]` because its schema is fixed and compiles
+warning-free, so an unexpected diagnostic fails the mount loudly instead
+of vanishing. **With your own schema, bind the list instead:**
+
+```elixir
+{:ok, form_state, diagnostics} =
+  Formentation.form(my_schema, adapter: :json_schema, data: initial_data)
+```
+
+Compilation can succeed *and* carry warnings — an `"array"` property, for
+instance, compiles with an `:unsupported_type` diagnostic — and a hard
+`[]` match would turn that warning into a `MatchError` crash on first
+render.
+
+The mount is paired with a private helper that does the
+`Formentation.Form` → `Phoenix.HTML.Form` projection every handler below
+calls back into:
 
 ```elixir
 defp assign_payload(socket, form_state) do
@@ -79,11 +94,13 @@ only addition is doing it once in `mount/3` too, so the first render
 already has a `Phoenix.HTML.Form` to hand to
 `Formentation.Phoenix.fields/1`.
 
-A LiveView that compiles on every mount rather than once at boot could
-use `Formentation.form/2` instead of the `compile/2` + `Form.new/3`
-pattern above — it combines both steps and is simpler when you don't need
-the intermediate definition to cache or inspect. See
-[[getting-started|Getting started]] for an example.
+`Formentation.form/2` compiles on every mount. That is the ordinary path
+and what the demo does, because compilation is cheap and the code stays
+short. A LiveView that needs the intermediate `Formentation.Definition`
+— to cache it at boot rather than recompile per mount, or to inspect it
+through `Formentation.Info` — can use `Formentation.compile/2` followed
+by `Formentation.Form.new/3` instead; the two steps are exactly what the
+façade combines. See [[getting-started|Getting started]] for both.
 
 ## Handlers: `validate/2` on change, `submit/2` on submit
 

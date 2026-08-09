@@ -15,7 +15,7 @@ defmodule Formentation.PublicLifecycleTest do
   import Formentation.HTMLAssertions
   import Phoenix.LiveViewTest, only: [render_component: 2]
 
-  alias Formentation.{Form, InstancePath}
+  alias Formentation.{Diagnostic, Form, InstancePath}
   alias Formentation.Phoenix.DOMIdentity
 
   @declaration %{
@@ -25,6 +25,15 @@ defmodule Formentation.PublicLifecycleTest do
       {"email", %{kind: :string, role: :email, title: "Email", min_length: 1}},
       {"age", %{kind: :integer, title: "Age"}}
     ]
+  }
+
+  # The same declaration without `min_length: 1`: a required string that
+  # permits an empty value. Worth telling the caller about, but not an
+  # error — so it compiles successfully *and* warns.
+  @warning_declaration %{
+    kind: :object,
+    required: ["email"],
+    properties: [{"email", %{kind: :string, role: :email, title: "Email"}}]
   }
 
   # The caller owns `as` and `id`; the renderer derives DOM identity from
@@ -40,8 +49,10 @@ defmodule Formentation.PublicLifecycleTest do
     do: DOMIdentity.field("payload", InstancePath.new!(path), part)
 
   test "the ordinary lifecycle carries a form from declaration to a typed submission" do
-    # 1. A symbolic built-in selector compiles and initializes in one step,
-    #    and successful diagnostics are retained rather than swallowed.
+    # 1. A symbolic built-in selector compiles and initializes in one
+    #    step. This declaration is deliberately warning-free; that
+    #    diagnostics *survive* a successful compile is pinned by the
+    #    second test below, which this `== []` alone would not prove.
     assert {:ok, form_state, diagnostics} =
              Formentation.form(@declaration,
                adapter: :map,
@@ -79,5 +90,12 @@ defmodule Formentation.PublicLifecycleTest do
              Form.submit(form_state, %{"email" => "ada@example.com", "age" => "36"})
 
     assert candidate == %{"email" => "ada@example.com", "age" => 36}
+  end
+
+  test "a successful compilation carries its warnings through to the caller" do
+    assert {:ok, %Form{}, [diagnostic]} =
+             Formentation.form(@warning_declaration, adapter: :map)
+
+    assert %Diagnostic{severity: :warning, code: :required_permits_empty} = diagnostic
   end
 end
