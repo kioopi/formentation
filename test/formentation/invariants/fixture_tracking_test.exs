@@ -37,13 +37,6 @@ defmodule Formentation.FixtureTrackingTest do
     assert tracks?(FormentationDemo.PumpInspection, "pump_inspection/ui.json")
   end
 
-  test "the getting-started module budget tracks the page it scans" do
-    assert tracks?(
-             Formentation.GettingStartedModulesTest,
-             "Userguide/getting-started.md"
-           )
-  end
-
   test "the embedded declarations still decode to the documents on disk" do
     on_disk =
       "test/support/fixtures/annotations/schema.json"

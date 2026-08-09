@@ -24,6 +24,8 @@ defmodule Formentation.GettingStartedModulesTest do
   @external_resource @page
   @source File.read!(@page)
 
+  @own_source File.read!(__ENV__.file)
+
   @approved MapSet.new([
               "Formentation",
               "Formentation.Definition",
@@ -31,15 +33,46 @@ defmodule Formentation.GettingStartedModulesTest do
               "Formentation.Phoenix"
             ])
 
-  test "getting started names only the four agreed Formentation modules" do
+  test "getting started names exactly the four agreed Formentation modules" do
     named =
       ~r/Formentation(?:\.[A-Z][A-Za-z0-9_]*)*/
       |> Regex.scan(@source)
       |> List.flatten()
       |> MapSet.new()
 
+    # The contract is "exactly", not "at most". A page that stopped
+    # naming `Formentation.Form` would still be within budget while no
+    # longer teaching the lifecycle, so absence is as much a violation
+    # as excess.
+    missing = @approved |> MapSet.difference(named) |> MapSet.to_list() |> Enum.sort()
     extra = named |> MapSet.difference(@approved) |> MapSet.to_list() |> Enum.sort()
 
-    assert extra == []
+    assert missing == [], "Getting started no longer names: #{inspect(missing)}"
+    assert extra == [], "Getting started names unapproved modules: #{inspect(extra)}"
+  end
+
+  # Self-contained, because a cross-module assertion would depend on
+  # another test module being loaded: running this file alone, or having
+  # `--stale` select only the sibling, would raise UndefinedFunctionError
+  # rather than report a real result.
+  #
+  # Both halves are pinned for the reason `Formentation.FixtureTrackingTest`
+  # documents for fixtures. Without `@external_resource` a page edit marks
+  # nothing stale; with it but a runtime read in a function body the
+  # recompiled `.beam` is byte-identical, so `mix test --stale` — what
+  # `mix test.dev` runs — still selects nothing and reports a green that
+  # proves nothing.
+  test "the page is tracked and read at compile time, so editing it selects this test" do
+    tracked =
+      __MODULE__.module_info(:attributes)
+      |> Keyword.get_values(:external_resource)
+      |> List.flatten()
+      |> Enum.map(&to_string/1)
+
+    assert @page in tracked
+
+    assert @own_source =~ "@source File.read!(@page)",
+           "the page must be read into a module attribute at compile time, " <>
+             "not inside a function body"
   end
 end
