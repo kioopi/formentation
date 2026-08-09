@@ -110,9 +110,48 @@ defmodule Formentation.Source.Map do
   end
 
   defp compile_properties(properties, declaration, ctx) do
-    with {:ok, required} <- fetch_list(declaration, :required, ctx),
+    with {:ok, required} <- fetch_required(declaration, property_names(properties), ctx),
          {:ok, compiled, ctx} <- compile_properties_in_order(properties, required, ctx) do
       {:ok, Enum.reverse(compiled), ctx}
+    end
+  end
+
+  defp fetch_required(declaration, property_names, ctx) do
+    with {:ok, required} <- fetch_list(declaration, :required, ctx) do
+      validate_required_members(required, property_names, ctx)
+    end
+  end
+
+  defp validate_required_members(required, property_names, ctx) do
+    required
+    |> Enum.with_index()
+    |> Enum.reduce_while({:ok, MapSet.new()}, fn {name, index}, {:ok, acc} ->
+      case validate_required_member(name, index, property_names, ctx) do
+        :ok -> {:cont, {:ok, MapSet.put(acc, name)}}
+        {:error, diagnostic} -> {:halt, {:error, diagnostic}}
+      end
+    end)
+  end
+
+  defp validate_required_member(name, index, _property_names, ctx) when not is_binary(name) do
+    {:error,
+     invalid(
+       "required entry #{index}: expected a string, got: #{inspect(name)}",
+       ctx,
+       ctx.source_path ++ [:required, index]
+     )}
+  end
+
+  defp validate_required_member(name, index, property_names, ctx) do
+    if MapSet.member?(property_names, name) do
+      :ok
+    else
+      {:error,
+       invalid(
+         "required entry #{index}: #{inspect(name)} is not a declared property",
+         ctx,
+         ctx.source_path ++ [:required, index]
+       )}
     end
   end
 

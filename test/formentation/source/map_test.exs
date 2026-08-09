@@ -1145,6 +1145,48 @@ defmodule Formentation.Source.MapTest do
                Formentation.compile(declaration, adapter: Formentation.Source.Map)
     end
 
+    test "a non-binary required member is an invalid_declaration error, not a crash" do
+      declaration = %{kind: :object, required: [:name], properties: [{"name", %{kind: :string}}]}
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  severity: :error,
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:required, 0]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a required member naming an undeclared property is an invalid_declaration error" do
+      declaration = %{
+        kind: :object,
+        required: ["missing"],
+        properties: [{"name", %{kind: :string}}]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  severity: :error,
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:required, 0]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "duplicate required members are idempotent, not an error" do
+      declaration = %{
+        kind: :object,
+        required: ["name", "name"],
+        properties: [{"name", %{kind: :string, min_length: 1}}]
+      }
+
+      {:ok, definition, []} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
+      assert %Semantic.Field{required?: true} = Info.node_at(definition, ["name"])
+    end
+
     test "an unknown kind compiles to an unsupported node plus a warning" do
       declaration = %{
         kind: :object,
