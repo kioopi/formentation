@@ -248,7 +248,7 @@ into its predecessor, and no layer receives two different shapes from the
 same neighbour. That is what makes each testable without the next, which
 [[test-and-verification-architecture|the test architecture]] then
 exploits: the compile layer is tested with no state, the state layer with
-no Phoenix, the projector with any `FormData`, and the UI against a
+no Phoenix, render preparation with any `FormData`, and the UI against a
 hand-built plan.
 
 **The definition and the state are separately cacheable.** Compilation is

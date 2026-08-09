@@ -262,7 +262,7 @@ purely namespace-based check would miss**
 The property that makes all of the above affordable is the one-directional
 [[end-to-end-data-flow|data flow]]: each layer is testable without the
 next. The compile pipeline is tested with no runtime state; the state
-layer with no Phoenix; the projector against any `FormData` source; the
+layer with no Phoenix; render preparation against any `FormData` source; the
 UI against a hand-built plan. Nothing needs a `Plug.Conn`, a LiveView
 process, or a browser.
 

@@ -145,8 +145,8 @@ dispatched as a protocol on `form.source`:
 
 `@fallback_to_any` means a source with no dedicated implementation still
 projects, through the conservative `Any` behaviour rather than a crash. No
-public function — `Projector.project/2`, `project_at/3`, or either
-component — takes an adapter argument; dispatch is entirely on
+render-preparation function or either component takes an adapter argument;
+dispatch is entirely on
 `form.source`. See [[18-decisions#D-027 — Projection reads semantic state through a StateView protocol|D-027]].
 
 ## Component API

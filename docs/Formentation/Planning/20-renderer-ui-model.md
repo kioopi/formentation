@@ -1289,11 +1289,14 @@ The alignment work should not add:
 - interactive widget behaviours.
 
 Those would commit to the seam before the split definition and collections have
-provided representative requirements. The pre-`0.1.0` alignment renamed
-`Formentation.Phoenix.Projector` to reflect preparation and
+provided representative requirements. The pre-`0.1.0` alignment renamed the
+former `Formentation.Phoenix.Projector` to reflect preparation and
 `Formentation.Phoenix.UI.Reference` to remove the obsolete architectural use
-of “theme”; [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]
-records those vocabulary corrections, not a public UI contract.
+of “theme”; the later D-047 restructure established
+`Formentation.Phoenix.Render.Preparation` and
+`Formentation.Phoenix.UI.Reference`. [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]
+and [[18-decisions#D-047 — The lib tree is restructured to state the north-star architecture|D-047]]
+record those vocabulary corrections, not a public UI contract.
 
 ## Phase 3 discovery and delivery
 

@@ -14,7 +14,7 @@ defmodule Formentation.SourceFixture do
   to prove a group-level issue reaches the summary through
   `Formentation.Phoenix.StateView.issues/2` alone — the nested source
   carries no state-view answers of its own, and needs none, because the
-  projector always dispatches on the root source.
+  render preparation always dispatches on the root source.
   """
 
   alias Formentation.InstancePath

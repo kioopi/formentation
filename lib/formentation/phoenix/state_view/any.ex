@@ -3,7 +3,7 @@ defimpl Formentation.Phoenix.StateView, for: Any do
   The conservative default for any `Phoenix.HTML.FormData` source without
   a dedicated state view.
 
-  Preserves exactly the behaviour the projector had before D-027: `:submit`
+  Preserves exactly the behaviour render preparation had before D-027: `:submit`
   is the only action that counts as submitted, visibility is left to the
   Phoenix default, and root/object issue enrichment is reported as
   unavailable rather than guessed. Projection never crashes merely because

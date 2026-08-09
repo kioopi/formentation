@@ -12,7 +12,9 @@ status: current
 
 # Rendering
 
-*As of 2026-08-08 (projection-context resolution and cursor ownership extracted
+*As of 2026-08-09 (remaining "projector" prose replaced with "render preparation":
+the stage was renamed twice — `Projector` → `RenderPreparation` → `Render.Preparation` —
+and the old noun outlived the module; projection-context resolution and cursor ownership extracted
 to `Render.Preparation.Context`; object-level error-summary entries link to their rendered,
 focusable fieldset, keyed off `Render.Node.Group`'s `kind`/`occurrence_path`
 provenance, [GitHub issue #34](https://github.com/kioopi/formentation/issues/34); module paths
@@ -64,7 +66,7 @@ tree and return typed presentation descriptors:
 - **Field descriptors** carry a semantic `InstancePath` plus presentation
   facts such as label, help, hidden-control intent, and widget hint.
 
-The projector builds one semantic-node lookup from `Definition.semantic` and
+Render preparation builds one semantic-node lookup from `Definition.semantic` and
 uses descriptor paths to resolve field facts through that backing store. This
 keeps declaration order and layout order as separate contracts: for example,
 semantic fields can enumerate as `["a", "c"]` while a presentation group
@@ -210,7 +212,7 @@ It combines two sources:
   fieldset. That fieldset has `tabindex="-1"`, so following its summary anchor
   moves focus to a meaningful, non-tab-stop group boundary.
 - **Object entries** — root and object-level issues never appear in
-  Phoenix's per-field `field.errors` convention. The projector asks the
+  Phoenix's per-field `field.errors` convention. Preparation asks the
   source's `StateView.issues/2` for the complete, normalized, adapter-ordered
   list, filtered by `issue_visibility/3`. `Formentation.Form` answers
   `{:ok, issues}`; a source with no enumeration capability answers
@@ -242,12 +244,12 @@ accessibility regression. `summary={true}` / `summary={false}` overrides that
 placement explicitly.
 
 An entry whose path resolves to a `Semantic.Unsupported` is the one object
-entry the projector labels, humanizing the node's last path segment; root
+entry preparation labels, humanizing the node's last path segment; root
 and group entries stay unlabelled.
 
 ### Where submission blockers enter
 
-Capability explanations are not a projector concept. The
+Capability explanations are not a preparation concept. The
 `%Formentation.Form{}` state view translates each
 `Formentation.Form.SubmissionBlocker` from `Form.submission_blockers/1` into one
 normalized `StateView.Issue` at the owning unsupported node's path, whose
@@ -263,7 +265,7 @@ By the time the list reaches render preparation it is ordinary normalized
 issues, so the object-entry rule above renders them unchanged — including
 the humanized label, which the unsupported-node case already earns. A
 source with different semantics (Ash, Ecto) can produce equivalent entries
-without the projector learning anything new.
+without preparation learning anything new.
 
 The summary renders at the top of `fields/1`'s own output, not the top
 of the page. When the payload form is embedded after hand-written

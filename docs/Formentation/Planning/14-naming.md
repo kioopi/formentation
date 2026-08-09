@@ -78,12 +78,11 @@ Keep the runtime/rendering verbs distinct:
   UI descriptor, and overrides into a prepared view;
 - **rendering** turns that prepared view into output through a UI integration.
 
-`Projector`, `Render.Plan`, `Render.Node`, and
-`Formentation.Phoenix.UI.Reference` are current Phase 1 implementation
-names. They do not define the future public vocabulary. Before `0.1.0`,
-`Projector` should be renamed for preparation and the reference component
-module should be renamed so “theme” does not continue to mean a component set.
-See
+`Formentation.Phoenix.Render.Preparation`, `Render.Plan`, `Render.Node`, and
+`Formentation.Phoenix.UI.Reference` are current Phase 1 implementation names.
+They do not define the future public vocabulary. The former `Projector` and
+theme-derived component names were superseded first by D-041 and then by the
+D-047 module-tree restructure. See
 [[20-renderer-ui-model#Projection and preparation terminology|the canonical terminology]].
 
 ## Related notes

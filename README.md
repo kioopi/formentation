@@ -40,7 +40,7 @@ A form passes through a small number of named stages:
 - **Definition** — the compiled result: static semantic storage plus a presentation layout tree, queried through `Formentation.Info`. See [Definition and Node](docs/Formentation/Techdocs/definition-and-node.md).
 - **Info** — the stable query surface. Renderers, tooling, and tests ask `Formentation.Info` questions (`fields/1`, `role/2`, `required?/2`, …) instead of pattern-matching definition internals.
 - **Form state** — a definition paired with the data, params, and interaction history of one filling-in. Pure and Phoenix-free. See [form state and transitions](docs/Formentation/Techdocs/form-state-and-transitions.md).
-- **Projection and rendering** — form state becomes an ordinary `Phoenix.HTML.Form`, which the projector turns into a render plan and the UI into HTML. See [rendering](docs/Formentation/Techdocs/rendering.md).
+- **Projection and rendering** — form state becomes an ordinary `Phoenix.HTML.Form`, which render preparation turns into a render plan and the UI into HTML. See [rendering](docs/Formentation/Techdocs/rendering.md).
 - **Diagnostics and origins** — compilation never fails silently or guesses invisibly: problems become `Formentation.Diagnostic` structs, and every resolved value records where it came from — a path into the source or a named inference rule. See [diagnostics and origins](docs/Formentation/Techdocs/diagnostics-and-origins.md).
 
 Everything lives in [`docs/Formentation/`](docs/Formentation/Formentation.md), an Obsidian vault with four areas: `Planning/` (why and intended design), `Development/` (phase status), `Techdocs/` (what is actually built), and `Userguide/` (how to use it).

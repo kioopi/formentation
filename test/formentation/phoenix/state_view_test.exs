@@ -31,7 +31,7 @@ defmodule Formentation.Phoenix.StateViewTest do
       end
     end
 
-    test "defers visibility to the projector's Phoenix default" do
+    test "defers visibility to render preparation's Phoenix default" do
       form = generic_form(:submit)
 
       assert StateView.issue_visibility(form.source, form, InstancePath.new!([])) == :default
@@ -205,7 +205,7 @@ defmodule Formentation.Phoenix.StateViewTest do
   # can repair, not an authoritative issue, so it has no place on
   # Formentation.Form's issue list. The state view is where it becomes
   # something projection can render — which keeps the translation (and
-  # its English wording) out of the source-neutral projector entirely.
+  # its English wording) out of source-neutral render preparation entirely.
   describe "Formentation.Form submission blockers in issues/2" do
     defp blocked_pair(schema, data, params) do
       {:ok, definition, _diagnostics} =
