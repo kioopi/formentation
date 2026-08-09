@@ -1087,8 +1087,27 @@ defmodule Formentation.Source.MapTest do
     test "a property spec without a kind is an invalid_declaration error" do
       declaration = %{kind: :object, properties: [{"broken", %{title: "No kind"}}]}
 
-      assert {:error, [%Formentation.Diagnostic{code: :invalid_declaration}]} =
-               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "broken", :kind]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-atom kind is an invalid_declaration error, not an unsupported node" do
+      for kind <- ["string", %{}, [1], 42] do
+        declaration = %{kind: :object, properties: [{"broken", %{kind: kind}}]}
+
+        assert {:error,
+                [
+                  %Formentation.Diagnostic{
+                    code: :invalid_declaration,
+                    origin: {:map_source, [:properties, "broken", :kind]}
+                  }
+                ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      end
     end
 
     test "a non-list properties value is an invalid_declaration error" do

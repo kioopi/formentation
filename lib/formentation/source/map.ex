@@ -365,7 +365,7 @@ defmodule Formentation.Source.Map do
     compile_field(name, spec, required?, ctx)
   end
 
-  defp compile_property(name, %{kind: kind}, required?, ctx) do
+  defp compile_property(name, %{kind: kind}, required?, ctx) when is_atom(kind) do
     with {:ok, ctx} <- take_budget(ctx) do
       template_path = TemplatePath.child(ctx.template_path, name)
       source_path = ctx.source_path ++ [:properties, name]
@@ -391,8 +391,24 @@ defmodule Formentation.Source.Map do
     end
   end
 
+  defp compile_property(name, %{kind: kind}, _required?, ctx) do
+    {:error,
+     invalid(
+       "property #{inspect(name)} kind must be an atom, got: #{inspect(kind)}",
+       ctx,
+       ctx.source_path ++ [:properties, name, :kind],
+       TemplatePath.child(ctx.template_path, name)
+     )}
+  end
+
   defp compile_property(name, spec, _required?, ctx) do
-    {:error, invalid("property #{inspect(name)} has no kind: #{inspect(spec)}", ctx)}
+    {:error,
+     invalid(
+       "property #{inspect(name)} has no kind: #{inspect(spec)}",
+       ctx,
+       ctx.source_path ++ [:properties, name, :kind],
+       TemplatePath.child(ctx.template_path, name)
+     )}
   end
 
   defp validate_constraints(spec, kind, name, source_path, template_path, ctx) do
