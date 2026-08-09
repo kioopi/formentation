@@ -127,8 +127,8 @@ Without `:title`, the label is humanized from the property name —
 so you can always tell which labels you wrote:
 
 ```elixir
-Formentation.Info.origins(definition, ["age"])
-#=> [label: {:map_source, [:properties, "age", :title]}, role: {:inference, :integer_default}]
+Formentation.Info.origins(definition, ["serial_number"])
+#=> [role: {:inference, :string_default}, label: {:inference, :label_from_name}]
 ```
 
 `{:inference, _}` means Formentation decided; `{:map_source, _}` means
