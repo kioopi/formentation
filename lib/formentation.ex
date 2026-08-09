@@ -20,6 +20,11 @@ defmodule Formentation do
   raise `ArgumentError`, because no adapter has run and there is no
   declaration to attach a diagnostic to. Failures *compiling* a declaration
   are ordinary `{:error, diagnostics}` results.
+
+  Accepting a module is a stable dispatch mechanism, but it is not a
+  third-party adapter contract: the internals required to construct a
+  valid `Formentation.Definition` are not compatibility-stable. See
+  `Formentation.Source`.
   """
 
   alias Formentation.{Definition, Diagnostic, Form}
@@ -49,7 +54,8 @@ defmodule Formentation do
 
   Built-in adapters have stable symbolic selectors — `:map` for
   `Formentation.Source.Map`, `:json_schema` for `Formentation.Source.JSONSchema`.
-  Third-party adapters remain reachable by module.
+  Out-of-tree adapters remain reachable by module, with the compatibility
+  boundary `Formentation.Source` describes.
   """
   @spec compile(term(), keyword()) ::
           {:ok, Definition.t(), [Diagnostic.t()]} | {:error, [Diagnostic.t()]}

@@ -87,11 +87,12 @@ its class names; you cannot swap the markup.
 No custom node kinds, no custom codecs or per-field codec overrides, no
 compiler passes, no widget registration. Third-party adapters can be
 passed to `compile/2` and `form/2` as modules, and the adapter-selection
-mechanism is public and supported. However, the `Formentation.Definition`
-type and the `Formentation.Source` behaviour are not documented public
-surfaces: the contracts for building a `Definition` are unstable, so
-writing a third-party adapter remains an unsupported activity that may
-break across versions.
+mechanism is public and supported. `Formentation.Source` is documented so
+the contract the built-in adapters satisfy is readable — but documented is
+not the same as stable to build against. The internals required to
+construct a valid `Formentation.Definition` are not a compatibility-stable
+surface, so writing a third-party adapter remains an unsupported activity
+that may break across versions.
 
 ## By area
 

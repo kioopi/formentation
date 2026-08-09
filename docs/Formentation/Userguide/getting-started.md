@@ -10,7 +10,7 @@ status: current
 
 # Getting started
 
-*Covers Formentation as of 2026-08-07. Every snippet below was run
+*Covers Formentation as of 2026-08-09. Every snippet below was run
 against that version.*
 
 This page walks the whole loop once: declare a form, compile it, render

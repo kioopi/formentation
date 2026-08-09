@@ -14,7 +14,15 @@ defmodule Formentation.GettingStartedModulesTest do
   # `Formentation.Info`. It is deliberately not a Markdown parser: a
   # module name a reader can see anywhere on the page is a name the page
   # spends, wherever it appears.
+  #
+  # The page is tracked as an external resource *and* read at compile
+  # time, for the reason `Formentation.FixtureTrackingTest` documents:
+  # either half alone leaves `mix test --stale` — what `mix test.dev`
+  # runs — selecting zero tests when only the page changed, which is
+  # exactly the edit this guardrail exists to catch.
   @page Path.expand("../../../docs/Formentation/Userguide/getting-started.md", __DIR__)
+  @external_resource @page
+  @source File.read!(@page)
 
   @approved MapSet.new([
               "Formentation",
@@ -25,9 +33,8 @@ defmodule Formentation.GettingStartedModulesTest do
 
   test "getting started names only the four agreed Formentation modules" do
     named =
-      @page
-      |> File.read!()
-      |> then(&Regex.scan(~r/Formentation(?:\.[A-Z][A-Za-z0-9_]*)*/, &1))
+      ~r/Formentation(?:\.[A-Z][A-Za-z0-9_]*)*/
+      |> Regex.scan(@source)
       |> List.flatten()
       |> MapSet.new()
 
