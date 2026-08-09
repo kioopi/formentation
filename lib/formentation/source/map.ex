@@ -398,6 +398,115 @@ defmodule Formentation.Source.Map do
     {:error, invalid("property #{inspect(name)} has no kind: #{inspect(spec)}", ctx)}
   end
 
+  defp validate_constraints(spec, kind, name, source_path, template_path, ctx) do
+    spec
+    |> Map.take(@constraint_keys)
+    |> Enum.reduce_while({:ok, %{}}, fn {key, value}, {:ok, acc} ->
+      case validate_constraint(key, value, kind, name, source_path, template_path, ctx) do
+        :ok -> {:cont, {:ok, Map.put(acc, key, value)}}
+        {:error, diagnostic} -> {:halt, {:error, diagnostic}}
+      end
+    end)
+    |> case do
+      {:ok, constraints} ->
+        validate_constraint_bounds(constraints, name, source_path, template_path, ctx)
+
+      {:error, diagnostic} ->
+        {:error, diagnostic}
+    end
+  end
+
+  defp validate_constraint(key, value, kind, name, source_path, template_path, ctx)
+       when key in [:min_length, :max_length] do
+    cond do
+      kind != :string ->
+        {:error,
+         invalid(
+           "#{key} is only valid for :string properties, got kind #{inspect(kind)} for " <>
+             "property #{inspect(name)}",
+           ctx,
+           source_path ++ [key],
+           template_path
+         )}
+
+      not (is_integer(value) and value >= 0) ->
+        {:error,
+         invalid(
+           "#{key} for property #{inspect(name)} must be a non-negative integer, " <>
+             "got: #{inspect(value)}",
+           ctx,
+           source_path ++ [key],
+           template_path
+         )}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp validate_constraint(key, value, kind, name, source_path, template_path, ctx)
+       when key in [:min, :max] do
+    cond do
+      kind not in [:integer, :number] ->
+        {:error,
+         invalid(
+           "#{key} is only valid for :integer or :number properties, got kind " <>
+             "#{inspect(kind)} for property #{inspect(name)}",
+           ctx,
+           source_path ++ [key],
+           template_path
+         )}
+
+      not is_number(value) ->
+        {:error,
+         invalid(
+           "#{key} for property #{inspect(name)} must be a number, got: #{inspect(value)}",
+           ctx,
+           source_path ++ [key],
+           template_path
+         )}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp validate_constraint_bounds(constraints, name, source_path, template_path, ctx) do
+    with :ok <-
+           check_bounds(
+             constraints,
+             :min_length,
+             :max_length,
+             name,
+             source_path,
+             template_path,
+             ctx
+           ),
+         :ok <- check_bounds(constraints, :min, :max, name, source_path, template_path, ctx) do
+      {:ok, constraints}
+    end
+  end
+
+  defp check_bounds(constraints, low_key, high_key, name, source_path, template_path, ctx) do
+    with {:ok, low} <- Map.fetch(constraints, low_key),
+         {:ok, high} <- Map.fetch(constraints, high_key) do
+      if low <= high do
+        :ok
+      else
+        {:error,
+         invalid(
+           "#{low_key} (#{inspect(low)}) exceeds #{high_key} (#{inspect(high)}) for " <>
+             "property #{inspect(name)}",
+           ctx,
+           source_path ++ [high_key],
+           template_path
+         )}
+      end
+    else
+      :error -> :ok
+    end
+  end
+
   defp compile_field(name, %{kind: kind} = spec, required?, ctx) when kind in @scalar_kinds do
     template_path = TemplatePath.child(ctx.template_path, name)
     source_path = ctx.source_path ++ [:properties, name]
@@ -430,7 +539,9 @@ defmodule Formentation.Source.Map do
              ctx
            ),
          {:ok, {default, default_origin, ctx}} <-
-           resolve_default(spec, name, kind, source_path, template_path, ctx) do
+           resolve_default(spec, name, kind, source_path, template_path, ctx),
+         {:ok, constraints} <-
+           validate_constraints(spec, kind, name, source_path, template_path, ctx) do
       {hidden, hidden_origin, ctx} =
         resolve_flag(spec, :hidden, name, source_path, template_path, ctx)
 
@@ -458,7 +569,7 @@ defmodule Formentation.Source.Map do
           options: options,
           default: default,
           examples: examples,
-          constraints: Map.take(spec, @constraint_keys),
+          constraints: constraints,
           origins: semantic_origins(origins)
         )
 

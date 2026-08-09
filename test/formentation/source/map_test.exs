@@ -507,6 +507,95 @@ defmodule Formentation.Source.MapTest do
     end
   end
 
+  describe "constraint validation" do
+    test "min_length on a non-string field is an invalid_declaration error" do
+      declaration = %{kind: :object, properties: [{"count", %{kind: :integer, min_length: 1}}]}
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "count", :min_length]}
+                }
+              ]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "min on a non-numeric field is an invalid_declaration error" do
+      declaration = %{kind: :object, properties: [{"name", %{kind: :string, min: 1}}]}
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "name", :min]}
+                }
+              ]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-integer min_length is an invalid_declaration error" do
+      declaration = %{kind: :object, properties: [{"name", %{kind: :string, min_length: "four"}}]}
+
+      assert {:error, [%Formentation.Diagnostic{code: :invalid_declaration}]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a negative min_length is an invalid_declaration error" do
+      declaration = %{kind: :object, properties: [{"name", %{kind: :string, min_length: -1}}]}
+
+      assert {:error, [%Formentation.Diagnostic{code: :invalid_declaration}]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-numeric min is an invalid_declaration error" do
+      declaration = %{kind: :object, properties: [{"count", %{kind: :integer, min: "zero"}}]}
+
+      assert {:error, [%Formentation.Diagnostic{code: :invalid_declaration}]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "min_length exceeding max_length is an invalid_declaration error" do
+      declaration = %{
+        kind: :object,
+        properties: [{"name", %{kind: :string, min_length: 10, max_length: 2}}]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "name", :max_length]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "min exceeding max is an invalid_declaration error" do
+      declaration = %{kind: :object, properties: [{"count", %{kind: :integer, min: 10, max: 2}}]}
+
+      assert {:error, [%Formentation.Diagnostic{code: :invalid_declaration}]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "valid, applicable constraints still compile unchanged" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"serial_number", %{kind: :string, min_length: 4, max_length: 20}},
+            {"operating_hours", %{kind: :integer, min: 0, max: 100_000}}
+          ]
+        })
+
+      assert Info.node_at(definition, ["serial_number"]).constraints == %{
+               min_length: 4,
+               max_length: 20
+             }
+
+      assert Info.node_at(definition, ["operating_hours"]).constraints == %{min: 0, max: 100_000}
+    end
+  end
+
   describe "presentation groups" do
     defp grouped_declaration do
       %{
