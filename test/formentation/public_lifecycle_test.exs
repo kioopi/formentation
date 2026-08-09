@@ -22,18 +22,9 @@ defmodule Formentation.PublicLifecycleTest do
     kind: :object,
     required: ["email"],
     properties: [
-      {"email", %{kind: :string, role: :email, title: "Email", min_length: 1}},
+      {"email", %{kind: :string, role: :email, title: "Email"}},
       {"age", %{kind: :integer, title: "Age"}}
     ]
-  }
-
-  # The same declaration without `min_length: 1`: a required string that
-  # permits an empty value. Worth telling the caller about, but not an
-  # error — so it compiles successfully *and* warns.
-  @warning_declaration %{
-    kind: :object,
-    required: ["email"],
-    properties: [{"email", %{kind: :string, role: :email, title: "Email"}}]
   }
 
   # The caller owns `as` and `id`; the renderer derives DOM identity from
@@ -41,25 +32,24 @@ defmodule Formentation.PublicLifecycleTest do
   # separately.
   defp render_projection(form_state) do
     render_component(&Formentation.Phoenix.fields/1,
-      form: Phoenix.Component.to_form(form_state, as: "payload", id: "payload")
+      form: Phoenix.Component.to_form(form_state, as: "payload", id: "payload_form")
     )
   end
 
   defp field_id(path, part),
-    do: DOMIdentity.field("payload", InstancePath.new!(path), part)
+    do: DOMIdentity.field("payload_form", InstancePath.new!(path), part)
 
   test "the ordinary lifecycle carries a form from declaration to a typed submission" do
     # 1. A symbolic built-in selector compiles and initializes in one
-    #    step. This declaration is deliberately warning-free; that
-    #    diagnostics *survive* a successful compile is pinned by the
-    #    second test below, which this `== []` alone would not prove.
+    #    step, and successful diagnostics are retained rather than
+    #    swallowed.
     assert {:ok, form_state, diagnostics} =
              Formentation.form(@declaration,
                adapter: :map,
                data: %{"email" => "ada@example.com"}
              )
 
-    assert diagnostics == []
+    assert [%Diagnostic{severity: :warning, code: :required_permits_empty}] = diagnostics
 
     # 2. The Form projects through the standard Phoenix entry point and
     #    renders with no `definition:` assign.
@@ -90,12 +80,5 @@ defmodule Formentation.PublicLifecycleTest do
              Form.submit(form_state, %{"email" => "ada@example.com", "age" => "36"})
 
     assert candidate == %{"email" => "ada@example.com", "age" => 36}
-  end
-
-  test "a successful compilation carries its warnings through to the caller" do
-    assert {:ok, %Form{}, [diagnostic]} =
-             Formentation.form(@warning_declaration, adapter: :map)
-
-    assert %Diagnostic{severity: :warning, code: :required_permits_empty} = diagnostic
   end
 end
