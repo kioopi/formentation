@@ -28,7 +28,7 @@ Then fetch it:
 mix deps.get
 ```
 
-Its runtime dependencies (`jsv`, `phoenix_html`, `phoenix_live_view`, `vibe_kit`) are
+Its runtime dependencies (`jsv`, `phoenix_html`, `phoenix_live_view`) are
 all on Hex and resolve automatically.
 
 ## Concepts

@@ -43,3 +43,11 @@ for the reasoning behind each one.
   and `field/1`, the `:map`/`:json_schema` adapter selectors, and the shared
   kernel — `InstancePath`, `TemplatePath`, `JSONPointer`, `NodeId`, `Origin`,
   `Diagnostic`, `Issue`) did not move and is unaffected.
+
+### Removed
+
+- The unused `vibe_kit` runtime dependency. No library or demo module
+  referenced it, and an unconditional dependency of a form library is imposed
+  on every consuming application. A future UI-library integration will declare
+  its own dependencies when that boundary is designed
+  ([#9](https://github.com/kioopi/formentation/issues/9)).
