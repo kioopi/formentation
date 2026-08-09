@@ -1436,7 +1436,22 @@ defmodule Formentation.Source.MapTest do
                 %Formentation.Diagnostic{
                   severity: :error,
                   code: :invalid_declaration,
-                  origin: {:map_source, [:properties, 0]}
+                  origin: {:map_source, [:properties, "name"]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-map property spec reports the keyed path even alongside other entries" do
+      declaration = %{
+        kind: :object,
+        properties: [{"first", %{kind: :string}}, {"broken", [1, 2]}]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "broken"]}
                 }
               ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
     end

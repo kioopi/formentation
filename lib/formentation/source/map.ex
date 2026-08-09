@@ -218,12 +218,12 @@ defmodule Formentation.Source.Map do
      )}
   end
 
-  defp validate_property_entry({_name, spec}, index, ctx) do
+  defp validate_property_entry({name, spec}, _index, ctx) when is_binary(name) do
     {:error,
      invalid(
-       "properties entry #{index}: spec must be a map, got: #{inspect(spec)}",
+       "property #{inspect(name)}: spec must be a map, got: #{inspect(spec)}",
        ctx,
-       ctx.source_path ++ [:properties, index]
+       ctx.source_path ++ [:properties, name]
      )}
   end
 
