@@ -85,4 +85,95 @@ defmodule Formentation.Source.MapPropertyTest do
   defp nested(depth) do
     %{kind: :object, properties: [{"level", nested(depth - 1)}]}
   end
+
+  defp scalar_term do
+    StreamData.one_of([
+      StreamData.string(:printable, max_length: 10),
+      StreamData.integer(),
+      StreamData.float(),
+      StreamData.boolean(),
+      StreamData.atom(:alphanumeric),
+      StreamData.constant(nil)
+    ])
+  end
+
+  defp arbitrary_term(0), do: scalar_term()
+
+  defp arbitrary_term(depth) do
+    StreamData.frequency([
+      {3, scalar_term()},
+      {2, StreamData.list_of(arbitrary_term(depth - 1), max_length: 4)},
+      {2,
+       StreamData.map_of(
+         StreamData.string(:alphanumeric, max_length: 6),
+         arbitrary_term(depth - 1),
+         max_length: 4
+       )},
+      {1, StreamData.tuple({arbitrary_term(depth - 1), arbitrary_term(depth - 1)})}
+    ])
+  end
+
+  property "compiling arbitrary terms never raises" do
+    check all(term <- arbitrary_term(3)) do
+      assert_total_result(
+        Formentation.compile(term, adapter: Formentation.Source.Map, max_depth: 8, max_nodes: 100)
+      )
+    end
+  end
+
+  defp scalar_kind, do: StreamData.member_of([:string, :integer, :number, :boolean])
+
+  defp field_spec do
+    StreamData.bind(scalar_kind(), fn kind -> StreamData.constant(%{kind: kind}) end)
+  end
+
+  defp corrupted_property_entry do
+    StreamData.frequency([
+      {5,
+       StreamData.bind(StreamData.string(:alphanumeric, min_length: 1, max_length: 8), fn name ->
+         StreamData.bind(field_spec(), fn spec -> StreamData.constant({name, spec}) end)
+       end)},
+      {1, StreamData.constant(nil)},
+      {1, StreamData.string(:alphanumeric, max_length: 5)},
+      {1,
+       StreamData.bind(StreamData.atom(:alphanumeric), fn name ->
+         StreamData.bind(field_spec(), fn spec -> StreamData.constant({name, spec}) end)
+       end)},
+      {1,
+       StreamData.bind(StreamData.string(:alphanumeric, min_length: 1, max_length: 8), fn name ->
+         StreamData.map(StreamData.integer(), fn value -> {name, value} end)
+       end)}
+    ])
+  end
+
+  defp almost_valid_object do
+    StreamData.bind(
+      StreamData.list_of(corrupted_property_entry(), max_length: 5),
+      fn properties ->
+        StreamData.constant(%{kind: :object, properties: properties})
+      end
+    )
+  end
+
+  property "compiling almost-valid declarations with occasionally malformed entries never raises" do
+    check all(declaration <- almost_valid_object()) do
+      assert_total_result(
+        Formentation.compile(declaration,
+          adapter: Formentation.Source.Map,
+          max_depth: 8,
+          max_nodes: 100
+        )
+      )
+    end
+  end
+
+  defp assert_total_result({:ok, %Formentation.Definition{}, diagnostics})
+       when is_list(diagnostics),
+       do: :ok
+
+  defp assert_total_result({:error, [%Formentation.Diagnostic{} | _]}), do: :ok
+
+  defp assert_total_result(other) do
+    flunk("expected a total compilation result, got: #{inspect(other)}")
+  end
 end
