@@ -27,7 +27,7 @@ Formentation is not yet on Hex. Add it as a git dependency pinned to a tag, then
 `mix deps.get`:
 
 ```elixir
-{:formentation, git: "https://github.com/kioopi/formentation.git", tag: "v0.1.0"}
+{:formentation, git: "https://github.com/kioopi/formentation.git", tag: "v0.2.0"}
 ```
 
 Formentation requires Elixir ~> 1.20, and pulls in `phoenix_html`,

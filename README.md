@@ -17,7 +17,7 @@ Formentation is not yet published to Hex. Add it as a git dependency, pinned to 
 ```elixir
 def deps do
   [
-    {:formentation, git: "https://github.com/kioopi/formentation.git", tag: "v0.1.0"}
+    {:formentation, git: "https://github.com/kioopi/formentation.git", tag: "v0.2.0"}
   ]
 end
 ```
