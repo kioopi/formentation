@@ -7,6 +7,11 @@ defmodule Formentation.Source.JSONSchema do
   (docs/superpowers/specs/2026-07-21-phase1-slice2-json-schema-adapter-design.md)
   and the annotations mini-slice spec
   (docs/superpowers/specs/2026-07-21-phase1-annotations-mini-slice-design.md).
+
+  Selected as `adapter: :json_schema`. The supported keyword subset is
+  the surface to plan against; the compiled `Formentation.Definition` is
+  queried through `Formentation.Info` rather than pattern-matched. See
+  `Formentation.Source` for the adapter compatibility boundary.
   """
 
   @behaviour Formentation.Source

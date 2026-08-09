@@ -10,7 +10,7 @@ status: draft
 
 # Compile pipeline
 
-> [!note] As of 2026-08-08 · Wave 3 façade (A3) complete; module paths refreshed for the lib-tree restructure ([[18-decisions#D-047 — The lib tree is restructured to state the north-star architecture|D-047]])
+> [!note] As of 2026-08-09 · Wave 3 façade (A3) complete; module paths refreshed for the lib-tree restructure ([[18-decisions#D-047 — The lib tree is restructured to state the north-star architecture|D-047]])
 > Describes the compile pipeline as built. The `Node` representation uses one struct per kind ([[18-decisions#D-015 — One struct per node kind|D-015]]); this note stays at pipeline altitude and defers `Node` internals to [[definition-and-node|Definition and Node]].
 
 The **compile pipeline** turns a declarative form description into a static, source-independent [[definition-and-node|`Definition`]] that can be cached, inspected, and queried — with no runtime state attached. It is the first half of Formentation: everything here runs once, ahead of any user interaction. The runtime half consumes the `Definition` and is documented in [[form-state-and-transitions|Form state and transitions]], [[phoenix-form-data|the FormData projection]], and [[rendering|Rendering]]; [[end-to-end-data-flow|End-to-end data flow]] joins both halves into one walk.
@@ -50,7 +50,7 @@ flowchart TD
 
 ### 1. Entry — `Formentation.compile/2` and `Formentation.form/2`
 
-`compile(declaration, adapter: :map)` is one public entry point. It resolves `:adapter` — a stable built-in selector (`:map` for `Formentation.Source.Map`, `:json_schema` for `Formentation.Source.JSONSchema`), or any module exporting `compile/2` (the extension route for third-party adapters) — passes the rest through, and delegates to that adapter. Resolution failures (a missing, unsupported, or invalid `:adapter`) raise `ArgumentError` at this boundary rather than producing a diagnostic, since no adapter has run yet. Beyond that resolution, it carries no logic of its own — source selection is the only decision made here. ([[18-decisions#D-046 — Adapter resolution failures raise; compilation failures stay diagnostics|D-046]])
+`compile(declaration, adapter: :map)` is one public entry point. It resolves `:adapter` — a stable built-in selector (`:map` for `Formentation.Source.Map`, `:json_schema` for `Formentation.Source.JSONSchema`), or any module exporting `compile/2` (an accepted advanced dispatch mechanism — see the compatibility note below) — passes the rest through, and delegates to that adapter. Resolution failures (a missing, unsupported, or invalid `:adapter`) raise `ArgumentError` at this boundary rather than producing a diagnostic, since no adapter has run yet. Beyond that resolution, it carries no logic of its own — source selection is the only decision made here. ([[18-decisions#D-046 — Adapter resolution failures raise; compilation failures stay diagnostics|D-046]])
 
 `Formentation.form/2` is the second public entry point: a compile-and-initialize façade. It extracts `data:` (defaulting to `%{}`) and `defaults:` from the option list for `Formentation.Form.new/3`, partitions them so an adapter can never receive `:data` or `:defaults` even if it takes options by those names (the escape hatch for that case is `compile/2` + `Form.new/3`), and forwards every other option to `compile/2` in original order. It only initializes a form after successful compilation; if compilation fails, the form is never built and `Form.new/3` is not called.
 
@@ -65,6 +65,14 @@ Entry contract:
 ```
 
 A successful `compile/2` still returns diagnostics (warnings, unsupported constructs); `:error` is reserved for a declaration too malformed to yield a definition at all. A successful `form/2` returns a form (never a definition) and the same diagnostics; a compilation failure propagates unchanged and skips form initialization.
+
+> [!warning] Dispatch is supported; construction is not
+> Accepting a module that exports `compile/2` is a stable dispatch
+> mechanism, and `Formentation.compile/2`/`form/2` will keep accepting
+> one. That is *not* the same as a third-party adapter contract: the
+> internals required to build a valid `Formentation.Definition` are not
+> compatibility-stable, so an out-of-tree adapter may break across
+> versions. See [[limitations#No extension points|What isn't supported yet]].
 
 ### 2. Source adapter — declaration → `Definition`
 
