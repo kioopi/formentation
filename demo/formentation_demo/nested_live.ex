@@ -28,13 +28,12 @@ defmodule FormentationDemo.NestedLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, definition, _diagnostics} =
-      Formentation.compile(@schema, adapter: Formentation.Source.JSONSchema)
+    {:ok, form_state, []} = Formentation.form(@schema, adapter: :json_schema)
 
     {:ok,
      socket
-     |> assign(definition: definition, submitted: nil)
-     |> assign_payload(Form.new(definition))}
+     |> assign(:submitted, nil)
+     |> assign_payload(form_state)}
   end
 
   @impl true

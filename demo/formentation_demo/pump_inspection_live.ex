@@ -16,21 +16,21 @@ defmodule FormentationDemo.PumpInspectionLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, definition, _diagnostics} =
-      Formentation.compile(PumpInspection.json_schema(),
-        adapter: Formentation.Source.JSONSchema,
-        ui: PumpInspection.ui_hints()
+    {:ok, form_state, []} =
+      Formentation.form(PumpInspection.json_schema(),
+        adapter: :json_schema,
+        ui: PumpInspection.ui_hints(),
+        data: PumpInspection.initial_data()
       )
 
     {:ok,
      socket
      |> assign(
-       definition: definition,
        asset_form: to_form(%{"name" => "Pump 7"}, as: :asset),
        submitted: nil,
        native_validation: true
      )
-     |> assign_payload(Form.new(definition, PumpInspection.initial_data()))}
+     |> assign_payload(form_state)}
   end
 
   @impl true

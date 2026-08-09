@@ -13,7 +13,7 @@ status: current
 
 # Using Formentation with LiveView
 
-*Covers Formentation as of 2026-07-24. Every code sample below is either
+*Covers Formentation as of 2026-08-09. Every code sample below is either
 lifted verbatim from the runnable demo (`demo/formentation_demo/`,
 exercised by `test/formentation_demo/`) or was executed directly against
 this version before being written down.*
@@ -35,30 +35,45 @@ Its LiveViews — `demo/formentation_demo/pump_inspection_live.ex` and
 `test/formentation_demo/`, and the snippets below are lifted from them
 rather than invented for this page.
 
-## Mount: compile once, build the form, project it
+## Mount: build the form, project it
 
 ```elixir
 @impl true
 def mount(_params, _session, socket) do
-  {:ok, definition, _diagnostics} =
-    Formentation.compile(PumpInspection.json_schema(),
-      adapter: Formentation.Source.JSONSchema,
-      ui: PumpInspection.ui_hints()
+  {:ok, form_state, []} =
+    Formentation.form(PumpInspection.json_schema(),
+      adapter: :json_schema,
+      ui: PumpInspection.ui_hints(),
+      data: PumpInspection.initial_data()
     )
 
   {:ok,
    socket
    |> assign(
-     definition: definition,
      asset_form: to_form(%{"name" => "Pump 7"}, as: :asset),
      submitted: nil
    )
-   |> assign_payload(Form.new(definition, PumpInspection.initial_data()))}
+   |> assign_payload(form_state)}
 end
 ```
 
-paired with a private helper that does the `Formentation.Form` →
-`Phoenix.HTML.Form` projection every handler below calls back into:
+The demo matches a literal `[]` because its schema is fixed and compiles
+warning-free, so an unexpected diagnostic fails the mount loudly instead
+of vanishing. **With your own schema, bind the list instead:**
+
+```elixir
+{:ok, form_state, diagnostics} =
+  Formentation.form(my_schema, adapter: :json_schema, data: initial_data)
+```
+
+Compilation can succeed *and* carry warnings — an `"array"` property, for
+instance, compiles with an `:unsupported_type` diagnostic — and a hard
+`[]` match would turn that warning into a `MatchError` crash on first
+render.
+
+The mount is paired with a private helper that does the
+`Formentation.Form` → `Phoenix.HTML.Form` projection every handler below
+calls back into:
 
 ```elixir
 defp assign_payload(socket, form_state) do
@@ -79,11 +94,13 @@ only addition is doing it once in `mount/3` too, so the first render
 already has a `Phoenix.HTML.Form` to hand to
 `Formentation.Phoenix.fields/1`.
 
-A LiveView that compiles on every mount rather than once at boot could
-use `Formentation.form/2` instead of the `compile/2` + `Form.new/3`
-pattern above — it combines both steps and is simpler when you don't need
-the intermediate definition to cache or inspect. See
-[[getting-started|Getting started]] for an example.
+`Formentation.form/2` compiles on every mount. That is the ordinary path
+and what the demo does, because compilation is cheap and the code stays
+short. A LiveView that needs the intermediate `Formentation.Definition`
+— to cache it at boot rather than recompile per mount, or to inspect it
+through `Formentation.Info` — can use `Formentation.compile/2` followed
+by `Formentation.Form.new/3` instead; the two steps are exactly what the
+façade combines. See [[getting-started|Getting started]] for both.
 
 ## Handlers: `validate/2` on change, `submit/2` on submit
 
