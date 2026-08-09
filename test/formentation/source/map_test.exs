@@ -113,6 +113,15 @@ defmodule Formentation.Source.MapTest do
 
       assert Info.origins(definition, ["serial_number"])[:label] == {:inference, :label_from_name}
     end
+
+    test "an explicit nil title still falls back to a humanized name" do
+      declaration = %{kind: :object, properties: [{"first_name", %{kind: :string, title: nil}}]}
+
+      definition = compile!(declaration)
+
+      assert {:ok, %PresentationInfo.Field{label: "First name"}} =
+               Info.presentation_at(definition, ["first_name"])
+    end
   end
 
   describe "scalar kinds and roles" do
@@ -1154,6 +1163,45 @@ defmodule Formentation.Source.MapTest do
                 %Formentation.Diagnostic{
                   code: :invalid_declaration,
                   origin: {:map_source, [:groups, 1, :id]}
+                }
+              ]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-string, non-nil title is an invalid_declaration error" do
+      declaration = %{kind: :object, properties: [{"name", %{kind: :string, title: 42}}]}
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "name", :title]}
+                }
+              ]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-string root title is an invalid_declaration error" do
+      declaration = %{kind: :object, title: :oops, properties: [{"name", %{kind: :string}}]}
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:title]}
+                }
+              ]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-string, non-nil help is an invalid_declaration error" do
+      declaration = %{kind: :object, properties: [{"name", %{kind: :string, help: ["oops"]}}]}
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "name", :help]}
                 }
               ]} =
                Formentation.compile(declaration, adapter: Formentation.Source.Map)

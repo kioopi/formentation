@@ -42,11 +42,20 @@ defmodule Formentation.Source.Map do
     with :ok <- check_depth(ctx),
          {:ok, ctx} <- take_budget(ctx),
          {:ok, children, ctx} <- compile_children(declaration, ctx),
-         {:ok, groups} <- fetch_groups(declaration, ctx) do
+         {:ok, groups} <- fetch_groups(declaration, ctx),
+         {:ok, {label, label_origin}} <-
+           resolve_label(declaration, name, ctx.source_path, ctx.template_path, ctx),
+         {:ok, help} <-
+           fetch_optional_string(
+             declaration,
+             :help,
+             label_subject(name),
+             ctx.source_path,
+             ctx.template_path,
+             ctx
+           ) do
       semantic_children = Enum.map(children, & &1.semantic)
       {presentation_children, ctx} = attach_presentation_groups(children, groups, ctx)
-
-      {label, label_origin} = resolve_label(declaration, name, ctx.source_path)
 
       presentation_origins =
         Shared.origin_entries(
@@ -59,7 +68,7 @@ defmodule Formentation.Source.Map do
       presentation =
         Presentation.Object.new(semantic.id, presentation_children,
           label: label,
-          help: declaration[:help],
+          help: help,
           origins: presentation_origins
         )
 
@@ -397,8 +406,18 @@ defmodule Formentation.Source.Map do
          {:ok, examples, examples_origin} <-
            fetch_examples(spec, name, source_path, template_path, ctx),
          {:ok, options, options_origin, ctx} <-
-           fetch_one_of_options(spec, name, source_path, template_path, ctx) do
-      {label, label_origin} = resolve_label(spec, name, source_path)
+           fetch_one_of_options(spec, name, source_path, template_path, ctx),
+         {:ok, {label, label_origin}} <-
+           resolve_label(spec, name, source_path, template_path, ctx),
+         {:ok, help} <-
+           fetch_optional_string(
+             spec,
+             :help,
+             label_subject(name),
+             source_path,
+             template_path,
+             ctx
+           ) do
       {role, role_origin} = resolve_role(spec, source_path)
 
       {default, default_origin, ctx} =
@@ -438,7 +457,7 @@ defmodule Formentation.Source.Map do
       presentation =
         Presentation.Field.new(semantic.id,
           label: label,
-          help: spec[:help],
+          help: help,
           widget: spec[:widget],
           hidden?: hidden,
           origins: presentation_origins(origins)
@@ -521,15 +540,49 @@ defmodule Formentation.Source.Map do
     }
   end
 
-  defp resolve_label(%{title: title}, _name, source_path) when is_binary(title) do
-    {title, {:map_source, source_path ++ [:title]}}
+  defp fetch_optional_string(map, key, subject, source_path, template_path, ctx) do
+    case Map.get(map, key) do
+      nil ->
+        {:ok, nil}
+
+      value when is_binary(value) ->
+        {:ok, value}
+
+      other ->
+        {:error,
+         invalid(
+           "#{key} for #{subject} must be a string, got: #{inspect(other)}",
+           ctx,
+           source_path ++ [key],
+           template_path
+         )}
+    end
   end
 
-  defp resolve_label(_spec, nil, _source_path), do: {nil, nil}
-
-  defp resolve_label(_spec, name, _source_path) do
-    {Shared.humanize(name), {:inference, :label_from_name}}
+  defp resolve_label(%{title: title}, _name, source_path, _template_path, _ctx)
+       when is_binary(title) do
+    {:ok, {title, {:map_source, source_path ++ [:title]}}}
   end
+
+  defp resolve_label(%{title: title}, name, source_path, template_path, ctx)
+       when not is_nil(title) do
+    {:error,
+     invalid(
+       "title for #{label_subject(name)} must be a string, got: #{inspect(title)}",
+       ctx,
+       source_path ++ [:title],
+       template_path
+     )}
+  end
+
+  defp resolve_label(_spec, nil, _source_path, _template_path, _ctx), do: {:ok, {nil, nil}}
+
+  defp resolve_label(_spec, name, _source_path, _template_path, _ctx) do
+    {:ok, {Shared.humanize(name), {:inference, :label_from_name}}}
+  end
+
+  defp label_subject(nil), do: "the root object"
+  defp label_subject(name), do: "property #{inspect(name)}"
 
   defp resolve_role(%{role: role}, source_path) when not is_nil(role) do
     {role, {:map_source, source_path ++ [:role]}}
