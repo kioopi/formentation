@@ -334,21 +334,18 @@ defmodule Formentation.Source.Map do
   end
 
   defp validate_group_fields(fields, index, ctx) do
-    fields
-    |> Enum.with_index()
-    |> Enum.reduce_while(:ok, fn {name, field_index}, :ok ->
-      if is_binary(name) do
-        {:cont, :ok}
-      else
-        {:halt,
-         {:error,
-          invalid(
-            "group #{index}: field #{field_index} must be a string, got: #{inspect(name)}",
-            ctx,
-            ctx.source_path ++ [:groups, index, :fields, field_index]
-          )}}
-      end
-    end)
+    case Enum.find(Enum.with_index(fields), fn {name, _field_index} -> not is_binary(name) end) do
+      nil ->
+        :ok
+
+      {name, field_index} ->
+        {:error,
+         invalid(
+           "group #{index}: field #{field_index} must be a string, got: #{inspect(name)}",
+           ctx,
+           ctx.source_path ++ [:groups, index, :fields, field_index]
+         )}
+    end
   end
 
   defp compile_property(name, %{kind: :object} = spec, required?, ctx) do

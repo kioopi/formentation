@@ -10,7 +10,7 @@ status: current
 
 # Source adapters
 
-> [!note] As of 2026-08-08 · source-neutral validation dispatch; adapter selection (D-046); module paths refreshed for the lib-tree restructure (D-047)
+> [!note] As of 2026-08-09 · Map-source declaration totality (D-048); source-neutral validation dispatch; adapter selection (D-046); module paths refreshed for the lib-tree restructure (D-047)
 > Describes the two adapters as built. Node shapes are deferred to
 > [[definition-and-node|Definition and Node]], the origin model to
 > [[diagnostics-and-origins|Diagnostics and origins]], and the addressing
@@ -221,6 +221,19 @@ Two safeguards run through every compile, independent of source:
   ([[18-decisions#D-010 — Empty-string, null, and absent-key decode policies|D-010]]).
   These depend on the finished nodes, not the vocabulary, so they live in
   the shared layer and fire the same way for both sources.
+
+## Map-source declaration validation
+
+`Formentation.Source.Map` validates declaration shapes at the compile boundary.
+Malformed values return a hard `:invalid_declaration` diagnostic with an indexed
+or keyed `:map_source` origin rather than raising. Validation covers property
+entry tuples and specs, `required` member types and membership, group shape,
+unique binary group IDs and binary field members, `title`/`help` string values,
+`role`/`widget` atom values, scalar-kind-compatible defaults, and constraint
+types, applicability, and bound ordering. Validation is deterministic and
+fail-fast; valid declarations retain declaration order and existing recoverable
+warnings, including hint coercion and unknown group-field warnings. See
+[[18-decisions#D-048 — Map-source declarations are total at the compile boundary|D-048]].
 
 ## The differential-equivalence property
 
