@@ -1701,6 +1701,7 @@ defmodule Formentation.Source.MapTest do
         properties: [
           {"_unused_note", %{kind: :string}},
           {"_csrf_token", %{kind: :string}},
+          {"_persistent_id", %{kind: :string}},
           {"fine", %{kind: :string}}
         ]
       }
@@ -1709,7 +1710,21 @@ defmodule Formentation.Source.MapTest do
         Formentation.compile(declaration, adapter: Formentation.Source.Map)
 
       codes = Enum.map(diagnostics, & &1.code)
-      assert Enum.count(codes, &(&1 == :reserved_property_name)) == 2
+      assert Enum.count(codes, &(&1 == :reserved_property_name)) == 3
+    end
+
+    test "warns on a nested _persistent_id property name" do
+      declaration = %{
+        kind: :object,
+        properties: [
+          {"nested", %{kind: :object, properties: [{"_persistent_id", %{kind: :string}}]}}
+        ]
+      }
+
+      {:ok, _definition, diagnostics} =
+        Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
+      assert [%Formentation.Diagnostic{code: :reserved_property_name}] = diagnostics
     end
   end
 
