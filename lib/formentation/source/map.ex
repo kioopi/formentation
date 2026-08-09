@@ -417,9 +417,9 @@ defmodule Formentation.Source.Map do
              source_path,
              template_path,
              ctx
-           ) do
-      {role, role_origin} = resolve_role(spec, source_path)
-
+           ),
+         {:ok, {role, role_origin}} <-
+           resolve_role(spec, name, source_path, template_path, ctx) do
       {default, default_origin, ctx} =
         resolve_default(spec, name, source_path, template_path, ctx)
 
@@ -584,17 +584,29 @@ defmodule Formentation.Source.Map do
   defp label_subject(nil), do: "the root object"
   defp label_subject(name), do: "property #{inspect(name)}"
 
-  defp resolve_role(%{role: role}, source_path) when not is_nil(role) do
-    {role, {:map_source, source_path ++ [:role]}}
+  defp resolve_role(%{role: role}, _name, source_path, _template_path, _ctx)
+       when is_atom(role) and not is_nil(role) do
+    {:ok, {role, {:map_source, source_path ++ [:role]}}}
   end
 
-  defp resolve_role(%{one_of: options}, _source_path) when is_list(options) do
-    {:select, {:inference, :one_of_select}}
+  defp resolve_role(%{role: role}, name, source_path, template_path, ctx) when not is_nil(role) do
+    {:error,
+     invalid(
+       "role for #{label_subject(name)} must be an atom, got: #{inspect(role)}",
+       ctx,
+       source_path ++ [:role],
+       template_path
+     )}
   end
 
-  defp resolve_role(%{kind: kind}, _source_path) do
+  defp resolve_role(%{one_of: options}, _name, _source_path, _template_path, _ctx)
+       when is_list(options) do
+    {:ok, {:select, {:inference, :one_of_select}}}
+  end
+
+  defp resolve_role(%{kind: kind}, _name, _source_path, _template_path, _ctx) do
     {role, rule} = Map.fetch!(@role_defaults, kind)
-    {role, {:inference, rule}}
+    {:ok, {role, {:inference, rule}}}
   end
 
   defp key_origin(spec, key, source_path) do

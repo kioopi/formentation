@@ -174,6 +174,14 @@ defmodule Formentation.Source.MapTest do
       assert Info.origins(definition, ["last_service"])[:role] == {:inference, :string_default}
     end
 
+    test "a custom atom role passes through verbatim" do
+      declaration = %{kind: :object, properties: [{"contact", %{kind: :string, role: :email}}]}
+
+      definition = compile!(declaration)
+
+      assert %Semantic.Field{role: :email} = Info.node_at(definition, ["contact"])
+    end
+
     test "fields carry their scalar value type" do
       declaration = %{
         kind: :object,
@@ -1202,6 +1210,19 @@ defmodule Formentation.Source.MapTest do
                 %Formentation.Diagnostic{
                   code: :invalid_declaration,
                   origin: {:map_source, [:properties, "name", :help]}
+                }
+              ]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-atom, non-nil role is an invalid_declaration error" do
+      declaration = %{kind: :object, properties: [{"contact", %{kind: :string, role: "email"}}]}
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "contact", :role]}
                 }
               ]} =
                Formentation.compile(declaration, adapter: Formentation.Source.Map)
