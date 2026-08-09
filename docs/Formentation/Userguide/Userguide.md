@@ -35,11 +35,13 @@ how do I *do* a thing. The internal counterpart is [[Techdocs]].
 4. [[rendering-with-phoenix|Rendering with Phoenix]] — the two
    components, embedding under a parent form, widgets, and what the
    reference UI guarantees.
-5. [[using-with-liveview|Using Formentation with LiveView]] — mount,
+5. [[inspecting-definitions|Inspecting definitions]] — querying a
+   compiled definition and reading where each resolved value came from.
+6. [[using-with-liveview|Using Formentation with LiveView]] — mount,
    the `phx-change`/`phx-submit` handlers, the two rules, error
    visibility, the runnable demo (including its native-validation
    toggle), and how to run its browser-real test suite.
-6. [[limitations|What isn't supported yet]] — the honest list.
+7. [[limitations|What isn't supported yet]] — the honest list.
 
 Fine-grained API detail — every function, every option — lives in the
 moduledocs rather than here; run `mix docs` or read them in IEx with

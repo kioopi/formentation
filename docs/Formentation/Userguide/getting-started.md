@@ -74,9 +74,14 @@ compilation — `diagnostics` may carry warnings even on success — or
 case no form is created.
 
 The `adapter:` option is mandatory and selects your source:
-- `:map` for `Formentation.Source.Map` — plain Elixir declarations
-- `:json_schema` for `Formentation.Source.JSONSchema` — JSON Schema 2020-12 documents
-- Any module exporting `compile/2` for third-party sources
+- `:map` — plain Elixir declarations
+- `:json_schema` — JSON Schema 2020-12 documents
+
+There is no default and no inference: a plain map could be either a map
+declaration or a decoded JSON Schema, so you always say which. A third
+advanced route exists for supplying your own source — see
+[[limitations#No extension points|what isn't supported yet]] for what it
+does and does not promise.
 
 A **bad `adapter:`** — one that is missing, unknown, or invalid — raises
 `ArgumentError` immediately. This is different from a declaration that
@@ -111,33 +116,8 @@ form = Formentation.Form.new(definition, %{"email" => "ada@example.com"})
 
 `Formentation.compile/2` returns the `Formentation.Definition` — a static,
 inert description of the form that holds no values, no errors, and no DOM
-ids. Query it through `Formentation.Info`:
-
-```elixir
-Formentation.Info.fields(definition) |> Enum.map(& &1.name)
-#=> ["email", "age", "subscribed"]
-
-Formentation.Info.role(definition, ["email"])
-#=> :email
-
-Formentation.Info.required?(definition, ["email"])
-#=> true
-```
-
-Every value Formentation resolved records **where it came from**, which
-is useful when a form does not look the way you expected:
-
-```elixir
-Formentation.Info.origins(definition, ["age"])
-#=> [
-#=>   label: {:map_source, [:properties, "age", :title]},
-#=>   role: {:inference, :integer_default}
-#=> ]
-```
-
-The label came from your `title`; the role was *inferred* from the kind.
-Anything tagged `{:inference, _}` is a decision Formentation made for
-you.
+ids. You can query what it compiled to, including where each resolved
+value came from: see [[inspecting-definitions|Inspecting definitions]].
 
 Because the definition is inert, one compiled definition can back any
 number of forms: pair it with data through `Formentation.Form.new/3` as
@@ -262,13 +242,8 @@ For an undecodable field, the returned form has no candidate:
 Formentation.Form.candidate(submitted_form)
 #=> :none
 
-Formentation.Form.issues(submitted_form)
-#=> [%Formentation.Issue{
-#=>    path: %InstancePath{segments: ["age"]},
-#=>    code: :invalid_integer,
-#=>    message: "\"36x\" is not a valid integer",
-#=>    source: :decode
-#=>  }]
+Formentation.Form.issues(submitted_form) |> Enum.map(& &1.message)
+#=> ["\"36x\" is not a valid integer"]
 ```
 
 The all-or-nothing rule is deliberate: it stops one bad field from
