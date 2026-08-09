@@ -1081,6 +1081,70 @@ defmodule Formentation.Source.MapTest do
                Formentation.compile(declaration, adapter: Formentation.Source.Map)
     end
 
+    test "a non-tuple properties entry is an invalid_declaration error, not a crash" do
+      for entry <- [nil, "name", %{kind: :string}, {:name}, {:name, %{kind: :string}, :extra}] do
+        declaration = %{kind: :object, properties: [entry]}
+
+        assert {:error,
+                [
+                  %Formentation.Diagnostic{
+                    severity: :error,
+                    code: :invalid_declaration,
+                    origin: {:map_source, [:properties, 0]}
+                  }
+                ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      end
+    end
+
+    test "a non-binary property name is an invalid_declaration error, not a crash" do
+      declaration = %{kind: :object, properties: [{:name, %{kind: :string}}]}
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  severity: :error,
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, 0]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-map property spec is an invalid_declaration error, not a crash" do
+      declaration = %{kind: :object, properties: [{"name", "not-a-spec"}]}
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  severity: :error,
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, 0]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a malformed nested properties entry reports the nested indexed path" do
+      declaration = %{
+        kind: :object,
+        properties: [{"outer", %{kind: :object, properties: [{"x", %{kind: :string}}, nil]}}]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  severity: :error,
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "outer", :properties, 1]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "the first malformed entry is reported deterministically" do
+      declaration = %{kind: :object, properties: [nil, {:also_bad, %{kind: :string}}]}
+
+      assert {:error, [%Formentation.Diagnostic{origin: {:map_source, [:properties, 0]}}]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
     test "an unknown kind compiles to an unsupported node plus a warning" do
       declaration = %{
         kind: :object,

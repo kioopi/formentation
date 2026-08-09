@@ -41,8 +41,7 @@ defmodule Formentation.Source.Map do
   defp compile_object(%{kind: :object} = declaration, name, ctx) do
     with :ok <- check_depth(ctx),
          {:ok, ctx} <- take_budget(ctx),
-         {:ok, required} <- fetch_list(declaration, :required, ctx),
-         {:ok, children, ctx} <- compile_children(declaration, required, ctx),
+         {:ok, children, ctx} <- compile_children(declaration, ctx),
          {:ok, groups} <- fetch_groups(declaration, ctx) do
       semantic_children = Enum.map(children, & &1.semantic)
       {presentation_children, ctx} = attach_presentation_groups(children, groups, ctx)
@@ -102,14 +101,16 @@ defmodule Formentation.Source.Map do
     }
   end
 
-  defp compile_children(declaration, required, ctx) do
-    with {:ok, properties} <- fetch_list(declaration, :properties, ctx) do
-      compile_properties(properties, required, ctx)
+  defp compile_children(declaration, ctx) do
+    with {:ok, properties} <- fetch_list(declaration, :properties, ctx),
+         {:ok, properties} <- validate_property_entries(properties, ctx),
+         :ok <- reject_duplicate_properties(properties, ctx) do
+      compile_properties(properties, declaration, ctx)
     end
   end
 
-  defp compile_properties(properties, required, ctx) do
-    with :ok <- reject_duplicate_properties(properties, ctx),
+  defp compile_properties(properties, declaration, ctx) do
+    with {:ok, required} <- fetch_list(declaration, :required, ctx),
          {:ok, compiled, ctx} <- compile_properties_in_order(properties, required, ctx) do
       {:ok, Enum.reverse(compiled), ctx}
     end
@@ -138,6 +139,57 @@ defmodule Formentation.Source.Map do
       nil -> :ok
       name -> {:error, duplicate_property(name, ctx)}
     end
+  end
+
+  defp validate_property_entries(properties, ctx) do
+    properties
+    |> Enum.with_index()
+    |> Enum.reduce_while({:ok, []}, fn {entry, index}, {:ok, acc} ->
+      case validate_property_entry(entry, index, ctx) do
+        {:ok, valid_entry} -> {:cont, {:ok, [valid_entry | acc]}}
+        {:error, diagnostic} -> {:halt, {:error, diagnostic}}
+      end
+    end)
+    |> case do
+      {:ok, acc} -> {:ok, Enum.reverse(acc)}
+      {:error, diagnostic} -> {:error, diagnostic}
+    end
+  end
+
+  defp validate_property_entry({name, spec}, _index, _ctx)
+       when is_binary(name) and is_map(spec) do
+    {:ok, {name, spec}}
+  end
+
+  defp validate_property_entry({name, _spec}, index, ctx) when not is_binary(name) do
+    {:error,
+     invalid(
+       "properties entry #{index}: name must be a string, got: #{inspect(name)}",
+       ctx,
+       ctx.source_path ++ [:properties, index]
+     )}
+  end
+
+  defp validate_property_entry({_name, spec}, index, ctx) do
+    {:error,
+     invalid(
+       "properties entry #{index}: spec must be a map, got: #{inspect(spec)}",
+       ctx,
+       ctx.source_path ++ [:properties, index]
+     )}
+  end
+
+  defp validate_property_entry(other, index, ctx) do
+    {:error,
+     invalid(
+       "properties entry #{index}: expected a {name, spec} tuple, got: #{inspect(other)}",
+       ctx,
+       ctx.source_path ++ [:properties, index]
+     )}
+  end
+
+  defp property_names(properties) do
+    properties |> Enum.map(fn {name, _spec} -> name end) |> MapSet.new()
   end
 
   defp duplicate_property(name, ctx) do
