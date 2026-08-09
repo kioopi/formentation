@@ -1244,6 +1244,38 @@ defmodule Formentation.Source.MapTest do
                Formentation.compile(declaration, adapter: Formentation.Source.Map)
     end
 
+    test "a default incompatible with the field's kind is an invalid_declaration error" do
+      declaration = %{
+        kind: :object,
+        properties: [{"count", %{kind: :integer, default: "not-a-number"}}]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "count", :default]}
+                }
+              ]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a boolean default on a boolean field is compatible" do
+      declaration = %{kind: :object, properties: [{"active", %{kind: :boolean, default: true}}]}
+
+      definition = compile!(declaration)
+
+      assert %Semantic.Field{default: true} = Info.node_at(definition, ["active"])
+    end
+
+    test "a numeric default on a number field is compatible" do
+      declaration = %{kind: :object, properties: [{"weight", %{kind: :number, default: 1.5}}]}
+
+      definition = compile!(declaration)
+
+      assert %Semantic.Field{default: 1.5} = Info.node_at(definition, ["weight"])
+    end
+
     test "a non-tuple properties entry is an invalid_declaration error, not a crash" do
       for entry <- [nil, "name", %{kind: :string}, {:name}, {:name, %{kind: :string}, :extra}] do
         declaration = %{kind: :object, properties: [entry]}

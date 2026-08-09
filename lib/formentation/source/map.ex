@@ -428,10 +428,9 @@ defmodule Formentation.Source.Map do
              source_path,
              template_path,
              ctx
-           ) do
-      {default, default_origin, ctx} =
-        resolve_default(spec, name, source_path, template_path, ctx)
-
+           ),
+         {:ok, {default, default_origin, ctx}} <-
+           resolve_default(spec, name, kind, source_path, template_path, ctx) do
       {hidden, hidden_origin, ctx} =
         resolve_flag(spec, :hidden, name, source_path, template_path, ctx)
 
@@ -495,7 +494,7 @@ defmodule Formentation.Source.Map do
     end
   end
 
-  defp resolve_default(spec, name, source_path, template_path, ctx) do
+  defp resolve_default(spec, name, kind, source_path, template_path, ctx) do
     case Map.fetch(spec, :default) do
       {:ok, nil} ->
         warning = %Diagnostic{
@@ -506,15 +505,34 @@ defmodule Formentation.Source.Map do
           template_path: template_path
         }
 
-        {nil, nil, %{ctx | diagnostics: [warning | ctx.diagnostics]}}
+        {:ok, {nil, nil, %{ctx | diagnostics: [warning | ctx.diagnostics]}}}
 
       {:ok, value} ->
-        {value, {:map_source, source_path ++ [:default]}, ctx}
+        if default_compatible?(kind, value) do
+          {:ok, {value, {:map_source, source_path ++ [:default]}, ctx}}
+        else
+          {:error,
+           invalid(
+             "default for property #{inspect(name)} must be #{kind_article(kind)} #{kind}, " <>
+               "got: #{inspect(value)}",
+             ctx,
+             source_path ++ [:default],
+             template_path
+           )}
+        end
 
       :error ->
-        {nil, nil, ctx}
+        {:ok, {nil, nil, ctx}}
     end
   end
+
+  defp default_compatible?(:string, value), do: is_binary(value)
+  defp default_compatible?(:integer, value), do: is_integer(value)
+  defp default_compatible?(:number, value), do: is_number(value)
+  defp default_compatible?(:boolean, value), do: is_boolean(value)
+
+  defp kind_article(:integer), do: "an"
+  defp kind_article(_kind), do: "a"
 
   defp resolve_flag(spec, key, name, source_path, template_path, ctx) do
     case Map.fetch(spec, key) do
