@@ -984,8 +984,14 @@ defmodule Formentation.Source.MapTest do
         properties: %{"b" => %{kind: :string}, "a" => %{kind: :string}}
       }
 
-      assert {:error, [%Formentation.Diagnostic{severity: :error, code: :invalid_declaration}]} =
-               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  severity: :error,
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
     end
 
     test "duplicate property names are a duplicate_property error" do
@@ -1037,8 +1043,14 @@ defmodule Formentation.Source.MapTest do
         properties: [{"a", %{kind: :string}}]
       }
 
-      assert {:error, [%Formentation.Diagnostic{severity: :error, code: :invalid_declaration}]} =
-               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  severity: :error,
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:required]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
     end
 
     test "a non-list groups value is an invalid_declaration error" do
@@ -1048,8 +1060,14 @@ defmodule Formentation.Source.MapTest do
         groups: %{"electrical" => %{id: "electrical", fields: ["voltage"]}}
       }
 
-      assert {:error, [%Formentation.Diagnostic{severity: :error, code: :invalid_declaration}]} =
-               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  severity: :error,
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:groups]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
     end
 
     test "a group entry missing :fields is an invalid_declaration error" do

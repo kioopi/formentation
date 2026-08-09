@@ -156,7 +156,12 @@ defmodule Formentation.Source.Map do
         {:ok, list}
 
       other ->
-        {:error, invalid("#{key}: expected a list, got: #{inspect(other)}", ctx)}
+        {:error,
+         invalid(
+           "#{key}: expected a list, got: #{inspect(other)}",
+           ctx,
+           ctx.source_path ++ [key]
+         )}
     end
   end
 
