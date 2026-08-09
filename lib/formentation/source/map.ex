@@ -419,7 +419,16 @@ defmodule Formentation.Source.Map do
              ctx
            ),
          {:ok, {role, role_origin}} <-
-           resolve_role(spec, name, source_path, template_path, ctx) do
+           resolve_role(spec, name, source_path, template_path, ctx),
+         {:ok, widget} <-
+           fetch_optional_atom(
+             spec,
+             :widget,
+             label_subject(name),
+             source_path,
+             template_path,
+             ctx
+           ) do
       {default, default_origin, ctx} =
         resolve_default(spec, name, source_path, template_path, ctx)
 
@@ -458,7 +467,7 @@ defmodule Formentation.Source.Map do
         Presentation.Field.new(semantic.id,
           label: label,
           help: help,
-          widget: spec[:widget],
+          widget: widget,
           hidden?: hidden,
           origins: presentation_origins(origins)
         )
@@ -607,6 +616,25 @@ defmodule Formentation.Source.Map do
   defp resolve_role(%{kind: kind}, _name, _source_path, _template_path, _ctx) do
     {role, rule} = Map.fetch!(@role_defaults, kind)
     {:ok, {role, {:inference, rule}}}
+  end
+
+  defp fetch_optional_atom(map, key, subject, source_path, template_path, ctx) do
+    case Map.get(map, key) do
+      nil ->
+        {:ok, nil}
+
+      value when is_atom(value) ->
+        {:ok, value}
+
+      other ->
+        {:error,
+         invalid(
+           "#{key} for #{subject} must be an atom, got: #{inspect(other)}",
+           ctx,
+           source_path ++ [key],
+           template_path
+         )}
+    end
   end
 
   defp key_origin(spec, key, source_path) do

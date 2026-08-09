@@ -1228,6 +1228,22 @@ defmodule Formentation.Source.MapTest do
                Formentation.compile(declaration, adapter: Formentation.Source.Map)
     end
 
+    test "a non-atom, non-nil widget is an invalid_declaration error" do
+      declaration = %{
+        kind: :object,
+        properties: [{"notes", %{kind: :string, widget: "textarea"}}]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "notes", :widget]}
+                }
+              ]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
     test "a non-tuple properties entry is an invalid_declaration error, not a crash" do
       for entry <- [nil, "name", %{kind: :string}, {:name}, {:name, %{kind: :string}, :extra}] do
         declaration = %{kind: :object, properties: [entry]}
