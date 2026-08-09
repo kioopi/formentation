@@ -822,16 +822,46 @@ to this gate.
 - [x] The getting-started page names exactly `Formentation`,
       `Formentation.Definition`, `Formentation.Form`, and
       `Formentation.Phoenix` among Formentation modules.
-- [ ] Current unit, property, LiveView, architecture, and documentation checks
+- [x] Current unit, property, LiveView, architecture, and documentation checks
       pass.
-- [ ] Browser-real acceptance tests pass.
+- [x] Browser-real acceptance tests pass.
 - [x] README, demo, `Userguide`, and `Techdocs` describe the implemented API.
 - [x] Collections remain the only material Phase 1 capability not yet
       implemented.
 
 ## Wave 4 verification
 
-*Filled in by the release gates — see Task 5.*
+### Release-candidate verification
+
+Run on the release-candidate branch before merge:
+
+- `mix ci` — PASS: 894 passed (68 doctests, 33 properties, 793 tests), 8 excluded.
+- `mix test.browser` — PASS: 8 passed, 894 excluded.
+- GitHub Actions run: linked from the release-candidate PR.
+
+No candidate commit SHA is recorded here on purpose. The branch is squash-merged,
+so the commit that lands on `main` — and therefore the commit the tag points at —
+is a different object than anything verified pre-merge. Recording a pre-merge SHA
+would name a commit that no longer exists in the released history.
+
+### Released commit
+
+The release is identified in this repository by the immutable tag **`v0.2.0`**,
+not by a SHA written into a note. That is deliberate: a commit cannot contain
+its own hash, so recording the merged SHA here would produce a *new* commit —
+leaving the tag either on a commit that predates its own record, or on one whose
+recorded SHA is already stale.
+
+The resolved commit hash, the post-merge `mix ci` and `mix test.browser` runs,
+and their workflow links are therefore recorded outside the tree, on the
+[`v0.2.0` release](https://github.com/kioopi/formentation/releases/tag/v0.2.0)
+and in the [#46](https://github.com/kioopi/formentation/issues/46) close-out
+comment. `git rev-parse v0.2.0` resolves the tag to that commit at any time.
+
+Post-merge gate results are the acceptance condition for cutting the tag: both
+gates re-run on `main` before `v0.2.0` is created, because the branch is
+squash-merged and the released commit is therefore an object no pre-merge run
+has seen.
 
 ## Exit and what follows
 
