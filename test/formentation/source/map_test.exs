@@ -113,6 +113,15 @@ defmodule Formentation.Source.MapTest do
 
       assert Info.origins(definition, ["serial_number"])[:label] == {:inference, :label_from_name}
     end
+
+    test "an explicit nil title still falls back to a humanized name" do
+      declaration = %{kind: :object, properties: [{"first_name", %{kind: :string, title: nil}}]}
+
+      definition = compile!(declaration)
+
+      assert {:ok, %PresentationInfo.Field{label: "First name"}} =
+               Info.presentation_at(definition, ["first_name"])
+    end
   end
 
   describe "scalar kinds and roles" do
@@ -163,6 +172,14 @@ defmodule Formentation.Source.MapTest do
 
       assert Info.role(definition, ["last_service"]) == :text
       assert Info.origins(definition, ["last_service"])[:role] == {:inference, :string_default}
+    end
+
+    test "a custom atom role passes through verbatim" do
+      declaration = %{kind: :object, properties: [{"contact", %{kind: :string, role: :email}}]}
+
+      definition = compile!(declaration)
+
+      assert %Semantic.Field{role: :email} = Info.node_at(definition, ["contact"])
     end
 
     test "fields carry their scalar value type" do
@@ -490,6 +507,114 @@ defmodule Formentation.Source.MapTest do
     end
   end
 
+  describe "constraint validation" do
+    test "min_length on a non-string field is an invalid_declaration error" do
+      declaration = %{kind: :object, properties: [{"count", %{kind: :integer, min_length: 1}}]}
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "count", :min_length]}
+                }
+              ]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "min on a non-numeric field is an invalid_declaration error" do
+      declaration = %{kind: :object, properties: [{"name", %{kind: :string, min: 1}}]}
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "name", :min]}
+                }
+              ]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-integer min_length is an invalid_declaration error" do
+      declaration = %{kind: :object, properties: [{"name", %{kind: :string, min_length: "four"}}]}
+
+      assert {:error, [%Formentation.Diagnostic{code: :invalid_declaration}]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a negative min_length is an invalid_declaration error" do
+      declaration = %{kind: :object, properties: [{"name", %{kind: :string, min_length: -1}}]}
+
+      assert {:error, [%Formentation.Diagnostic{code: :invalid_declaration}]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-numeric min is an invalid_declaration error" do
+      declaration = %{kind: :object, properties: [{"count", %{kind: :integer, min: "zero"}}]}
+
+      assert {:error, [%Formentation.Diagnostic{code: :invalid_declaration}]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "min_length exceeding max_length is an invalid_declaration error" do
+      declaration = %{
+        kind: :object,
+        properties: [{"name", %{kind: :string, min_length: 10, max_length: 2}}]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "name", :max_length]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "min exceeding max is an invalid_declaration error" do
+      declaration = %{kind: :object, properties: [{"count", %{kind: :integer, min: 10, max: 2}}]}
+
+      assert {:error, [%Formentation.Diagnostic{code: :invalid_declaration}]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "multiple inapplicable constraints report min_length first, deterministically" do
+      # Keys are written in reverse of @constraint_keys order on purpose, so this
+      # can't pass by coincidentally matching literal declaration order.
+      declaration = %{
+        kind: :object,
+        properties: [{"flag", %{kind: :boolean, max: 1, min: 2, max_length: 3, min_length: 4}}]
+      }
+
+      for _ <- 1..20 do
+        assert {:error,
+                [
+                  %Formentation.Diagnostic{
+                    code: :invalid_declaration,
+                    origin: {:map_source, [:properties, "flag", :min_length]}
+                  }
+                ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      end
+    end
+
+    test "valid, applicable constraints still compile unchanged" do
+      definition =
+        compile!(%{
+          kind: :object,
+          properties: [
+            {"serial_number", %{kind: :string, min_length: 4, max_length: 20}},
+            {"operating_hours", %{kind: :integer, min: 0, max: 100_000}}
+          ]
+        })
+
+      assert Info.node_at(definition, ["serial_number"]).constraints == %{
+               min_length: 4,
+               max_length: 20
+             }
+
+      assert Info.node_at(definition, ["operating_hours"]).constraints == %{min: 0, max: 100_000}
+    end
+  end
+
   describe "presentation groups" do
     defp grouped_declaration do
       %{
@@ -502,6 +627,13 @@ defmodule Formentation.Source.MapTest do
         ],
         groups: [%{id: "electrical", title: "Electrical", fields: ["voltage", "insulation_ok"]}]
       }
+    end
+
+    test "valid groups with unique ids still compile unchanged" do
+      definition = compile!(grouped_declaration())
+
+      assert %Presentation.Object{children: children} = definition.presentation
+      assert Enum.any?(children, &match?(%Presentation.Group{}, &1))
     end
 
     test "a group nests members in markup position without nesting data" do
@@ -974,8 +1106,27 @@ defmodule Formentation.Source.MapTest do
     test "a property spec without a kind is an invalid_declaration error" do
       declaration = %{kind: :object, properties: [{"broken", %{title: "No kind"}}]}
 
-      assert {:error, [%Formentation.Diagnostic{code: :invalid_declaration}]} =
-               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "broken", :kind]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-atom kind is an invalid_declaration error, not an unsupported node" do
+      for kind <- ["string", %{}, [1], 42] do
+        declaration = %{kind: :object, properties: [{"broken", %{kind: kind}}]}
+
+        assert {:error,
+                [
+                  %Formentation.Diagnostic{
+                    code: :invalid_declaration,
+                    origin: {:map_source, [:properties, "broken", :kind]}
+                  }
+                ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      end
     end
 
     test "a non-list properties value is an invalid_declaration error" do
@@ -984,8 +1135,14 @@ defmodule Formentation.Source.MapTest do
         properties: %{"b" => %{kind: :string}, "a" => %{kind: :string}}
       }
 
-      assert {:error, [%Formentation.Diagnostic{severity: :error, code: :invalid_declaration}]} =
-               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  severity: :error,
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
     end
 
     test "duplicate property names are a duplicate_property error" do
@@ -1037,8 +1194,14 @@ defmodule Formentation.Source.MapTest do
         properties: [{"a", %{kind: :string}}]
       }
 
-      assert {:error, [%Formentation.Diagnostic{severity: :error, code: :invalid_declaration}]} =
-               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  severity: :error,
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:required]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
     end
 
     test "a non-list groups value is an invalid_declaration error" do
@@ -1048,8 +1211,14 @@ defmodule Formentation.Source.MapTest do
         groups: %{"electrical" => %{id: "electrical", fields: ["voltage"]}}
       }
 
-      assert {:error, [%Formentation.Diagnostic{severity: :error, code: :invalid_declaration}]} =
-               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  severity: :error,
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:groups]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
     end
 
     test "a group entry missing :fields is an invalid_declaration error" do
@@ -1061,6 +1230,314 @@ defmodule Formentation.Source.MapTest do
 
       assert {:error, [%Formentation.Diagnostic{severity: :error, code: :invalid_declaration}]} =
                Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-binary group id is an invalid_declaration error, not a crash" do
+      declaration = %{
+        kind: :object,
+        properties: [{"voltage", %{kind: :number}}],
+        groups: [%{id: :electrical, fields: ["voltage"]}]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:groups, 0, :id]}
+                }
+              ]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-list group fields value is an invalid_declaration error, not a crash" do
+      declaration = %{
+        kind: :object,
+        properties: [{"voltage", %{kind: :number}}],
+        groups: [%{id: "electrical", fields: "voltage"}]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:groups, 0, :fields]}
+                }
+              ]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-binary group field member is an invalid_declaration error, not a crash" do
+      declaration = %{
+        kind: :object,
+        properties: [{"voltage", %{kind: :number}}],
+        groups: [%{id: "electrical", fields: [:voltage]}]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:groups, 0, :fields, 0]}
+                }
+              ]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a duplicate group id is an invalid_declaration error, not a finalizer crash" do
+      declaration = %{
+        kind: :object,
+        properties: [{"voltage", %{kind: :number}}, {"current", %{kind: :number}}],
+        groups: [
+          %{id: "electrical", fields: ["voltage"]},
+          %{id: "electrical", fields: ["current"]}
+        ]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:groups, 1, :id]}
+                }
+              ]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-string, non-nil group title is an invalid_declaration error, not silently dropped" do
+      declaration = %{
+        kind: :object,
+        properties: [{"voltage", %{kind: :number}}],
+        groups: [%{id: "electrical", title: 42, fields: ["voltage"]}]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:groups, 0, :title]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-string, non-nil title is an invalid_declaration error" do
+      declaration = %{kind: :object, properties: [{"name", %{kind: :string, title: 42}}]}
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "name", :title]}
+                }
+              ]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-string root title is an invalid_declaration error" do
+      declaration = %{kind: :object, title: :oops, properties: [{"name", %{kind: :string}}]}
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:title]}
+                }
+              ]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-string, non-nil help is an invalid_declaration error" do
+      declaration = %{kind: :object, properties: [{"name", %{kind: :string, help: ["oops"]}}]}
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "name", :help]}
+                }
+              ]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-atom, non-nil role is an invalid_declaration error" do
+      declaration = %{kind: :object, properties: [{"contact", %{kind: :string, role: "email"}}]}
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "contact", :role]}
+                }
+              ]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-atom, non-nil widget is an invalid_declaration error" do
+      declaration = %{
+        kind: :object,
+        properties: [{"notes", %{kind: :string, widget: "textarea"}}]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "notes", :widget]}
+                }
+              ]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a default incompatible with the field's kind is an invalid_declaration error" do
+      declaration = %{
+        kind: :object,
+        properties: [{"count", %{kind: :integer, default: "not-a-number"}}]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "count", :default]}
+                }
+              ]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a boolean default on a boolean field is compatible" do
+      declaration = %{kind: :object, properties: [{"active", %{kind: :boolean, default: true}}]}
+
+      definition = compile!(declaration)
+
+      assert %Semantic.Field{default: true} = Info.node_at(definition, ["active"])
+    end
+
+    test "a numeric default on a number field is compatible" do
+      declaration = %{kind: :object, properties: [{"weight", %{kind: :number, default: 1.5}}]}
+
+      definition = compile!(declaration)
+
+      assert %Semantic.Field{default: 1.5} = Info.node_at(definition, ["weight"])
+    end
+
+    test "a non-tuple properties entry is an invalid_declaration error, not a crash" do
+      for entry <- [nil, "name", %{kind: :string}, {:name}, {:name, %{kind: :string}, :extra}] do
+        declaration = %{kind: :object, properties: [entry]}
+
+        assert {:error,
+                [
+                  %Formentation.Diagnostic{
+                    severity: :error,
+                    code: :invalid_declaration,
+                    origin: {:map_source, [:properties, 0]}
+                  }
+                ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+      end
+    end
+
+    test "a non-binary property name is an invalid_declaration error, not a crash" do
+      declaration = %{kind: :object, properties: [{:name, %{kind: :string}}]}
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  severity: :error,
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, 0]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-map property spec is an invalid_declaration error, not a crash" do
+      declaration = %{kind: :object, properties: [{"name", "not-a-spec"}]}
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  severity: :error,
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "name"]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-map property spec reports the keyed path even alongside other entries" do
+      declaration = %{
+        kind: :object,
+        properties: [{"first", %{kind: :string}}, {"broken", [1, 2]}]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "broken"]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a malformed nested properties entry reports the nested indexed path" do
+      declaration = %{
+        kind: :object,
+        properties: [{"outer", %{kind: :object, properties: [{"x", %{kind: :string}}, nil]}}]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  severity: :error,
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:properties, "outer", :properties, 1]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "the first malformed entry is reported deterministically" do
+      declaration = %{kind: :object, properties: [nil, {:also_bad, %{kind: :string}}]}
+
+      assert {:error, [%Formentation.Diagnostic{origin: {:map_source, [:properties, 0]}}]} =
+               Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a non-binary required member is an invalid_declaration error, not a crash" do
+      declaration = %{kind: :object, required: [:name], properties: [{"name", %{kind: :string}}]}
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  severity: :error,
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:required, 0]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "a required member naming an undeclared property is an invalid_declaration error" do
+      declaration = %{
+        kind: :object,
+        required: ["missing"],
+        properties: [{"name", %{kind: :string}}]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  severity: :error,
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:required, 0]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
+    test "duplicate required members are idempotent, not an error" do
+      declaration = %{
+        kind: :object,
+        required: ["name", "name"],
+        properties: [{"name", %{kind: :string, min_length: 1}}]
+      }
+
+      {:ok, definition, []} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
+      assert %Semantic.Field{required?: true} = Info.node_at(definition, ["name"])
     end
 
     test "an unknown kind compiles to an unsupported node plus a warning" do
@@ -1293,6 +1770,7 @@ defmodule Formentation.Source.MapTest do
         properties: [
           {"_unused_note", %{kind: :string}},
           {"_csrf_token", %{kind: :string}},
+          {"_persistent_id", %{kind: :string}},
           {"fine", %{kind: :string}}
         ]
       }
@@ -1301,7 +1779,21 @@ defmodule Formentation.Source.MapTest do
         Formentation.compile(declaration, adapter: Formentation.Source.Map)
 
       codes = Enum.map(diagnostics, & &1.code)
-      assert Enum.count(codes, &(&1 == :reserved_property_name)) == 2
+      assert Enum.count(codes, &(&1 == :reserved_property_name)) == 3
+    end
+
+    test "warns on a nested _persistent_id property name" do
+      declaration = %{
+        kind: :object,
+        properties: [
+          {"nested", %{kind: :object, properties: [{"_persistent_id", %{kind: :string}}]}}
+        ]
+      }
+
+      {:ok, _definition, diagnostics} =
+        Formentation.compile(declaration, adapter: Formentation.Source.Map)
+
+      assert [%Formentation.Diagnostic{code: :reserved_property_name}] = diagnostics
     end
   end
 

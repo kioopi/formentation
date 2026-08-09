@@ -1206,3 +1206,32 @@ user-visible half of the rename table.
 - [[13-roadmap|Roadmap]]
 - [[00-use-case|Motivating use case]]
 - [[Formentation|Back to the entry point]]
+
+## D-048 — Map-source declarations are total at the compile boundary
+
+*2026-08-09*
+
+**Context.** GitHub issue #6 identified malformed Map-source declarations that
+could escape source validation and raise `FunctionClauseError`,
+`Protocol.UndefinedError`, or an `ArgumentError` from a `Definition.Finalizer`
+invariant. These failures had no stable source origin and could make a
+declaration compiler crash instead of returning its documented result shape.
+
+**Decision.** `Formentation.Source.Map` hard-validates declaration values before
+destructuring them or passing them to typed constructors. The boundary validates
+property entry tuples and specs, `required` members and declared-property
+membership, group shape, binary unique group IDs and binary field members,
+string `title`/`help`, atom `role`/`widget`, scalar-kind-compatible defaults,
+and constraint types, kind applicability, and bound consistency. Each malformed
+value returns the first `:invalid_declaration` diagnostic with an indexed or
+keyed `:map_source` origin. Existing recoverable warning behavior and the
+permissive unknown-key DSL remain unchanged; D-042 `one_of` behavior and
+`hidden`/`read_only` warning coercion remain out of scope.
+
+**Consequences.** Compilation is total and deterministic over malformed Map
+declarations: it returns either `{:ok, %Definition{}, diagnostics}` or
+`{:error, diagnostics}` without a partial definition. `Form.apply_defaults/2`
+can no longer receive a type-incompatible default from this source, and a
+duplicate presentation group ID cannot reach `Definition.Finalizer`'s
+`:duplicate_layout_id` invariant. `_persistent_id` is now included in the
+shared reserved transport-property warnings.

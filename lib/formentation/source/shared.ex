@@ -94,7 +94,7 @@ defmodule Formentation.Source.Shared do
     |> MapSet.new()
   end
 
-  @reserved_names ["_csrf_token", "_target"]
+  @reserved_names ["_csrf_token", "_target", "_persistent_id"]
   @reserved_prefix "_unused_"
 
   defp policy_diagnostics(root), do: root |> collect_policy_warnings([]) |> Enum.reverse()

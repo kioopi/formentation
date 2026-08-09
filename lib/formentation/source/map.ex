@@ -41,13 +41,21 @@ defmodule Formentation.Source.Map do
   defp compile_object(%{kind: :object} = declaration, name, ctx) do
     with :ok <- check_depth(ctx),
          {:ok, ctx} <- take_budget(ctx),
-         {:ok, required} <- fetch_list(declaration, :required, ctx),
-         {:ok, children, ctx} <- compile_children(declaration, required, ctx),
-         {:ok, groups} <- fetch_groups(declaration, ctx) do
+         {:ok, children, ctx} <- compile_children(declaration, ctx),
+         {:ok, groups} <- fetch_groups(declaration, ctx),
+         {:ok, {label, label_origin}} <-
+           resolve_label(declaration, name, ctx.source_path, ctx.template_path, ctx),
+         {:ok, help} <-
+           fetch_optional_string(
+             declaration,
+             :help,
+             label_subject(name),
+             ctx.source_path,
+             ctx.template_path,
+             ctx
+           ) do
       semantic_children = Enum.map(children, & &1.semantic)
       {presentation_children, ctx} = attach_presentation_groups(children, groups, ctx)
-
-      {label, label_origin} = resolve_label(declaration, name, ctx.source_path)
 
       presentation_origins =
         Shared.origin_entries(
@@ -60,7 +68,7 @@ defmodule Formentation.Source.Map do
       presentation =
         Presentation.Object.new(semantic.id, presentation_children,
           label: label,
-          help: declaration[:help],
+          help: help,
           origins: presentation_origins
         )
 
@@ -102,16 +110,57 @@ defmodule Formentation.Source.Map do
     }
   end
 
-  defp compile_children(declaration, required, ctx) do
-    with {:ok, properties} <- fetch_list(declaration, :properties, ctx) do
-      compile_properties(properties, required, ctx)
+  defp compile_children(declaration, ctx) do
+    with {:ok, properties} <- fetch_list(declaration, :properties, ctx),
+         {:ok, properties} <- validate_property_entries(properties, ctx),
+         :ok <- reject_duplicate_properties(properties, ctx) do
+      compile_properties(properties, declaration, ctx)
     end
   end
 
-  defp compile_properties(properties, required, ctx) do
-    with :ok <- reject_duplicate_properties(properties, ctx),
+  defp compile_properties(properties, declaration, ctx) do
+    with {:ok, required} <- fetch_required(declaration, property_names(properties), ctx),
          {:ok, compiled, ctx} <- compile_properties_in_order(properties, required, ctx) do
       {:ok, Enum.reverse(compiled), ctx}
+    end
+  end
+
+  defp fetch_required(declaration, property_names, ctx) do
+    with {:ok, required} <- fetch_list(declaration, :required, ctx) do
+      validate_required_members(required, property_names, ctx)
+    end
+  end
+
+  defp validate_required_members(required, property_names, ctx) do
+    required
+    |> Enum.with_index()
+    |> Enum.reduce_while({:ok, MapSet.new()}, fn {name, index}, {:ok, acc} ->
+      case validate_required_member(name, index, property_names, ctx) do
+        :ok -> {:cont, {:ok, MapSet.put(acc, name)}}
+        {:error, diagnostic} -> {:halt, {:error, diagnostic}}
+      end
+    end)
+  end
+
+  defp validate_required_member(name, index, _property_names, ctx) when not is_binary(name) do
+    {:error,
+     invalid(
+       "required entry #{index}: expected a string, got: #{inspect(name)}",
+       ctx,
+       ctx.source_path ++ [:required, index]
+     )}
+  end
+
+  defp validate_required_member(name, index, property_names, ctx) do
+    if MapSet.member?(property_names, name) do
+      :ok
+    else
+      {:error,
+       invalid(
+         "required entry #{index}: #{inspect(name)} is not a declared property",
+         ctx,
+         ctx.source_path ++ [:required, index]
+       )}
     end
   end
 
@@ -140,6 +189,57 @@ defmodule Formentation.Source.Map do
     end
   end
 
+  defp validate_property_entries(properties, ctx) do
+    properties
+    |> Enum.with_index()
+    |> Enum.reduce_while({:ok, []}, fn {entry, index}, {:ok, acc} ->
+      case validate_property_entry(entry, index, ctx) do
+        {:ok, valid_entry} -> {:cont, {:ok, [valid_entry | acc]}}
+        {:error, diagnostic} -> {:halt, {:error, diagnostic}}
+      end
+    end)
+    |> case do
+      {:ok, acc} -> {:ok, Enum.reverse(acc)}
+      {:error, diagnostic} -> {:error, diagnostic}
+    end
+  end
+
+  defp validate_property_entry({name, spec}, _index, _ctx)
+       when is_binary(name) and is_map(spec) do
+    {:ok, {name, spec}}
+  end
+
+  defp validate_property_entry({name, _spec}, index, ctx) when not is_binary(name) do
+    {:error,
+     invalid(
+       "properties entry #{index}: name must be a string, got: #{inspect(name)}",
+       ctx,
+       ctx.source_path ++ [:properties, index]
+     )}
+  end
+
+  defp validate_property_entry({name, spec}, _index, ctx) when is_binary(name) do
+    {:error,
+     invalid(
+       "property #{inspect(name)}: spec must be a map, got: #{inspect(spec)}",
+       ctx,
+       ctx.source_path ++ [:properties, name]
+     )}
+  end
+
+  defp validate_property_entry(other, index, ctx) do
+    {:error,
+     invalid(
+       "properties entry #{index}: expected a {name, spec} tuple, got: #{inspect(other)}",
+       ctx,
+       ctx.source_path ++ [:properties, index]
+     )}
+  end
+
+  defp property_names(properties) do
+    properties |> Enum.map(fn {name, _spec} -> name end) |> MapSet.new()
+  end
+
   defp duplicate_property(name, ctx) do
     %Diagnostic{
       severity: :error,
@@ -156,7 +256,12 @@ defmodule Formentation.Source.Map do
         {:ok, list}
 
       other ->
-        {:error, invalid("#{key}: expected a list, got: #{inspect(other)}", ctx)}
+        {:error,
+         invalid(
+           "#{key}: expected a list, got: #{inspect(other)}",
+           ctx,
+           ctx.source_path ++ [key]
+         )}
     end
   end
 
@@ -168,18 +273,92 @@ defmodule Formentation.Source.Map do
 
   defp validate_groups(groups, ctx) do
     groups
-    |> Enum.reduce_while({:ok, []}, fn
-      %{id: _id, fields: _fields} = group, {:ok, acc} ->
-        {:cont, {:ok, [group | acc]}}
-
-      other, _acc ->
-        {:halt,
-         {:error, invalid("group declaration missing :id or :fields: #{inspect(other)}", ctx)}}
+    |> Enum.with_index()
+    |> Enum.reduce_while({:ok, [], MapSet.new()}, fn {group, index}, {:ok, acc, seen_ids} ->
+      case validate_group(group, index, seen_ids, ctx) do
+        {:ok, id} -> {:cont, {:ok, [group | acc], MapSet.put(seen_ids, id)}}
+        {:error, diagnostic} -> {:halt, {:error, diagnostic}}
+      end
     end)
     |> case do
-      {:ok, acc} -> {:ok, Enum.reverse(acc)}
+      {:ok, acc, _seen_ids} -> {:ok, Enum.reverse(acc)}
       {:error, diagnostic} -> {:error, diagnostic}
     end
+  end
+
+  defp validate_group(%{id: id, fields: fields} = group, index, seen_ids, ctx) do
+    with :ok <- validate_group_id(id, index, seen_ids, ctx),
+         :ok <- validate_group_fields(fields, index, ctx),
+         :ok <- validate_group_title(Map.get(group, :title), index, ctx) do
+      {:ok, id}
+    end
+  end
+
+  defp validate_group(other, index, _seen_ids, ctx) do
+    {:error,
+     invalid(
+       "group #{index}: missing :id or :fields: #{inspect(other)}",
+       ctx,
+       ctx.source_path ++ [:groups, index]
+     )}
+  end
+
+  defp validate_group_id(id, index, _seen_ids, ctx) when not is_binary(id) do
+    {:error,
+     invalid(
+       "group #{index}: :id must be a string, got: #{inspect(id)}",
+       ctx,
+       ctx.source_path ++ [:groups, index, :id]
+     )}
+  end
+
+  defp validate_group_id(id, index, seen_ids, ctx) do
+    if MapSet.member?(seen_ids, id) do
+      {:error,
+       invalid(
+         "group #{index}: duplicate group id #{inspect(id)}",
+         ctx,
+         ctx.source_path ++ [:groups, index, :id]
+       )}
+    else
+      :ok
+    end
+  end
+
+  defp validate_group_fields(fields, index, ctx) when not is_list(fields) do
+    {:error,
+     invalid(
+       "group #{index}: :fields must be a list, got: #{inspect(fields)}",
+       ctx,
+       ctx.source_path ++ [:groups, index, :fields]
+     )}
+  end
+
+  defp validate_group_fields(fields, index, ctx) do
+    case Enum.find(Enum.with_index(fields), fn {name, _field_index} -> not is_binary(name) end) do
+      nil ->
+        :ok
+
+      {name, field_index} ->
+        {:error,
+         invalid(
+           "group #{index}: field #{field_index} must be a string, got: #{inspect(name)}",
+           ctx,
+           ctx.source_path ++ [:groups, index, :fields, field_index]
+         )}
+    end
+  end
+
+  defp validate_group_title(nil, _index, _ctx), do: :ok
+  defp validate_group_title(title, _index, _ctx) when is_binary(title), do: :ok
+
+  defp validate_group_title(title, index, ctx) do
+    {:error,
+     invalid(
+       "group #{index}: :title must be a string, got: #{inspect(title)}",
+       ctx,
+       ctx.source_path ++ [:groups, index, :title]
+     )}
   end
 
   defp compile_property(name, %{kind: :object} = spec, required?, ctx) do
@@ -199,7 +378,7 @@ defmodule Formentation.Source.Map do
     compile_field(name, spec, required?, ctx)
   end
 
-  defp compile_property(name, %{kind: kind}, required?, ctx) do
+  defp compile_property(name, %{kind: kind}, required?, ctx) when is_atom(kind) do
     with {:ok, ctx} <- take_budget(ctx) do
       template_path = TemplatePath.child(ctx.template_path, name)
       source_path = ctx.source_path ++ [:properties, name]
@@ -225,8 +404,155 @@ defmodule Formentation.Source.Map do
     end
   end
 
+  defp compile_property(name, %{kind: kind}, _required?, ctx) do
+    {:error,
+     invalid(
+       "property #{inspect(name)} kind must be an atom, got: #{inspect(kind)}",
+       ctx,
+       ctx.source_path ++ [:properties, name, :kind],
+       TemplatePath.child(ctx.template_path, name)
+     )}
+  end
+
   defp compile_property(name, spec, _required?, ctx) do
-    {:error, invalid("property #{inspect(name)} has no kind: #{inspect(spec)}", ctx)}
+    {:error,
+     invalid(
+       "property #{inspect(name)} has no kind: #{inspect(spec)}",
+       ctx,
+       ctx.source_path ++ [:properties, name, :kind],
+       TemplatePath.child(ctx.template_path, name)
+     )}
+  end
+
+  defp validate_constraints(spec, kind, name, source_path, template_path, ctx) do
+    @constraint_keys
+    |> Enum.reduce_while({:ok, %{}}, fn key, {:ok, acc} ->
+      accumulate_constraint(key, acc, spec, kind, name, source_path, template_path, ctx)
+    end)
+    |> case do
+      {:ok, constraints} ->
+        validate_constraint_bounds(constraints, name, source_path, template_path, ctx)
+
+      {:error, diagnostic} ->
+        {:error, diagnostic}
+    end
+  end
+
+  defp accumulate_constraint(key, acc, spec, kind, name, source_path, template_path, ctx) do
+    case Map.fetch(spec, key) do
+      :error ->
+        {:cont, {:ok, acc}}
+
+      {:ok, value} ->
+        continue_constraint_reduction(
+          key,
+          value,
+          acc,
+          kind,
+          name,
+          source_path,
+          template_path,
+          ctx
+        )
+    end
+  end
+
+  defp continue_constraint_reduction(key, value, acc, kind, name, source_path, template_path, ctx) do
+    case validate_constraint(key, value, kind, name, source_path, template_path, ctx) do
+      :ok -> {:cont, {:ok, Map.put(acc, key, value)}}
+      {:error, diagnostic} -> {:halt, {:error, diagnostic}}
+    end
+  end
+
+  defp validate_constraint(key, value, kind, name, source_path, template_path, ctx)
+       when key in [:min_length, :max_length] do
+    cond do
+      kind != :string ->
+        {:error,
+         invalid(
+           "#{key} is only valid for :string properties, got kind #{inspect(kind)} for " <>
+             "property #{inspect(name)}",
+           ctx,
+           source_path ++ [key],
+           template_path
+         )}
+
+      not (is_integer(value) and value >= 0) ->
+        {:error,
+         invalid(
+           "#{key} for property #{inspect(name)} must be a non-negative integer, " <>
+             "got: #{inspect(value)}",
+           ctx,
+           source_path ++ [key],
+           template_path
+         )}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp validate_constraint(key, value, kind, name, source_path, template_path, ctx)
+       when key in [:min, :max] do
+    cond do
+      kind not in [:integer, :number] ->
+        {:error,
+         invalid(
+           "#{key} is only valid for :integer or :number properties, got kind " <>
+             "#{inspect(kind)} for property #{inspect(name)}",
+           ctx,
+           source_path ++ [key],
+           template_path
+         )}
+
+      not is_number(value) ->
+        {:error,
+         invalid(
+           "#{key} for property #{inspect(name)} must be a number, got: #{inspect(value)}",
+           ctx,
+           source_path ++ [key],
+           template_path
+         )}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp validate_constraint_bounds(constraints, name, source_path, template_path, ctx) do
+    with :ok <-
+           check_bounds(
+             constraints,
+             :min_length,
+             :max_length,
+             name,
+             source_path,
+             template_path,
+             ctx
+           ),
+         :ok <- check_bounds(constraints, :min, :max, name, source_path, template_path, ctx) do
+      {:ok, constraints}
+    end
+  end
+
+  defp check_bounds(constraints, low_key, high_key, name, source_path, template_path, ctx) do
+    with {:ok, low} <- Map.fetch(constraints, low_key),
+         {:ok, high} <- Map.fetch(constraints, high_key) do
+      if low <= high do
+        :ok
+      else
+        {:error,
+         invalid(
+           "#{low_key} (#{inspect(low)}) exceeds #{high_key} (#{inspect(high)}) for " <>
+             "property #{inspect(name)}",
+           ctx,
+           source_path ++ [high_key],
+           template_path
+         )}
+      end
+    else
+      :error -> :ok
+    end
   end
 
   defp compile_field(name, %{kind: kind} = spec, required?, ctx) when kind in @scalar_kinds do
@@ -237,13 +563,33 @@ defmodule Formentation.Source.Map do
          {:ok, examples, examples_origin} <-
            fetch_examples(spec, name, source_path, template_path, ctx),
          {:ok, options, options_origin, ctx} <-
-           fetch_one_of_options(spec, name, source_path, template_path, ctx) do
-      {label, label_origin} = resolve_label(spec, name, source_path)
-      {role, role_origin} = resolve_role(spec, source_path)
-
-      {default, default_origin, ctx} =
-        resolve_default(spec, name, source_path, template_path, ctx)
-
+           fetch_one_of_options(spec, name, source_path, template_path, ctx),
+         {:ok, {label, label_origin}} <-
+           resolve_label(spec, name, source_path, template_path, ctx),
+         {:ok, help} <-
+           fetch_optional_string(
+             spec,
+             :help,
+             label_subject(name),
+             source_path,
+             template_path,
+             ctx
+           ),
+         {:ok, {role, role_origin}} <-
+           resolve_role(spec, name, source_path, template_path, ctx),
+         {:ok, widget} <-
+           fetch_optional_atom(
+             spec,
+             :widget,
+             label_subject(name),
+             source_path,
+             template_path,
+             ctx
+           ),
+         {:ok, {default, default_origin, ctx}} <-
+           resolve_default(spec, name, kind, source_path, template_path, ctx),
+         {:ok, constraints} <-
+           validate_constraints(spec, kind, name, source_path, template_path, ctx) do
       {hidden, hidden_origin, ctx} =
         resolve_flag(spec, :hidden, name, source_path, template_path, ctx)
 
@@ -271,15 +617,15 @@ defmodule Formentation.Source.Map do
           options: options,
           default: default,
           examples: examples,
-          constraints: Map.take(spec, @constraint_keys),
+          constraints: constraints,
           origins: semantic_origins(origins)
         )
 
       presentation =
         Presentation.Field.new(semantic.id,
           label: label,
-          help: spec[:help],
-          widget: spec[:widget],
+          help: help,
+          widget: widget,
           hidden?: hidden,
           origins: presentation_origins(origins)
         )
@@ -307,7 +653,7 @@ defmodule Formentation.Source.Map do
     end
   end
 
-  defp resolve_default(spec, name, source_path, template_path, ctx) do
+  defp resolve_default(spec, name, kind, source_path, template_path, ctx) do
     case Map.fetch(spec, :default) do
       {:ok, nil} ->
         warning = %Diagnostic{
@@ -318,15 +664,34 @@ defmodule Formentation.Source.Map do
           template_path: template_path
         }
 
-        {nil, nil, %{ctx | diagnostics: [warning | ctx.diagnostics]}}
+        {:ok, {nil, nil, %{ctx | diagnostics: [warning | ctx.diagnostics]}}}
 
       {:ok, value} ->
-        {value, {:map_source, source_path ++ [:default]}, ctx}
+        if default_compatible?(kind, value) do
+          {:ok, {value, {:map_source, source_path ++ [:default]}, ctx}}
+        else
+          {:error,
+           invalid(
+             "default for property #{inspect(name)} must be #{kind_article(kind)} #{kind}, " <>
+               "got: #{inspect(value)}",
+             ctx,
+             source_path ++ [:default],
+             template_path
+           )}
+        end
 
       :error ->
-        {nil, nil, ctx}
+        {:ok, {nil, nil, ctx}}
     end
   end
+
+  defp default_compatible?(:string, value), do: is_binary(value)
+  defp default_compatible?(:integer, value), do: is_integer(value)
+  defp default_compatible?(:number, value), do: is_number(value)
+  defp default_compatible?(:boolean, value), do: is_boolean(value)
+
+  defp kind_article(:integer), do: "an"
+  defp kind_article(_kind), do: "a"
 
   defp resolve_flag(spec, key, name, source_path, template_path, ctx) do
     case Map.fetch(spec, key) do
@@ -361,27 +726,92 @@ defmodule Formentation.Source.Map do
     }
   end
 
-  defp resolve_label(%{title: title}, _name, source_path) when is_binary(title) do
-    {title, {:map_source, source_path ++ [:title]}}
+  defp fetch_optional_string(map, key, subject, source_path, template_path, ctx) do
+    case Map.get(map, key) do
+      nil ->
+        {:ok, nil}
+
+      value when is_binary(value) ->
+        {:ok, value}
+
+      other ->
+        {:error,
+         invalid(
+           "#{key} for #{subject} must be a string, got: #{inspect(other)}",
+           ctx,
+           source_path ++ [key],
+           template_path
+         )}
+    end
   end
 
-  defp resolve_label(_spec, nil, _source_path), do: {nil, nil}
-
-  defp resolve_label(_spec, name, _source_path) do
-    {Shared.humanize(name), {:inference, :label_from_name}}
+  defp resolve_label(%{title: title}, _name, source_path, _template_path, _ctx)
+       when is_binary(title) do
+    {:ok, {title, {:map_source, source_path ++ [:title]}}}
   end
 
-  defp resolve_role(%{role: role}, source_path) when not is_nil(role) do
-    {role, {:map_source, source_path ++ [:role]}}
+  defp resolve_label(%{title: title}, name, source_path, template_path, ctx)
+       when not is_nil(title) do
+    {:error,
+     invalid(
+       "title for #{label_subject(name)} must be a string, got: #{inspect(title)}",
+       ctx,
+       source_path ++ [:title],
+       template_path
+     )}
   end
 
-  defp resolve_role(%{one_of: options}, _source_path) when is_list(options) do
-    {:select, {:inference, :one_of_select}}
+  defp resolve_label(_spec, nil, _source_path, _template_path, _ctx), do: {:ok, {nil, nil}}
+
+  defp resolve_label(_spec, name, _source_path, _template_path, _ctx) do
+    {:ok, {Shared.humanize(name), {:inference, :label_from_name}}}
   end
 
-  defp resolve_role(%{kind: kind}, _source_path) do
+  defp label_subject(nil), do: "the root object"
+  defp label_subject(name), do: "property #{inspect(name)}"
+
+  defp resolve_role(%{role: role}, _name, source_path, _template_path, _ctx)
+       when is_atom(role) and not is_nil(role) do
+    {:ok, {role, {:map_source, source_path ++ [:role]}}}
+  end
+
+  defp resolve_role(%{role: role}, name, source_path, template_path, ctx) when not is_nil(role) do
+    {:error,
+     invalid(
+       "role for #{label_subject(name)} must be an atom, got: #{inspect(role)}",
+       ctx,
+       source_path ++ [:role],
+       template_path
+     )}
+  end
+
+  defp resolve_role(%{one_of: options}, _name, _source_path, _template_path, _ctx)
+       when is_list(options) do
+    {:ok, {:select, {:inference, :one_of_select}}}
+  end
+
+  defp resolve_role(%{kind: kind}, _name, _source_path, _template_path, _ctx) do
     {role, rule} = Map.fetch!(@role_defaults, kind)
-    {role, {:inference, rule}}
+    {:ok, {role, {:inference, rule}}}
+  end
+
+  defp fetch_optional_atom(map, key, subject, source_path, template_path, ctx) do
+    case Map.get(map, key) do
+      nil ->
+        {:ok, nil}
+
+      value when is_atom(value) ->
+        {:ok, value}
+
+      other ->
+        {:error,
+         invalid(
+           "#{key} for #{subject} must be an atom, got: #{inspect(other)}",
+           ctx,
+           source_path ++ [key],
+           template_path
+         )}
+    end
   end
 
   defp key_origin(spec, key, source_path) do

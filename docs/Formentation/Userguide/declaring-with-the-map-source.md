@@ -310,8 +310,8 @@ Warnings worth knowing about:
   Add `min_length: 1` if you meant "must not be blank"; "required" alone
   only means the key must be present.
 - `:reserved_property_name` — a property named `_csrf_token`, `_target`,
-  or starting with `_unused_`. These are stripped as transport metadata
-  and would never reach your data. Rename the property.
+  `_persistent_id`, or starting with `_unused_`. These are stripped as
+  transport metadata and would never reach your data. Rename the property.
 
 An `:error` diagnostic means `compile/2` returned `{:error, diagnostics}`
 and there is no definition — a malformed declaration, a missing `:kind`,
