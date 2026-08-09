@@ -46,7 +46,7 @@ defprotocol Formentation.Phoenix.StateView do
   @doc """
   The source's visibility policy for issues at one absolute instance path.
 
-  `:default` asks the projector to apply its Phoenix-compatible default
+  `:default` asks render preparation to apply its Phoenix-compatible default
   (submitted, or `Phoenix.Component.used_input?/1` for a scalar field);
   `:show` and `:hide` override it.
 
@@ -69,9 +69,9 @@ defprotocol Formentation.Phoenix.StateView do
   `:unavailable` means the source has no complete enumeration capability;
   `{:ok, []}` means enumeration is supported and there is nothing to
   report. Returned order is the authoritative display order and must be
-  deterministic — the projector preserves it after filtering.
+  deterministic — preparation preserves it after filtering.
 
-  Scalar-field issues may appear here; the projector drops the ones whose
+  Scalar-field issues may appear here; preparation drops the ones whose
   path resolves to a `Formentation.Definition.Semantic.Field` because Phoenix already
   carries them as `field.errors`.
 

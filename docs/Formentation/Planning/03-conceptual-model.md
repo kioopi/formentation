@@ -47,7 +47,7 @@ Candidate node kinds:
 | Kind | Meaning |
 | --- | --- |
 | `:field` | An editable or display-only scalar value. A scalar `enum`/`const` is a field with a fixed option set, not a choice ([[18-decisions#D-005 — Scalar enums are fields, not choice nodes|D-005]]). |
-| `:group` | A presentation grouping or an object-like container — one kind, distinguished by a `nests_data?` flag ([[18-decisions|D-006]]). |
+| `:group` | A presentation grouping or an object-like container — one kind, distinguished by a `nests_data?` flag ([[18-decisions|D-006]]). **Superseded:** since [[phase-1-north-star-alignment\|the north-star alignment]] (`v0.2.0`), a definition stores separate semantic and presentation structures, so an object and a presentation group are distinct types and `nests_data?` no longer exists. |
 | `:collection` | A homogeneous or tuple-like sequence. |
 | `:choice` | Structural alternatives such as `oneOf` or union selection between different subtrees. |
 | `:conditional` | Content activated by a predicate. |

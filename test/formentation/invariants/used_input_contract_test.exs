@@ -104,7 +104,7 @@ defmodule Formentation.Phoenix.UsedInputContractTest do
     assert Form.show_issues?(form_state, ["address", "number"]) == false
   end
 
-  test "the projector's state-view visibility agrees with used_input? on every scalar after a single transition" do
+  test "preparation's state-view visibility agrees with used_input? on every scalar after a single transition" do
     # This proves agreement only for the single-transition case, where
     # `form.usage` starts empty and the D-014 usage merge in
     # `Form.transition/2` (`Map.merge(form.usage, normalized.usage)`) is
@@ -199,7 +199,7 @@ defmodule Formentation.Phoenix.UsedInputContractTest do
     # usage still says :used.
     assert Form.show_issues?(form_t2, ["title"]) == true
 
-    # And the user-visible consequence, through the projector, is that
+    # And the user-visible consequence, through render preparation, is that
     # the (now-:required, since "title" is absent from the candidate)
     # error is shown.
     plan = Preparation.prepare(phoenix_form_t2, definition: definition)

@@ -8,12 +8,24 @@ tags:
   - phase-1
   - architecture
   - refactoring
-status: planned
+status: done
 phase: 1
 gate: aligned-milestone-a
+completed: 2026-08-09
+released_as: v0.2.0
 ---
 
 # Phase 1 — North-star alignment
+
+> [!success] Closed 2026-08-09 — Aligned Milestone A
+> Implemented across [#18](https://github.com/kioopi/formentation/issues/18),
+> [#19](https://github.com/kioopi/formentation/issues/19),
+> [#27](https://github.com/kioopi/formentation/issues/27),
+> [#28](https://github.com/kioopi/formentation/issues/28), and
+> [#46](https://github.com/kioopi/formentation/issues/46) (Wave 4, PRs #47–#50).
+> Every criterion below is met against named evidence; the release itself ships
+> as `v0.2.0`. Commands, counts, and the tagged commit are recorded in
+> [Wave 4 verification](#wave-4-verification).
 
 ## Goal
 
@@ -537,7 +549,7 @@ the explicit definition-plus-form path.
 
 ### P3 — Hide preparation stages
 
-**Outcome:** projector, render plan, render nodes, and the built-in reference
+**Outcome:** the preparation stage (formerly `Projector`), render plan, render nodes, and the built-in reference
 component set no longer appear as required beginner-facing lifecycle stages.
 
 For Phase 1:
@@ -629,31 +641,31 @@ The current suite already protects most behaviour. “Gap” means an executable
 characterization must be added before or with the implementation node that can
 change it.
 
-| Behaviour or invariant | Current evidence | Alignment expectation | Gap |
+| Behaviour or invariant | Current evidence | Alignment expectation | Closed by |
 | --- | --- | --- | --- |
-| Both sources describe the same supported form | `differential_test.exs`, `pump_inspection_test.exs`, shared fixtures | Equivalent semantic facts and presentation layout apart from origins | Extend equivalence assertions to both split structures |
-| Compilation is deterministic and map-order independent | `json_schema_property_test.exs`, `source/map_property_test.exs` | Split structures and derived default layout remain deterministic | Add layout determinism assertions |
-| Invalid and unsupported declarations are diagnosed | source-adapter tests, `info_test.exs` | Diagnostics and source locations survive the cutover | Add split-location coverage where representation changes |
-| No atoms from source keys; budgets terminate | adapter property tests | Query seams and new constructors preserve both guarantees | No known gap |
-| Paths and IDs round-trip safely | path, pointer, node-ID, and naming property tests | Semantic occurrence paths stay independent of typed/namespaced presentation identities | Add dangling-reference and namespace-confusion properties |
-| Semantic field order is independent of layout order | A map-source declaration-order test exists but its fixture cannot reorder; a reordering fixture exists but asserts only group children | `Info.fields/1` returns declaration order while presentation traversal returns group order | Widen the existing declaration-order test to a reordering fixture in D1 and document the behaviour correction |
-| Raw transport and decoded operations remain distinct | `transport_test.exs`, `codec_test.exs`, `form_test.exs` | Existing `validate/2` and submission transition retain the same semantics | No new lifecycle alias required |
-| No complete candidate while decoding fails | `form_test.exs`, `form_property_test.exs` | Unchanged | No known gap |
-| Source-neutral validation dispatch | `form_validation_dispatch_test.exs`, validator tests | Semantic traversal supplies the same candidate to the same plan | Add before/after query-seam equivalence |
-| Nested-object presence is content-derived | `form_nested_presence_test.exs`, submission integration tests | Layout groups cannot manufacture or suppress object presence | Add the layout-regrouping invariance test in Wave 0 |
-| Read-only and unknown original data are preserved | `form_property_test.exs`, form tests | Presentation changes cannot change participation | Add equivalent transition/candidate semantics under two layouts in Wave 0 |
-| Unsupported blockers are derived and observable | `form_submission_test.exs`, `submission_blocker_test.exs` | Semantic unsupported traversal produces identical status and ownership | Extend to split semantic queries |
-| Submission success includes blockers | Submission-status and blocker tests; demo helper currently checks only issues plus candidate | Only `:ready` reaches application success | Add a required unsupported map-source demo/integration fixture in A2 |
-| Usage is accumulated and controls visibility | `transport_test.exs`, `used_input_contract_test.exs` | Lifecycle and projected-Form render path preserve it | Add component coverage without a separate definition assign |
-| `FormData` preserves names, values, nesting, and raw failures | `form_data_test.exs`, `naming_property_test.exs` | Native and advanced rendering use the same Phoenix conventions | Add explicit advanced non-native fixture |
-| A projected form renders the subtree it represents | Nested projection tests; component tests always pass a definition explicitly | A nested projected form renders only its own subtree, and a source carrying no definition fails clearly | Add nested-form derivation coverage for both components in P1 |
-| Projection is source-neutral and pure | `state_view_test.exs`, `projector_test.exs`, boundary tests | Layout traversal names no concrete state source | Extend boundary check to new preparation module |
-| Markup is accessible and transport-correct | component, reference-theme, and snapshot tests | Reference-component rename or rewiring changes no semantics | Regenerate snapshots only after reviewed diff |
-| LiveView lifecycle works end to end | demo LiveView tests | Demo uses the complete submission decision and projected-Form render path | Update fixture and handlers |
-| Real browser preserves unused gating, raw numeric text, focus, and valid submit | browser tests | All remain green after public-path migration | Required final run |
-| Ordinary target API is coherent | No current test; API does not yet exist | North-star examples compile and render | Add public API acceptance test |
-| Getting started has a bounded noun budget | Current guide exposes implementation stages | The getting-started page names exactly `Formentation`, `Formentation.Definition`, `Formentation.Form`, and `Formentation.Phoenix` among Formentation modules | Add a documentation assertion or focused review check in V |
-| Old mixed representation is absent | Current implementation requires it | No `Definition.root`, `nests_data?`, or semantic field group membership | Add architecture/static checks in D6 |
+| Both sources describe the same supported form | `differential_test.exs`, `pump_inspection_test.exs`, shared fixtures | Equivalent semantic facts and presentation layout apart from origins | `differential_test.exs` covers split structures |
+| Compilation is deterministic and map-order independent | `json_schema_property_test.exs`, `source/map_property_test.exs` | Split structures and derived default layout remain deterministic | Property assertions cover deterministic layouts |
+| Invalid and unsupported declarations are diagnosed | source-adapter tests, `info_test.exs` | Diagnostics and source locations survive the cutover | Source-adapter and Info coverage retained through the split |
+| No atoms from source keys; budgets terminate | adapter property tests | Query seams and new constructors preserve both guarantees | Existing property coverage |
+| Paths and IDs round-trip safely | path, pointer, node-ID, and naming property tests | Semantic occurrence paths stay independent of typed/namespaced presentation identities | Naming and DOM-identity properties |
+| Semantic field order is independent of layout order | declaration-order and reordering fixtures | `Info.fields/1` returns declaration order while presentation traversal returns group order | D1 tests and the documented correction |
+| Raw transport and decoded operations remain distinct | `transport_test.exs`, `codec_test.exs`, `form_test.exs` | Existing `validate/2` and submission transition retain the same semantics | Existing lifecycle coverage |
+| No complete candidate while decoding fails | `form_test.exs`, `form_property_test.exs` | Unchanged | Existing unit and property coverage |
+| Source-neutral validation dispatch | `form_validation_dispatch_test.exs`, validator tests | Semantic traversal supplies the same candidate to the same plan | Validation-dispatch coverage |
+| Nested-object presence is content-derived | `form_nested_presence_test.exs`, submission integration tests | Layout groups cannot manufacture or suppress object presence | `layout_invariance_test.exs` |
+| Read-only and unknown original data are preserved | `form_property_test.exs`, form tests | Presentation changes cannot change participation | `layout_invariance_test.exs` transition/candidate semantics |
+| Unsupported blockers are derived and observable | `form_submission_test.exs`, `submission_blocker_test.exs` | Semantic unsupported traversal produces identical status and ownership | Submission and semantic-query coverage |
+| Submission success includes blockers | Submission-status and blocker tests; demo integration | Only `:ready` reaches application success | A2 integration coverage |
+| Usage is accumulated and controls visibility | `transport_test.exs`, `used_input_contract_test.exs` | Lifecycle and projected-Form render path preserve it | Projected-component coverage |
+| `FormData` preserves names, values, nesting, and raw failures | `form_data_test.exs`, `naming_property_test.exs` | Native and advanced rendering use the same Phoenix conventions | Non-native `FormData` fixture |
+| A projected form renders the subtree it represents | nested projection and component tests | A nested projected form renders only its own subtree, and a source carrying no definition fails clearly | `components_test.exs`, `phoenix/form_data_test.exs` |
+| Projection is source-neutral and pure | `state_view_test.exs`, `render/preparation_test.exs`, boundary tests | Layout traversal names no concrete state source | Preparation boundary checks |
+| Markup is accessible and transport-correct | component, `ui/reference_test.exs`, and snapshot tests | Reference-component rename or rewiring changes no semantics | Reviewed reference and snapshot coverage |
+| LiveView lifecycle works end to end | demo LiveView tests | Demo uses the complete submission decision and projected-Form render path | `public_lifecycle_test.exs` |
+| Real browser preserves unused gating, raw numeric text, focus, and valid submit | browser tests | All remain green after public-path migration | Final release gate |
+| Ordinary target API is coherent | `public_lifecycle_test.exs` | North-star examples compile and render | Public lifecycle acceptance coverage |
+| Getting started has a bounded noun budget | `getting_started_modules_test.exs` | The guide names exactly the four public modules | Documentation assertion in V |
+| Old mixed representation is absent | architecture/static checks | No `Definition.root`, `nests_data?`, or semantic field group membership | D6 architecture checks |
 
 ## Migration policy
 
@@ -772,11 +784,11 @@ to this gate.
 
 ## Definition of Aligned Milestone A
 
-- [ ] North-star ownership and vocabulary are accepted and linked from the
+- [x] North-star ownership and vocabulary are accepted and linked from the
       vault indexes.
-- [ ] Current behaviour is characterized; gaps in the matrix are closed where
+- [x] Current behaviour is characterized; gaps in the matrix are closed where
       their implementation nodes can affect behaviour.
-- [ ] Wave 0 proves equivalent transition/candidate semantics under different
+- [x] Wave 0 proves equivalent transition/candidate semantics under different
       layouts and layout-invariant nested-object presence.
 - [x] `Definition` stores separate semantic and presentation structures.
 - [x] Both current adapters produce those structures directly.
@@ -791,31 +803,65 @@ to this gate.
 - [x] `Info.fields/1` returns semantic declaration order while presentation
       traversal returns layout order; the intentional behaviour correction is
       documented.
-- [ ] Existing `new/3` and `validate/2` remain the ordinary construction and
+- [x] Existing `new/3` and `validate/2` remain the ordinary construction and
       change-event operations.
 - [x] Submission exposes success versus redisplay through
       `submission_status/1`, including blockers, and the demo no longer
       hand-rolls readiness.
-- [ ] `Formentation.form/2` provides the agreed convenience path, and both it
+- [x] `Formentation.form/2` provides the agreed convenience path, and both it
       and `Formentation.compile/2` accept the stable built-in `adapter:` keys.
-- [ ] Phoenix components accept the `%Phoenix.HTML.Form{}` projection of a
+- [x] Phoenix components accept the `%Phoenix.HTML.Form{}` projection of a
       `%Formentation.Form{}` and derive its definition without a separate
       assign; `as` and `id` remain caller-owned.
-- [ ] A nested projected form renders its own subtree, because derivation
+- [x] A nested projected form renders its own subtree, because derivation
       recovers the projection root as well as the definition.
-- [ ] Arbitrary `FormData` plus `StateView` remains a tested, permanent
+- [x] Arbitrary `FormData` plus `StateView` remains a tested, permanent
       low-level interoperability path.
-- [ ] Projector/render-plan/reference-component details are absent from the
+- [x] Projector/render-plan/reference-component details are absent from the
       getting-started lifecycle.
-- [ ] The getting-started page names exactly `Formentation`,
+- [x] The getting-started page names exactly `Formentation`,
       `Formentation.Definition`, `Formentation.Form`, and
       `Formentation.Phoenix` among Formentation modules.
-- [ ] Current unit, property, LiveView, architecture, and documentation checks
+- [x] Current unit, property, LiveView, architecture, and documentation checks
       pass.
-- [ ] Browser-real acceptance tests pass.
-- [ ] README, demo, `Userguide`, and `Techdocs` describe the implemented API.
-- [ ] Collections remain the only material Phase 1 capability not yet
+- [x] Browser-real acceptance tests pass.
+- [x] README, demo, `Userguide`, and `Techdocs` describe the implemented API.
+- [x] Collections remain the only material Phase 1 capability not yet
       implemented.
+
+## Wave 4 verification
+
+### Release-candidate verification
+
+Run on the release-candidate branch before merge:
+
+- `mix ci` — PASS: 894 passed (68 doctests, 33 properties, 793 tests), 8 excluded.
+- `mix test.browser` — PASS: 8 passed, 894 excluded.
+- GitHub Actions run: linked from the release-candidate PR.
+
+No candidate commit SHA is recorded here on purpose. The branch is squash-merged,
+so the commit that lands on `main` — and therefore the commit the tag points at —
+is a different object than anything verified pre-merge. Recording a pre-merge SHA
+would name a commit that no longer exists in the released history.
+
+### Released commit
+
+The release is identified in this repository by the immutable tag **`v0.2.0`**,
+not by a SHA written into a note. That is deliberate: a commit cannot contain
+its own hash, so recording the merged SHA here would produce a *new* commit —
+leaving the tag either on a commit that predates its own record, or on one whose
+recorded SHA is already stale.
+
+The resolved commit hash, the post-merge `mix ci` and `mix test.browser` runs,
+and their workflow links are therefore recorded outside the tree, on the
+[`v0.2.0` release](https://github.com/kioopi/formentation/releases/tag/v0.2.0)
+and in the [#46](https://github.com/kioopi/formentation/issues/46) close-out
+comment. `git rev-parse v0.2.0` resolves the tag to that commit at any time.
+
+Post-merge gate results are the acceptance condition for cutting the tag: both
+gates re-run on `main` before `v0.2.0` is created, because the branch is
+squash-merged and the released commit is therefore an object no pre-merge run
+has seen.
 
 ## Exit and what follows
 

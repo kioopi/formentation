@@ -283,7 +283,9 @@ minimal `package/0` block (`licenses`, `links`) prepares for a later Hex release
 GitHub Actions reusing the pinned `mise.toml` toolchain via `jdx/mise-action`: a
 blocking `check` job running the full `mix ci`, plus a non-blocking `browser` job
 running `mix test.browser` (isolated from merge gating while CI browser stability is
-unproven).
+unproven). *The browser job's non-blocking posture was superseded by
+[[#D-049 — The browser job gates merges from `v0.2.0`|D-049]]; the rest of this
+decision stands.*
 
 ## D-025 — Instance validation dispatches through a source-neutral behaviour
 
@@ -1235,3 +1237,31 @@ can no longer receive a type-incompatible default from this source, and a
 duplicate presentation group ID cannot reach `Definition.Finalizer`'s
 `:duplicate_layout_id` invariant. `_persistent_id` is now included in the
 shared reserved transport-property warnings.
+
+## D-049 — The browser job gates merges from `v0.2.0`
+
+*2026-08-09*
+
+**Context.** [[#D-024 — Distribution, license, and CI|D-024]]
+made the `browser` job non-blocking, "isolated from merge gating while CI
+browser stability is unproven". That caution was right at the time: the suite
+was new and its LiveSocket join flaked under CPU load
+([[browser-testing|Techdocs/Browser testing]] records 4/8 whole-run failures
+before the join timeout was raised, 0/8 after). Aligned Milestone A is now
+declared against exactly the behaviours only this suite can observe — real
+`_unused_` gating, raw numeric preservation under a browser, error-summary
+focus movement — and an advisory job cannot protect them.
+
+**Decision.** The `browser` job blocks merges as of `v0.2.0`, superseding
+D-024's non-blocking posture. It carries `timeout-minutes: 15`: the join is
+still CPU-sensitive under load, so a starved run should fail on a visible bound
+rather than consume the job's full budget. The bound rests on the suite's own
+measured behaviour, not on an assumption about runner size. If a specific test proves flaky under CI load, quarantine that test with
+a linked issue; do not restore whole-job advisory status, which would hide
+regressions in the contract the milestone rests on.
+
+**Consequences.** A red browser job now stops a merge, so a starved join and a
+real regression look alike until someone reads the failure — the timeout exists
+to make the starved case recognisable. `mix ci` still does not run the suite;
+the split between the static gate and the browser job is unchanged, only the
+browser job's authority.

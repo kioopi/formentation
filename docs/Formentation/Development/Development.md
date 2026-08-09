@@ -20,7 +20,7 @@ The conceptual roadmap that frames these phases is [[13-roadmap|Planning/13 — 
 | Phase | Status | Outcome |
 | --- | --- | --- |
 | [[phase-1-walking-skeleton\|1 — Walking skeleton]] | 🚧 In progress | A form compiled from two sources renders, validates, and submits end to end through Phoenix. |
-| [[phase-1-north-star-alignment\|Phase 1 — North-star alignment]] | 🚧 In progress | Milestone A adopts split semantic/presentation structure, layout-invariant semantics, a complete submission decision, and the intended Phoenix projection path before collections. |
+| [[phase-1-north-star-alignment\|Phase 1 — North-star alignment]] | ✅ Done (2026-08-09) | Milestone A delivered split semantic/presentation structure, layout-invariant semantics, a complete submission decision, and the projected Phoenix path in `v0.2.0`. |
 | [[phase-2-compiler-diagnostics\|2 — Compiler and diagnostics]] | 📋 Planned | Compilation becomes an ordered, explainable pipeline with verifiers, full provenance, and stable diagnostics. |
 | [[phase-3-extensibility\|3 — Extensibility and UI integrations]] | 📋 Planned | Applications and UI packages can add semantics, codecs, prepared-view consumers, stateless and interactive widgets, and compiler passes through proven contracts. |
 | [[phase-4-dynamic-schemas\|4 — Dynamic schemas]] | 📋 Planned | Conditional and compositional schemas project against changing data without losing state. |
@@ -42,15 +42,11 @@ rendering can prove the relevant boundaries.
 
 Phase 1 is mid-flight. Completed within it so far: the map-source static pipeline, the JSON Schema adapter, the annotations mini-slice, step 4 (state and codecs, decided on paper as [[18-decisions#D-009 — Form state separates transport from operation|D-009]]–[[18-decisions#D-014 — Usage is a first-class interaction axis|D-014]] and then implemented), the per-kind `Node` split ([[18-decisions#D-015 — One struct per node kind|D-015]]), the non-submitting-fields mini-slice ([[18-decisions#D-016 — Participation is definition-driven, not transport-driven|D-016]]), step 5, the `Phoenix.HTML.FormData` projection ([[18-decisions#D-017 — Phoenix integration ships in-tree behind a namespace boundary|D-017]]), step 6, the projector, public components, and reference theme — Phoenix-generic projection ([[18-decisions#D-019 — Projection is Phoenix-generic|D-019]]) and the reference theme as a markup set rather than a contract ([[18-decisions#D-020 — The reference theme is a markup set, not a contract|D-020]]) — and step 7, the LiveView lifecycle: thin `validate/2`/`submit/2` wrappers, the `_persistent_id` transport strip, and a repo-root `demo/` application (both LiveViews, `mix demo`) serving as both the `Phoenix.LiveViewTest` fixture and a browser-checked example ([[18-decisions#D-021 — LiveView integration is wrappers plus a demo, not framework machinery|D-021]]).
 
-The active next step is now
-[[phase-1-north-star-alignment|the Phase 1 north-star alignment gate]], accepted
-in [[18-decisions#D-029 — Definition and Form are the ordinary public model|D-029]].
-It separates semantic structure from presentation layout and
-converges the public API before **step 8, Milestone B (collections)** resumes.
-Its Wave 0 begins with the planning documents and then adds two executable
-layout-invariance characterizations before the first query-order change.
-The current implementation remains accurately documented in `Techdocs` and
-`Userguide` until the corresponding alignment changes land.
+[[phase-1-north-star-alignment|The Phase 1 north-star alignment gate]] is
+closed. It delivered the split definition, a semantic-only `Form`, the
+submission decision, the `form/2` façade with symbolic selectors, and
+projected-form rendering; all ship in `v0.2.0`. **Phase 1 Milestone B
+(collections) is now the active work.**
 
 Supplementary to the numbered steps: an opt-in, demo-driven browser-real test suite (PhoenixTest + Playwright, [[18-decisions#D-022 — Browser-real tests are an opt-in, demo-driven Playwright suite|D-022]]) now covers truths `Phoenix.LiveViewTest` cannot observe — real `_unused_` marker gating, number-widget raw-text preservation under an actual browser, and error-summary focus movement — and surfaced the pump-inspection demo's native-validation toggle ([[18-decisions#D-023 — The demo keeps native validation, behind a toggle|D-023]]). It runs via `mix test.browser`, stays out of `mix ci` by design, and is not itself a phase-1 step; see [[browser-testing|Techdocs/Browser testing]].
 
@@ -115,6 +111,9 @@ keeping their moduledocs for IEx. See
 [[18-decisions#D-041 — Projected Phoenix forms are the ordinary rendering input|D-041]]
 and the refreshed [[rendering|Rendering]], [[phoenix-form-data|Phoenix FormData]],
 and [[end-to-end-data-flow|End-to-end data flow]] notes.
+Both names were later superseded by `Formentation.Phoenix.Render.Preparation`
+and `Formentation.Phoenix.UI.Reference` in
+[[18-decisions#D-047 — The lib tree is restructured to state the north-star architecture|D-047]].
 
 As of 2026-07-26, the project direction is additionally frozen in
 [[19-north-star-architecture|North-star architecture]],
@@ -139,6 +138,9 @@ target; a presentation-only group carries none, since it owns no semantic
 occurrence to link. See
 [[18-decisions#D-044 — Object-level error-summary entries link to their prepared fieldset|D-044]]
 and the refreshed [[rendering|Rendering]] note.
+`RenderNode.Group` and `RenderPreparation.Summary` were later renamed under
+`Formentation.Phoenix.Render.Node` and `.Render.Preparation` by
+[[18-decisions#D-047 — The lib tree is restructured to state the north-star architecture|D-047]].
 
 ✅ Done (2026-08-07) — Wave 3 / North-star node A3: stable symbolic source
 selectors and a compile-and-initialize façade ([GitHub issue

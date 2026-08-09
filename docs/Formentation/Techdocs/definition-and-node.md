@@ -138,7 +138,7 @@ read-only field is excluded from the replace scope entirely — the
 submitted value is discarded and the original is kept. Both layers
 downstream read these declared facts rather than re-deriving the intent:
 [[form-state-and-transitions|the state layer]] for the decode
-operation, [[rendering|the projector]] for the widget and control
+operation, [[rendering|render preparation]] for the widget and control
 attributes.
 
 Only semantic objects and presentation containers have `children`. A semantic

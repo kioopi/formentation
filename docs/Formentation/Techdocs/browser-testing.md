@@ -13,7 +13,7 @@ status: current
 
 # Browser testing
 
-> [!note] As of 2026-08-04 · browser-test suite, prepared DOM identities, ephemeral test port
+> [!note] As of 2026-08-09 · browser-test suite, prepared DOM identities, ephemeral test port
 > Describes the opt-in Playwright suite as built: the harness, the config
 > posture, and what each seed test pins. This is additive to
 > [[test-and-verification-architecture|the test architecture]]'s mechanism
@@ -166,8 +166,10 @@ delegating to `Mix.Task.run/2` in-process sidesteps that. `cli/0` also lists
 `"test.browser": :test` under `preferred_envs`, so the alias runs in the
 `:test` Mix env without an explicit `MIX_ENV=test`.
 
-`mix ci` never runs this alias — it is excluded from CI by design, not by
+`mix ci` never runs this alias — it is excluded from `mix ci` by design, not by
 oversight; see [[test-and-verification-architecture#Static gates — `mix ci`|the static gates note]].
+The suite still runs in CI, as its own `browser` workflow job, and that job
+gates merges as of `v0.2.0`.
 
 To iterate on a single test file: `PLAYWRIGHT_E2E=1 mix test <file> --only
 browser` (bypassing the alias, since `mix test.browser` doesn't forward a
@@ -271,9 +273,18 @@ idle, 0/12 after. Under full CPU saturation the join itself starves and
 runs still fail — not a regime worth chasing, but the reason the timeout
 is generous rather than tight.
 
-This is also why the CI browser job is `continue-on-error: true`, and why
-an earlier attempt to fix the same flakiness by raising the timeout
-(“Raise browser-test assertion timeout to 5s”) could not have worked.
+This is also why an earlier attempt to fix the same flakiness by raising the
+assertion timeout (“Raise browser-test assertion timeout to 5s”) could not have
+worked — the join, not the assertions, was starving.
+
+The CI browser job carried `continue-on-error: true` while this stability was
+unproven. As of `v0.2.0` it **gates merges**
+([[18-decisions#D-049 — The browser job gates merges from `v0.2.0`|D-049]]):
+the contract it pins is the one
+Milestone A is declared against, and an advisory gate cannot protect a release.
+Because the join remains CPU-sensitive under load, the job carries
+`timeout-minutes: 15` so a starved run fails on a visible bound rather than
+burning the full job budget.
 
 ## Minor gotchas worth knowing
 

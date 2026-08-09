@@ -39,7 +39,13 @@ jobs:
   browser:
     name: browser tests
     runs-on: ubuntu-latest
-    continue-on-error: true
+    # This job gates merges as of v0.2.0. The suite's LiveSocket join is
+    # CPU-sensitive (see Techdocs/Browser testing: 4/8 whole-run failures with
+    # half the cores busy-looping), so a starved join is a real failure mode
+    # whatever the runner size. The timeout bounds it instead of letting it
+    # burn the job's full budget, and keeps a hung join recognisable rather
+    # than indistinguishable from a regression.
+    timeout-minutes: 15
     env:
       MIX_ENV: test
     steps:

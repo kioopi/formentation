@@ -90,8 +90,9 @@ widgets/capabilities, derives transport and localized presentation facts, and
 produces a prepared view.
 
 Preparation does not emit HEEx and does not mutate submitted data merely
-because a field is hidden. The current `Formentation.Phoenix.Projector` and
-`Render.Plan` are Phase 1 implementation names. See
+because a field is hidden. The current
+`Formentation.Phoenix.Render.Preparation` and `Render.Plan` are Phase 1
+implementation names. See
 [[06-runtime-projection|Runtime projection]].
 
 ### Renderer, UI, and theme

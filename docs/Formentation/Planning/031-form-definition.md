@@ -21,7 +21,9 @@ presentation layout as decided by
 [[19-north-star-architecture|the north-star architecture]].
 
 > [!note] Implementation status
-> Slice 1 of [[phase-1-walking-skeleton|Phase 1]] implements the core of this note: `Formentation.Definition`, per-kind node structs — `Formentation.Node.Field`, `.Group`, `.Unsupported` ([[18-decisions#D-015 — One struct per node kind|D-015]]), compact origin tags ([[18-decisions#D-003 — Simplified provenance first|D-003]]), `Formentation.Diagnostic`, and the first `Formentation.Info` queries. The rest — decisions with superseded candidates, conditions, capability requirements, indexes, fingerprints — is the target model, and is marked as such below.
+> Slice 1 of [[phase-1-walking-skeleton|Phase 1]] implemented the core of this note: `Formentation.Definition`, per-kind node structs — `Formentation.Node.Field`, `.Group`, `.Unsupported` ([[18-decisions#D-015 — One struct per node kind|D-015]]), compact origin tags ([[18-decisions#D-003 — Simplified provenance first|D-003]]), `Formentation.Diagnostic`, and the first `Formentation.Info` queries. The rest — decisions with superseded candidates, conditions, capability requirements, indexes, fingerprints — is the target model, and is marked as such below.
+>
+> **Superseded as of `v0.2.0`.** [[phase-1-north-star-alignment|The north-star alignment]] replaced the single mixed node tree with separate semantic and presentation structures. `Formentation.Node.*`, `Definition.root`, and the `nests_data?` flag no longer exist; a field's semantic facts live in `Formentation.Definition.Semantic.Field` and its layout facts in `Formentation.Definition.Presentation.Field`, and objects and presentation groups are distinct types. Every `Formentation.Node.*` reference and every `nests_data?` mention below describes the pre-alignment model and is retained for the reasoning, not as current API. See [[definition-and-node|Techdocs/Definition and Node]] for what is built.
 
 ## Its position in the system
 

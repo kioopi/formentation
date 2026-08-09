@@ -15,7 +15,7 @@ defimpl Formentation.Phoenix.StateView, for: Formentation.Form do
 
   # Never :default — Formentation.Form owns the complete D-014 policy
   # (scalar issues on submit or once used; group and root issues on
-  # submit only), so deferring to the projector's approximation could
+  # submit only), so deferring to preparation's approximation could
   # only reintroduce a second, drifting copy of that rule.
   def issue_visibility(form_state, _form, %InstancePath{segments: segments}) do
     if Form.show_issues?(form_state, segments), do: :show, else: :hide
@@ -31,7 +31,7 @@ defimpl Formentation.Phoenix.StateView, for: Formentation.Form do
     {:ok, Enum.map(blockers, &blocker_issue/1) ++ unowned_issues(form_state, blockers)}
   end
 
-  # The capability explanation is built here, not in the projector: it is
+  # The capability explanation is built here, not in preparation: it is
   # this source's account of its own limits, and a source with different
   # semantics owes projection nothing but a displayable message.
   defp blocker_issue(%SubmissionBlocker{path: path} = blocker) do
