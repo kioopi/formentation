@@ -1284,6 +1284,22 @@ defmodule Formentation.Source.MapTest do
                Formentation.compile(declaration, adapter: Formentation.Source.Map)
     end
 
+    test "a non-string, non-nil group title is an invalid_declaration error, not silently dropped" do
+      declaration = %{
+        kind: :object,
+        properties: [{"voltage", %{kind: :number}}],
+        groups: [%{id: "electrical", title: 42, fields: ["voltage"]}]
+      }
+
+      assert {:error,
+              [
+                %Formentation.Diagnostic{
+                  code: :invalid_declaration,
+                  origin: {:map_source, [:groups, 0, :title]}
+                }
+              ]} = Formentation.compile(declaration, adapter: Formentation.Source.Map)
+    end
+
     test "a non-string, non-nil title is an invalid_declaration error" do
       declaration = %{kind: :object, properties: [{"name", %{kind: :string, title: 42}}]}
 

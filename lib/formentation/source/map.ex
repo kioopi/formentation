@@ -286,9 +286,10 @@ defmodule Formentation.Source.Map do
     end
   end
 
-  defp validate_group(%{id: id, fields: fields}, index, seen_ids, ctx) do
+  defp validate_group(%{id: id, fields: fields} = group, index, seen_ids, ctx) do
     with :ok <- validate_group_id(id, index, seen_ids, ctx),
-         :ok <- validate_group_fields(fields, index, ctx) do
+         :ok <- validate_group_fields(fields, index, ctx),
+         :ok <- validate_group_title(Map.get(group, :title), index, ctx) do
       {:ok, id}
     end
   end
@@ -346,6 +347,18 @@ defmodule Formentation.Source.Map do
            ctx.source_path ++ [:groups, index, :fields, field_index]
          )}
     end
+  end
+
+  defp validate_group_title(nil, _index, _ctx), do: :ok
+  defp validate_group_title(title, _index, _ctx) when is_binary(title), do: :ok
+
+  defp validate_group_title(title, index, ctx) do
+    {:error,
+     invalid(
+       "group #{index}: :title must be a string, got: #{inspect(title)}",
+       ctx,
+       ctx.source_path ++ [:groups, index, :title]
+     )}
   end
 
   defp compile_property(name, %{kind: :object} = spec, required?, ctx) do
