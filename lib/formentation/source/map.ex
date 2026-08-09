@@ -10,6 +10,12 @@ defmodule Formentation.Source.Map do
   Field specifications support `:one_of` options lists containing scalar values
   (`String.t()`, `number()`, or `boolean()`). Unsupported non-scalar values in
   `:one_of` produce an `:invalid_declaration` error.
+
+  Selected as `adapter: :map`. The declaration vocabulary this module
+  compiles is the supported surface; the compiled `Formentation.Definition`
+  it produces is queried through `Formentation.Info` rather than
+  pattern-matched. See `Formentation.Source` for the adapter
+  compatibility boundary.
   """
 
   @behaviour Formentation.Source
