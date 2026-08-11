@@ -2,9 +2,9 @@ defmodule Formentation.NodeId do
   @moduledoc """
   Deterministic node IDs from template paths (D-007). Segments escape the
   ID vocabulary — RFC 6901's `~` → `~0` and `/` → `~1`, plus `#` → `~2`
-  as a Formentation extension for the presentation-group suffix — so no
-  legal property or group name can collide with a path separator or a
-  group ID.
+  and the collection-item marker `:item` → `~3` as Formentation extensions
+  — so no legal property or group name can collide with a path separator or
+  a group ID.
   """
 
   alias Formentation.{JSONPointer, TemplatePath}
@@ -22,7 +22,7 @@ defmodule Formentation.NodeId do
   def from_path(%TemplatePath{segments: []}), do: "/"
 
   def from_path(%TemplatePath{segments: segments}) do
-    IO.iodata_to_binary(Enum.map(segments, &["/", escape_segment(&1)]))
+    IO.iodata_to_binary(Enum.map(segments, &["/", encode_segment(&1)]))
   end
 
   @doc """
@@ -49,4 +49,10 @@ defmodule Formentation.NodeId do
     |> JSONPointer.escape_segment()
     |> String.replace("#", "~2")
   end
+
+  # The collection-item marker extends the escape family (~0 = ~, ~1 = /,
+  # ~2 = #): escaped user segments contain ~ only as ~0/~1/~2, so ~3 is
+  # unreachable from any property name and cannot be spoofed.
+  defp encode_segment(:item), do: "~3"
+  defp encode_segment(segment), do: escape_segment(segment)
 end
