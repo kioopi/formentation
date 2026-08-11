@@ -25,7 +25,7 @@ defmodule Formentation.PumpInspectionTest do
     assert Info.role(definition, ["last_service"]) == :date
     assert Info.role(definition, ["condition"]) == :select
 
-    assert {:ok, %PresentationInfo.Field{semantic_path: %{segments: ["voltage"]}}} =
+    assert {:ok, %PresentationInfo.Field{template_path: %{segments: ["voltage"]}}} =
              Info.presentation_at(definition, ["voltage"])
 
     assert %Semantic.Field{options: ["good", "worn", "defective"]} =

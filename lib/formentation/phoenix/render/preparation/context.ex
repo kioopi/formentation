@@ -51,7 +51,7 @@ defmodule Formentation.Phoenix.Render.Preparation.Context do
           path: [InstancePath.segment()],
           root_path: [InstancePath.segment()],
           root_instance_path: InstancePath.t(),
-          semantic_nodes: %{InstancePath.t() => term()},
+          semantic_nodes: %{Formentation.TemplatePath.t() => term()},
           dom_namespace: String.t()
         }
 

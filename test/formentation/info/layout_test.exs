@@ -15,7 +15,7 @@ defmodule Formentation.Info.LayoutTest do
 
   defp paths(%Layout.Object{children: children}), do: Enum.flat_map(children, &paths/1)
   defp paths(%Layout.Group{children: children}), do: Enum.flat_map(children, &paths/1)
-  defp paths(%Layout.Field{semantic_path: path}), do: [path.segments]
+  defp paths(%Layout.Field{template_path: path}), do: [path.segments]
 
   defp malformed_definition(semantic, presentation, by_id \\ %{}) do
     %Definition{
@@ -34,7 +34,7 @@ defmodule Formentation.Info.LayoutTest do
 
     root = Info.presentation_root(definition)
 
-    assert %Layout.Object{semantic_path: %{segments: []}} = root
+    assert %Layout.Object{template_path: %{segments: []}} = root
     assert paths(root) == [["a"], ["c"]]
     assert Info.presentation_root(definition) == root
   end
@@ -71,9 +71,9 @@ defmodule Formentation.Info.LayoutTest do
 
     assert %Layout.Object{
              children: [
-               %Layout.Field{semantic_path: %{segments: ["a"]}},
+               %Layout.Field{template_path: %{segments: ["a"]}},
                %Layout.Group{id: "/#late"} = group,
-               %Layout.Field{semantic_path: %{segments: ["c"]}}
+               %Layout.Field{template_path: %{segments: ["c"]}}
              ]
            } = Info.presentation_root(definition)
 
@@ -97,7 +97,7 @@ defmodule Formentation.Info.LayoutTest do
     assert %Layout.Object{
              children: [
                %Layout.Object{
-                 semantic_path: %{segments: ["details"]},
+                 template_path: %{segments: ["details"]},
                  children: [%Layout.Group{id: "/details#technical"} = group]
                }
              ]
@@ -129,7 +129,7 @@ defmodule Formentation.Info.LayoutTest do
 
     assert {:ok,
             %Layout.Field{
-              semantic_path: %{segments: ["mode"]},
+              template_path: %{segments: ["mode"]},
               label: "Mode",
               help: "Choose carefully.",
               widget: :radio,
@@ -189,16 +189,16 @@ defmodule Formentation.Info.LayoutTest do
         groups: [%{id: "main", fields: ["title"]}]
       })
 
-    assert {:ok, %Layout.Object{semantic_path: %{segments: []}}} =
+    assert {:ok, %Layout.Object{template_path: %{segments: []}}} =
              Info.presentation_at(definition, [])
 
-    assert {:ok, %Layout.Field{semantic_path: %{segments: ["title"]}}} =
+    assert {:ok, %Layout.Field{template_path: %{segments: ["title"]}}} =
              Info.presentation_at(definition, ["title"])
 
-    assert {:ok, %Layout.Object{semantic_path: %{segments: ["details"]}}} =
+    assert {:ok, %Layout.Object{template_path: %{segments: ["details"]}}} =
              Info.presentation_at(definition, ["details"])
 
-    assert {:ok, %Layout.Field{semantic_path: %{segments: ["details", "width"]}}} =
+    assert {:ok, %Layout.Field{template_path: %{segments: ["details", "width"]}}} =
              Info.presentation_at(definition, ["details", "width"])
 
     assert Info.presentation_at(definition, ["missing"]) == :not_found
@@ -296,7 +296,7 @@ defmodule Formentation.Info.LayoutTest do
       )
 
     assert %Layout.Object{
-             children: [%Layout.Field{semantic_path: %{segments: ["name"]}}]
+             children: [%Layout.Field{template_path: %{segments: ["name"]}}]
            } = Info.presentation_root(definition)
   end
 
@@ -316,7 +316,7 @@ defmodule Formentation.Info.LayoutTest do
                  end
   end
 
-  defp collect_refs(%Layout.Object{semantic_path: path, children: children}) do
+  defp collect_refs(%Layout.Object{template_path: path, children: children}) do
     [{:object, path.segments} | Enum.flat_map(children, &collect_refs/1)]
   end
 
@@ -324,7 +324,7 @@ defmodule Formentation.Info.LayoutTest do
     Enum.flat_map(children, &collect_refs/1)
   end
 
-  defp collect_refs(%Layout.Field{semantic_path: path}) do
+  defp collect_refs(%Layout.Field{template_path: path}) do
     [{:field, path.segments}]
   end
 end

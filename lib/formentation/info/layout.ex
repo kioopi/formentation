@@ -7,7 +7,7 @@ defmodule Formentation.Info.Layout do
   stored presentation structs themselves.
   """
 
-  alias Formentation.{Definition, InstancePath, Origin}
+  alias Formentation.{Definition, InstancePath, Origin, TemplatePath}
   alias Formentation.Definition.Presentation, as: Layout
   alias Formentation.Definition.Semantic
 
@@ -15,16 +15,16 @@ defmodule Formentation.Info.Layout do
     @moduledoc """
     A root or nested semantic-object layout boundary.
 
-    `semantic_path` identifies the object occurrence. `id` is layout identity
+    `template_path` identifies the object occurrence. `id` is layout identity
     for the current descriptor and must not be parsed as an instance path.
     """
 
-    @enforce_keys [:id, :semantic_path, :label, :help, :origins, :children]
-    defstruct [:id, :semantic_path, :label, :help, :origins, children: []]
+    @enforce_keys [:id, :template_path, :label, :help, :origins, :children]
+    defstruct [:id, :template_path, :label, :help, :origins, children: []]
 
     @type t :: %__MODULE__{
             id: String.t(),
-            semantic_path: InstancePath.t(),
+            template_path: TemplatePath.t(),
             label: String.t() | nil,
             help: String.t() | nil,
             origins: [{atom(), Origin.t()}],
@@ -35,11 +35,11 @@ defmodule Formentation.Info.Layout do
   defmodule Field do
     @moduledoc "A scalar field reference carrying presentation-owned facts."
 
-    @enforce_keys [:semantic_path, :label, :help, :widget, :hidden?, :origins]
-    defstruct [:semantic_path, :label, :help, :widget, :origins, hidden?: false]
+    @enforce_keys [:template_path, :label, :help, :widget, :hidden?, :origins]
+    defstruct [:template_path, :label, :help, :widget, :origins, hidden?: false]
 
     @type t :: %__MODULE__{
-            semantic_path: InstancePath.t(),
+            template_path: TemplatePath.t(),
             label: String.t() | nil,
             help: String.t() | nil,
             widget: atom() | nil,
@@ -101,7 +101,7 @@ defmodule Formentation.Info.Layout do
     entry = semantic_entry_by_id!(definition, object.semantic_id, :object)
 
     %Object{
-      semantic_path: entry.instance_path,
+      template_path: entry.template_path,
       id: object.id,
       label: object.label,
       help: object.help,
@@ -134,7 +134,7 @@ defmodule Formentation.Info.Layout do
     entry = semantic_entry_by_id!(definition, field.semantic_id, :field)
 
     %Field{
-      semantic_path: entry.instance_path,
+      template_path: entry.template_path,
       label: field.label,
       help: field.help,
       widget: field.widget,

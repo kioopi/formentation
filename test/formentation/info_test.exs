@@ -273,7 +273,7 @@ defmodule Formentation.InfoTest do
                  label: "Identity",
                  children: [
                    %Formentation.Info.Layout.Field{
-                     semantic_path: %{segments: ["name"]},
+                     template_path: %{segments: ["name"]},
                      label: "Display name",
                      help: "Shown to technicians.",
                      widget: :textarea,

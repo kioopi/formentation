@@ -107,7 +107,7 @@ defmodule Formentation.DifferentialTest do
 
   defp collect_presentation_facts(%Layout.Object{} = object) do
     [
-      {:object, object.semantic_path.segments, object.label, object.help}
+      {:object, object.template_path.segments, object.label, object.help}
       | Enum.flat_map(object.children, &collect_presentation_facts/1)
     ]
   end
@@ -121,7 +121,7 @@ defmodule Formentation.DifferentialTest do
 
   defp collect_presentation_facts(%Layout.Field{} = field) do
     [
-      {:field, field.semantic_path.segments, field.label, field.help, field.widget, field.hidden?}
+      {:field, field.template_path.segments, field.label, field.help, field.widget, field.hidden?}
     ]
   end
 end

@@ -13,7 +13,7 @@ defmodule Formentation.Source.JSONSchemaTest do
   end
 
   defp presentation_key(%PresentationInfo.Group{id: id}), do: id
-  defp presentation_key(%PresentationInfo.Field{semantic_path: path}), do: path.segments
+  defp presentation_key(%PresentationInfo.Field{template_path: path}), do: path.segments
 
   defp schema_with_group do
     %{
@@ -791,9 +791,9 @@ defmodule Formentation.Source.JSONSchemaTest do
       definition = compile!(schema_with_group(), ui: hints)
 
       assert [
-               %PresentationInfo.Field{semantic_path: %{segments: ["serial_number"]}},
+               %PresentationInfo.Field{template_path: %{segments: ["serial_number"]}},
                %PresentationInfo.Group{id: "/#electrical"},
-               %PresentationInfo.Field{semantic_path: %{segments: ["notes"]}}
+               %PresentationInfo.Field{template_path: %{segments: ["notes"]}}
              ] = Info.presentation_root(definition).children
     end
 
@@ -802,9 +802,9 @@ defmodule Formentation.Source.JSONSchemaTest do
       definition = compile!(schema_with_group(), ui: hints)
 
       assert [
-               %PresentationInfo.Field{semantic_path: %{segments: ["notes"]}},
+               %PresentationInfo.Field{template_path: %{segments: ["notes"]}},
                %PresentationInfo.Group{id: "/#electrical"},
-               %PresentationInfo.Field{semantic_path: %{segments: ["serial_number"]}}
+               %PresentationInfo.Field{template_path: %{segments: ["serial_number"]}}
              ] = Info.presentation_root(definition).children
     end
 
@@ -812,7 +812,7 @@ defmodule Formentation.Source.JSONSchemaTest do
       hints = %{"order" => ["notes", "notes"]}
       definition = compile!(schema_with_group(), ui: hints)
 
-      assert Enum.map(Info.presentation_root(definition).children, & &1.semantic_path.segments) ==
+      assert Enum.map(Info.presentation_root(definition).children, & &1.template_path.segments) ==
                [["notes"], ["insulation_ok"], ["serial_number"], ["voltage"]]
     end
 
@@ -828,7 +828,7 @@ defmodule Formentation.Source.JSONSchemaTest do
       assert [%Formentation.Diagnostic{severity: :warning, code: :unknown_order_entry}] =
                diagnostics
 
-      assert %PresentationInfo.Field{semantic_path: %{segments: ["notes"]}} =
+      assert %PresentationInfo.Field{template_path: %{segments: ["notes"]}} =
                List.first(Info.presentation_root(definition).children)
     end
   end

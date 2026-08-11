@@ -43,7 +43,7 @@ defmodule Formentation.Phoenix.Render.Preparation.Widget do
   ## Examples
 
       iex> presentation = %Formentation.Info.Layout.Field{
-      ...>   semantic_path: Formentation.InstancePath.new!(["a"]),
+      ...>   template_path: Formentation.TemplatePath.new!(["a"]),
       ...>   label: nil, help: nil, widget: nil, hidden?: false, origins: []
       ...> }
       iex> node = Formentation.Definition.Semantic.Field.new("a", Formentation.TemplatePath.new!(["a"]), :boolean)
@@ -51,7 +51,7 @@ defmodule Formentation.Phoenix.Render.Preparation.Widget do
       {:checkbox, []}
 
       iex> presentation = %Formentation.Info.Layout.Field{
-      ...>   semantic_path: Formentation.InstancePath.new!(["a"]),
+      ...>   template_path: Formentation.TemplatePath.new!(["a"]),
       ...>   label: nil, help: nil, widget: :checkbox, hidden?: false, origins: []
       ...> }
       iex> node = Formentation.Definition.Semantic.Field.new("a", Formentation.TemplatePath.new!(["a"]), :string)

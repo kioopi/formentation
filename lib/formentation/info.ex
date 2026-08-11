@@ -23,7 +23,7 @@ defmodule Formentation.Info do
       false
   """
 
-  alias Formentation.{Definition, Diagnostic, InstancePath, Origin}
+  alias Formentation.{Definition, Diagnostic, InstancePath, Origin, TemplatePath}
   alias Formentation.Definition.Semantic
   alias Formentation.Info.Layout
 
@@ -116,25 +116,25 @@ defmodule Formentation.Info do
     case Semantic.find_unique(definition, segments) do
       :not_found -> nil
       {:ok, %Semantic.Entry{kind: kind}} -> kind
-      {:ambiguous, count} -> raise_ambiguous_semantic_path!(segments, count)
+      {:ambiguous, count} -> raise_ambiguous_template_path!(segments, count)
     end
   end
 
   @doc false
   @spec semantic_node_index(Definition.t()) :: %{
-          InstancePath.t() => Semantic.Object.t() | Semantic.Field.t() | Semantic.Unsupported.t()
+          TemplatePath.t() => Semantic.Object.t() | Semantic.Field.t() | Semantic.Unsupported.t()
         }
   def semantic_node_index(%Definition{} = definition) do
     definition
     |> Semantic.root()
     |> semantic_entries()
-    |> Enum.group_by(& &1.instance_path)
+    |> Enum.group_by(& &1.template_path)
     |> Map.new(fn
       {path, [entry]} ->
         {path, entry.node}
 
       {path, matches} ->
-        raise_ambiguous_semantic_path!(path.segments, length(matches))
+        raise_ambiguous_template_path!(path.segments, length(matches))
     end)
   end
 
@@ -142,7 +142,7 @@ defmodule Formentation.Info do
     [entry | Enum.flat_map(Semantic.direct_children(entry), &semantic_entries/1)]
   end
 
-  defp raise_ambiguous_semantic_path!(segments, count) do
+  defp raise_ambiguous_template_path!(segments, count) do
     raise ArgumentError,
           "ambiguous semantic path #{inspect(segments)}: found #{count} occurrences"
   end
