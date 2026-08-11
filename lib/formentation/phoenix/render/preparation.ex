@@ -157,12 +157,9 @@ defmodule Formentation.Phoenix.Render.Preparation do
     {form, ctx} = object_context(object, path.segments, form, ctx)
     {children, diagnostics} = project_children(object.children, form, ctx)
 
-    # The aligned cursor, not the descriptor's static template_path: today
-    # they always agree (Phase 1 has no collections), but occurrence is
-    # what a future collection item's runtime integer segment would live
-    # on, and it must be the single source for both the DOM identity and
-    # the occurrence_path key summary linking indexes by — so the two can
-    # never drift apart from each other.
+    # The cursor is the single source of runtime identity: the occurrence
+    # path keys summary linking and mints DOM ids, and a future collection
+    # item's integer segment lives here, never on the static descriptor.
     occurrence = InstancePath.new!(ctx.path)
 
     dom = %Node.GroupDOM{
@@ -245,15 +242,15 @@ defmodule Formentation.Phoenix.Render.Preparation do
   defp project_field(%Layout.Field{} = presentation, %Semantic.Field{} = node, form, ctx) do
     field = form[access_key(node.name)]
     {widget, diagnostics} = Widget.resolve(presentation, node)
-    path = presentation.template_path.segments
-    instance_path = InstancePath.new!(path)
+    occurrence = InstancePath.new!(ctx.path) |> InstancePath.child(node.name)
+    path = occurrence.segments
 
     dom = %Node.FieldDOM{
-      control: DOMIdentity.field(ctx.dom_namespace, instance_path, :control),
-      container: DOMIdentity.field(ctx.dom_namespace, instance_path, :container),
-      help: DOMIdentity.field(ctx.dom_namespace, instance_path, :help),
-      errors: DOMIdentity.field(ctx.dom_namespace, instance_path, :errors),
-      options: DOMIdentity.field_options(ctx.dom_namespace, instance_path, node.options)
+      control: DOMIdentity.field(ctx.dom_namespace, occurrence, :control),
+      container: DOMIdentity.field(ctx.dom_namespace, occurrence, :container),
+      help: DOMIdentity.field(ctx.dom_namespace, occurrence, :help),
+      errors: DOMIdentity.field(ctx.dom_namespace, occurrence, :errors),
+      options: DOMIdentity.field_options(ctx.dom_namespace, occurrence, node.options)
     }
 
     {%Node.Field{
