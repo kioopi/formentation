@@ -7,8 +7,8 @@ defmodule Formentation.Definition.Semantic do
   defmodule Entry do
     @moduledoc false
 
-    @enforce_keys [:kind, :name, :node, :instance_path, :template_path]
-    defstruct [:kind, :name, :node, :instance_path, :template_path]
+    @enforce_keys [:kind, :name, :node, :template_path]
+    defstruct [:kind, :name, :node, :template_path]
 
     @type kind :: :object | :field | :unsupported
 
@@ -16,7 +16,6 @@ defmodule Formentation.Definition.Semantic do
             kind: kind(),
             name: String.t() | nil,
             node: Semantic.Object.t() | Semantic.Field.t() | Semantic.Unsupported.t(),
-            instance_path: InstancePath.t(),
             template_path: TemplatePath.t()
           }
   end
@@ -26,12 +25,12 @@ defmodule Formentation.Definition.Semantic do
 
   @spec root(Definition.t()) :: entry()
   def root(%Definition{semantic: %Semantic.Object{} = root}) do
-    entry(:object, root, %InstancePath{segments: []})
+    entry(:object, root)
   end
 
   @spec direct_children(entry()) :: [entry()]
-  def direct_children(%Entry{kind: :object, node: %Semantic.Object{} = node, instance_path: path}) do
-    Enum.map(node.children, &native_child_entry(&1, path))
+  def direct_children(%Entry{kind: :object, node: %Semantic.Object{} = node}) do
+    Enum.map(node.children, &native_child_entry/1)
   end
 
   def direct_children(%Entry{}), do: []
@@ -99,29 +98,24 @@ defmodule Formentation.Definition.Semantic do
     end)
   end
 
-  defp native_child_entry(%Semantic.Object{} = node, parent_path) do
-    entry(:object, node, child_path(parent_path, node.name))
+  defp native_child_entry(%Semantic.Object{} = node) do
+    entry(:object, node)
   end
 
-  defp native_child_entry(%Semantic.Field{} = node, parent_path) do
-    entry(:field, node, child_path(parent_path, node.name))
+  defp native_child_entry(%Semantic.Field{} = node) do
+    entry(:field, node)
   end
 
-  defp native_child_entry(%Semantic.Unsupported{} = node, parent_path) do
-    entry(:unsupported, node, child_path(parent_path, node.name))
+  defp native_child_entry(%Semantic.Unsupported{} = node) do
+    entry(:unsupported, node)
   end
 
-  defp entry(kind, node, instance_path) do
+  defp entry(kind, node) do
     %Entry{
       kind: kind,
       name: node.name,
       node: node,
-      instance_path: instance_path,
       template_path: node.template_path
     }
-  end
-
-  defp child_path(%InstancePath{segments: segments}, name) when is_binary(name) do
-    InstancePath.new!(segments ++ [name])
   end
 end

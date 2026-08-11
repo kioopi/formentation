@@ -193,30 +193,30 @@ defmodule Formentation.InfoTest do
       )
 
     root = Semantic.root(definition)
-    assert %Semantic.Entry{kind: :object, name: nil, instance_path: %{segments: []}} = root
+    assert %Semantic.Entry{kind: :object, name: nil, template_path: %{segments: []}} = root
 
     assert [
-             %Semantic.Entry{kind: :field, name: "title", instance_path: %{segments: ["title"]}},
+             %Semantic.Entry{kind: :field, name: "title", template_path: %{segments: ["title"]}},
              %Semantic.Entry{
                kind: :object,
                name: "dimensions",
-               instance_path: %{segments: ["dimensions"]}
+               template_path: %{segments: ["dimensions"]}
              },
              %Semantic.Entry{
                kind: :unsupported,
                name: "legacy",
-               instance_path: %{segments: ["legacy"]}
+               template_path: %{segments: ["legacy"]}
              }
            ] = Semantic.direct_children(root)
 
     dimensions = Semantic.find(definition, ["dimensions"])
 
     assert Enum.map(Semantic.direct_children(dimensions), fn entry ->
-             {entry.kind, entry.name, entry.instance_path.segments, entry.template_path.segments}
+             {entry.kind, entry.name, entry.template_path.segments}
            end) == [
-             {:field, "width", ["dimensions", "width"], ["dimensions", "width"]},
-             {:field, "depth", ["dimensions", "depth"], ["dimensions", "depth"]},
-             {:field, "height", ["dimensions", "height"], ["dimensions", "height"]}
+             {:field, "width", ["dimensions", "width"]},
+             {:field, "depth", ["dimensions", "depth"]},
+             {:field, "height", ["dimensions", "height"]}
            ]
 
     assert Semantic.find(definition, ["main", "legacy"]) == nil

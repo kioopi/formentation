@@ -167,7 +167,6 @@ defmodule Formentation.Info.Layout do
       kind: kind,
       name: name,
       node: node,
-      instance_path: InstancePath.new!(template_path.segments),
       template_path: template_path
     }
   end
