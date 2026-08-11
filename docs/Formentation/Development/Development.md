@@ -48,6 +48,13 @@ submission decision, the `form/2` façade with symbolic selectors, and
 projected-form rendering; all ship in `v0.2.0`. **Phase 1 Milestone B
 (collections) is now the active work.**
 
+✅ Done (2026-08-11) — supplementary Wave A refactor: the template/occurrence
+boundary is explicit. Static nodes and descriptors use `TemplatePath`, runtime
+bindings use `InstancePath` through `Formentation.Occurrence`, and render
+preparation derives identity from its traversal cursor. See
+[[18-decisions#D-050 — Occurrence is the runtime binding of a template node|D-050]],
+[[definition-and-node|Definition and Node]], and [[rendering|Rendering]].
+
 Supplementary to the numbered steps: an opt-in, demo-driven browser-real test suite (PhoenixTest + Playwright, [[18-decisions#D-022 — Browser-real tests are an opt-in, demo-driven Playwright suite|D-022]]) now covers truths `Phoenix.LiveViewTest` cannot observe — real `_unused_` marker gating, number-widget raw-text preservation under an actual browser, and error-summary focus movement — and surfaced the pump-inspection demo's native-validation toggle ([[18-decisions#D-023 — The demo keeps native validation, behind a toggle|D-023]]). It runs via `mix test.browser`, stays out of `mix ci` by design, and is not itself a phase-1 step; see [[browser-testing|Techdocs/Browser testing]].
 
 ✅ Done (2026-07-25) — also supplementary, an architecture refactor orthogonal to the numbered steps: instance validation dispatch is now source-neutral. The core-owned `Formentation.Definition.Validation` behaviour and `Formentation.Definition.ValidationPlan` (module + opaque artifact) replace the opaque `Definition.validator` field that `Form` used to dispatch by name straight to `Formentation.Source.JSONSchema.Validator`; `Form` now calls `plan.module.validate(plan.artifact, instance)` and names no adapter, `Issue.source` is `:decode | :validation`, `format_version` bumped 1→2, and the `core↔json_schema` layer cycle [[18-decisions#D-018 — Reach is the architecture gate|D-018]] baselined is removed. See [[18-decisions#D-025 — Instance validation dispatches through a source-neutral behaviour|D-025]] and the refreshed [[Techdocs|Techdocs]] notes ([[definition-and-node|Definition and Node]], [[form-state-and-transitions|Form state and transitions]], [[source-adapters|Source adapters]], [[diagnostics-and-origins|Diagnostics and origins]]).

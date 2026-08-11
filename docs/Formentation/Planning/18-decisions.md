@@ -1199,6 +1199,26 @@ moved with it — see [[Techdocs|the refreshed Techdocs notes]] for the
 current module-to-file map. The CHANGELOG under `Unreleased` lists the
 user-visible half of the rename table.
 
+## D-050 — Occurrence is the runtime binding of a template node
+
+*2026-08-11*
+
+**Decision.** Static artifacts (`Semantic.Entry`, `Info.Layout` descriptors,
+and the semantic node index) identify nodes by `TemplatePath`; the word
+*occurrence* is reserved for a template node bound to a concrete
+`InstancePath`. `Formentation.Occurrence.occurrences(definition, data)` owns
+that binding — enumeration is a function of definition *and* data because
+only data can say how many occurrences a collection node has (1:1 in
+Milestone A). `semantic_id` remains an internal join key between the semantic
+and presentation trees and appears on no descriptor. `NodeId` encodes the
+`:item` marker as `~3`, extending the `~0`/`~1`/`~2` escape family so no
+property name can spoof it.
+
+**Consequences.** Static descriptors no longer carry runtime identity, and
+form decoding, blockers, and render preparation derive concrete paths from
+the occurrence enumeration or traversal cursor. Collections can later make
+the binding data-dependent without changing its callers.
+
 ## Related notes
 
 - [[19-north-star-architecture|North-star architecture]]

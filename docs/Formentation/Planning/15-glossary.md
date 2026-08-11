@@ -46,6 +46,13 @@ selected subtree.
 
 **Instance path** — Location within a concrete data instance, such as `addresses[2].postcode`.
 
+**Template node** — A position declared in the template, named by a `TemplatePath`.
+
+**Occurrence** — A template node bound to one concrete `InstancePath` at runtime.
+
+**Projection** — The syntactic mapping from `InstancePath` to `TemplatePath`,
+replacing integer segments with `:item`.
+
 **Issue** — A structured expected problem with submitted or decoded instance data.
 
 **Node** — A semantic element in the current or future definition model, such
