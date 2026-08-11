@@ -44,6 +44,18 @@ defmodule Formentation.InstancePathTest do
     end
   end
 
+  describe "to_template/1" do
+    test "replaces integer segments with :item" do
+      assert InstancePath.new!(["addresses", 0, "street"]) |> InstancePath.to_template() ==
+               Formentation.TemplatePath.new!(["addresses", :item, "street"])
+    end
+
+    test "a string segment named like a number stays a string" do
+      assert InstancePath.new!(["0"]) |> InstancePath.to_template() ==
+               Formentation.TemplatePath.new!(["0"])
+    end
+  end
+
   describe "ancestor_or_self?/2" do
     test "a path is its own ancestor" do
       p = InstancePath.new!(["tags"])

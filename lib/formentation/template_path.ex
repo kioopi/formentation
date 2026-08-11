@@ -41,6 +41,39 @@ defmodule Formentation.TemplatePath do
     %__MODULE__{segments: segments ++ [segment]}
   end
 
+  @doc """
+  The path one collection-item step below this one.
+
+      iex> Formentation.TemplatePath.new!(["addresses"]) |> Formentation.TemplatePath.item()
+      %Formentation.TemplatePath{segments: ["addresses", :item]}
+  """
+  @spec item(t()) :: t()
+  def item(%__MODULE__{segments: segments}) do
+    %__MODULE__{segments: segments ++ [:item]}
+  end
+
+  @doc """
+  Whether `instance` is an occurrence of this template path: segmentwise,
+  `:item` matches any integer index and a string matches only itself.
+  Equivalent to `Formentation.InstancePath.to_template(instance) == template`.
+
+      iex> Formentation.TemplatePath.matches?(
+      ...>   Formentation.TemplatePath.new!(["addresses", :item]),
+      ...>   Formentation.InstancePath.new!(["addresses", 0])
+      ...> )
+      true
+  """
+  @spec matches?(t(), Formentation.InstancePath.t()) :: boolean()
+  def matches?(%__MODULE__{segments: template}, %Formentation.InstancePath{segments: instance}) do
+    length(template) == length(instance) and
+      template
+      |> Enum.zip(instance)
+      |> Enum.all?(fn
+        {:item, index} -> is_integer(index)
+        {name, segment} -> name == segment
+      end)
+  end
+
   defp validate_segment!(segment) when is_binary(segment), do: :ok
   defp validate_segment!(:item), do: :ok
 

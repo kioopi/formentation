@@ -6,6 +6,8 @@ defmodule Formentation.InstancePath do
   (collection indexes, Milestone B). Never atoms.
   """
 
+  alias Formentation.TemplatePath
+
   @enforce_keys [:segments]
   defstruct segments: []
 
@@ -53,6 +55,26 @@ defmodule Formentation.InstancePath do
 
   def parent(%__MODULE__{segments: segments}) do
     %__MODULE__{segments: Enum.drop(segments, -1)}
+  end
+
+  @doc """
+  Projects this instance path onto the template: every integer segment
+  becomes the `:item` marker, strings pass through. Total and
+  deterministic; the reverse mapping is one-to-many (one template node,
+  many occurrences). Projection is syntactic — whether the projected path
+  names a real node still requires a definition lookup.
+
+      iex> Formentation.InstancePath.new!(["addresses", 0, "street"]) |> Formentation.InstancePath.to_template()
+      %Formentation.TemplatePath{segments: ["addresses", :item, "street"]}
+  """
+  @spec to_template(t()) :: TemplatePath.t()
+  def to_template(%__MODULE__{segments: segments}) do
+    TemplatePath.new!(
+      Enum.map(segments, fn
+        index when is_integer(index) -> :item
+        name -> name
+      end)
+    )
   end
 
   @doc """
