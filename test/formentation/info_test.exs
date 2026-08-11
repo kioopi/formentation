@@ -168,15 +168,6 @@ defmodule Formentation.InfoTest do
     assert Info.unsupported_nodes(definition) == []
   end
 
-  test "unsupported_nodes_with_paths/1 pairs nodes with instance paths through both group flavors" do
-    paths =
-      definition()
-      |> Info.unsupported_nodes_with_paths()
-      |> Enum.map(fn {path, node} -> {path.segments, node.name} end)
-
-    assert paths == [{["electrical", "legacy"], "legacy"}, {["gadget"], "gadget"}]
-  end
-
   test "semantic entries expose object boundaries and computed paths" do
     {:ok, definition, [_unsupported_warning]} =
       Formentation.compile(

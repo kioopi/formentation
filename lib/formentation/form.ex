@@ -26,7 +26,7 @@ defmodule Formentation.Form do
       "42"
   """
 
-  alias Formentation.{Definition, Info, InstancePath, Issue}
+  alias Formentation.{Definition, InstancePath, Issue, Occurrence}
 
   alias Formentation.Definition.Semantic
   alias Formentation.Definition.ValidationPlan
@@ -141,7 +141,9 @@ defmodule Formentation.Form do
 
   def submission_blockers(%__MODULE__{candidate: {:ok, candidate}} = form) do
     form.definition
-    |> Info.unsupported_nodes_with_paths()
+    |> Occurrence.occurrences(candidate)
+    |> Enum.filter(fn {entry, _path} -> entry.kind == :unsupported end)
+    |> Enum.map(fn {entry, path} -> {path, entry.node} end)
     |> Enum.flat_map(fn {path, node} -> classify(form, path, node, candidate) end)
   end
 
@@ -403,9 +405,9 @@ defmodule Formentation.Form do
 
   defp decode(definition, domain_params) do
     definition
-    |> Semantic.fields()
-    |> Enum.reduce({%{}, %{}, %{}}, fn entry, {transports, operations, issues} ->
-      path = entry.instance_path
+    |> Occurrence.occurrences(domain_params)
+    |> Enum.filter(fn {entry, _path} -> entry.kind == :field end)
+    |> Enum.reduce({%{}, %{}, %{}}, fn {entry, path}, {transports, operations, issues} ->
       transport = transport_at(domain_params, path)
       operation = operation_for(entry.node, transport, path)
 
@@ -462,18 +464,18 @@ defmodule Formentation.Form do
       :none
     else
       root = Semantic.root(form.definition)
-      {:ok, materialize_object(root, form.original, [], operations)}
+      {:ok, materialize_object(root, form.original, InstancePath.new!([]), operations)}
     end
   end
 
   # Declared children rebuild from operations; keys the definition does
   # not describe are preserved from the original data, as are unsupported
   # nodes' values (preserve inactive data — D-009).
-  defp materialize_object(%Semantic.Entry{kind: :object} = entry, original, _prefix, operations) do
+  defp materialize_object(%Semantic.Entry{kind: :object} = entry, original, path, operations) do
     original = if is_map(original), do: original, else: %{}
 
     {declared_result, declared_names} =
-      materialize_children(entry, original, operations)
+      materialize_children(entry, original, path, operations)
 
     original
     |> Map.drop(MapSet.to_list(declared_names))
@@ -488,24 +490,32 @@ defmodule Formentation.Form do
   # `:absent | {:present, map()}` result is the extension point for future
   # collections, branches, and group-level presence transport — do not
   # collapse it into an `if value == %{}` at the call site.
-  defp materialize_nested_object(entry, original, operations) do
-    case materialize_object(entry, original, [], operations) do
+  defp materialize_nested_object(entry, original, path, operations) do
+    case materialize_object(entry, original, path, operations) do
       map when map_size(map) == 0 -> :absent
       map -> {:present, map}
     end
   end
 
-  defp materialize_children(%Semantic.Entry{kind: :object} = entry, original, operations) do
+  defp materialize_children(%Semantic.Entry{kind: :object} = entry, original, path, operations) do
     entry
     |> Semantic.direct_children()
     |> Enum.reduce({%{}, MapSet.new()}, fn child, {acc, declared} ->
-      materialize_child(child, original, operations, acc, declared)
+      materialize_child(
+        child,
+        original,
+        InstancePath.child(path, child.name),
+        operations,
+        acc,
+        declared
+      )
     end)
   end
 
   defp materialize_child(
-         %Semantic.Entry{kind: :field, name: name, instance_path: path},
+         %Semantic.Entry{kind: :field, name: name},
          original,
+         path,
          operations,
          acc,
          declared
@@ -522,6 +532,7 @@ defmodule Formentation.Form do
   defp materialize_child(
          %Semantic.Entry{kind: :object, name: name} = entry,
          original,
+         path,
          operations,
          acc,
          declared
@@ -531,7 +542,7 @@ defmodule Formentation.Form do
     # preservation in `materialize_object/4` (D-026).
     declared = MapSet.put(declared, name)
 
-    case materialize_nested_object(entry, Map.get(original, name, %{}), operations) do
+    case materialize_nested_object(entry, Map.get(original, name, %{}), path, operations) do
       {:present, value} -> {Map.put(acc, name, value), declared}
       :absent -> {acc, declared}
     end
@@ -540,6 +551,7 @@ defmodule Formentation.Form do
   defp materialize_child(
          %Semantic.Entry{kind: :unsupported, name: name},
          original,
+         _path,
          _operations,
          acc,
          declared

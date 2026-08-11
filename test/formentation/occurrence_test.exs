@@ -54,4 +54,23 @@ defmodule Formentation.OccurrenceTest do
     assert Occurrence.occurrences(definition, %{}) ==
              Occurrence.occurrences(definition, %{"name" => "x", "junk" => [1, 2]})
   end
+
+  test "pairs unsupported nodes with instance paths through both group flavors" do
+    definition =
+      compile!(%{
+        kind: :object,
+        properties: [
+          {"meta", %{kind: :object, properties: [{"blob", %{kind: :file}}]}},
+          {"attachment", %{kind: :file}}
+        ]
+      })
+
+    unsupported =
+      definition
+      |> Occurrence.occurrences(%{})
+      |> Enum.filter(fn {entry, _path} -> entry.kind == :unsupported end)
+      |> Enum.map(fn {entry, path} -> {path.segments, entry.node.name} end)
+
+    assert unsupported == [{["meta", "blob"], "blob"}, {["attachment"], "attachment"}]
+  end
 end

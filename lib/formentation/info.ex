@@ -56,17 +56,7 @@ defmodule Formentation.Info do
   """
   @spec unsupported_nodes(Definition.t()) :: [Semantic.Unsupported.t()]
   def unsupported_nodes(%Definition{} = definition) do
-    definition |> unsupported_nodes_with_paths() |> Enum.map(fn {_path, node} -> node end)
-  end
-
-  @doc false
-  @spec unsupported_nodes_with_paths(Definition.t()) :: [
-          {InstancePath.t(), Semantic.Unsupported.t()}
-        ]
-  def unsupported_nodes_with_paths(%Definition{} = definition) do
-    definition
-    |> Semantic.unsupported()
-    |> Enum.map(fn entry -> {entry.instance_path, entry.node} end)
+    definition |> Semantic.unsupported() |> Enum.map(& &1.node)
   end
 
   @doc """
