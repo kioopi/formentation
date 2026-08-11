@@ -217,7 +217,7 @@ defmodule Formentation.Info.LayoutTest do
       })
 
     assert_raise ArgumentError,
-                 ~r/invalid presentation reference \[\]: expected a object occurrence, found field/,
+                 ~r/invalid presentation reference \[\]: expected a object node, found field/,
                  fn ->
                    Info.presentation_root(definition)
                  end
@@ -229,7 +229,7 @@ defmodule Formentation.Info.LayoutTest do
     definition = malformed_definition(semantic, presentation)
 
     assert_raise ArgumentError,
-                 ~r/invalid presentation reference "\/": expected a object occurrence, found none/,
+                 ~r/invalid presentation reference "\/": expected a object node, found none/,
                  fn ->
                    Info.presentation_root(definition)
                  end
@@ -310,7 +310,7 @@ defmodule Formentation.Info.LayoutTest do
     definition = malformed_definition(semantic, LayoutStorage.Object.new("/", []))
 
     assert_raise ArgumentError,
-                 ~r/invalid presentation reference \["name"\]: expected exactly one semantic occurrence, found 2/,
+                 ~r/invalid presentation reference \["name"\]: expected exactly one semantic node, found 2/,
                  fn ->
                    Info.presentation_at(definition, ["name"])
                  end

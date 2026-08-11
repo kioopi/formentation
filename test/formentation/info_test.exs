@@ -118,7 +118,7 @@ defmodule Formentation.InfoTest do
 
     definition = %Formentation.Definition{semantic: semantic}
 
-    assert_raise ArgumentError, ~r/ambiguous semantic path \["name"\]: found 2 occurrences/, fn ->
+    assert_raise ArgumentError, ~r/ambiguous semantic path \["name"\]: found 2 nodes/, fn ->
       Info.semantic_kind(definition, ["name"])
     end
   end
@@ -132,7 +132,7 @@ defmodule Formentation.InfoTest do
 
     definition = %Formentation.Definition{semantic: semantic}
 
-    assert_raise ArgumentError, ~r/ambiguous semantic path \["name"\]: found 2 occurrences/, fn ->
+    assert_raise ArgumentError, ~r/ambiguous semantic path \["name"\]: found 2 nodes/, fn ->
       Info.semantic_node_index(definition)
     end
   end

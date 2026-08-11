@@ -73,7 +73,7 @@ defmodule Formentation.Definition.Finalizer do
   defp collect_semantic(node, _index, _parent_path) do
     invariant!(
       :invalid_semantic_child,
-      "semantic children must be semantic object, field, or unsupported occurrences",
+      "semantic children must be semantic object, field, or unsupported nodes",
       node
     )
   end
@@ -110,7 +110,7 @@ defmodule Formentation.Definition.Finalizer do
          parent_path
        )
        when is_binary(name) do
-    expected = %TemplatePath{segments: parent_path.segments ++ [name]}
+    expected = TemplatePath.child(parent_path, name)
 
     if path == expected do
       :ok
@@ -235,7 +235,7 @@ defmodule Formentation.Definition.Finalizer do
       %{kind: :unsupported} ->
         invariant!(
           :unsupported_presentation_reference,
-          "presentation reference #{inspect(semantic_id)} targets an unsupported occurrence",
+          "presentation reference #{inspect(semantic_id)} targets an unsupported node",
           node
         )
 
@@ -284,7 +284,7 @@ defmodule Formentation.Definition.Finalizer do
       [semantic_id | _rest] ->
         invariant!(
           :missing_presentation_reference,
-          "supported semantic occurrence #{inspect(semantic_id)} has no presentation reference",
+          "supported semantic node #{inspect(semantic_id)} has no presentation reference",
           nil
         )
     end

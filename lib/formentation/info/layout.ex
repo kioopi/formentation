@@ -15,7 +15,7 @@ defmodule Formentation.Info.Layout do
     @moduledoc """
     A root or nested semantic-object layout boundary.
 
-    `template_path` identifies the object occurrence. `id` is layout identity
+    `template_path` identifies the object node. `id` is layout identity
     for the current descriptor and must not be parsed as an instance path.
     """
 
@@ -158,7 +158,7 @@ defmodule Formentation.Info.Layout do
       :error ->
         raise ArgumentError,
               "invalid presentation reference #{inspect(semantic_id)}: expected a " <>
-                "#{expected_kind} occurrence, found none"
+                "#{expected_kind} node, found none"
     end
   end
 
@@ -218,12 +218,12 @@ defmodule Formentation.Info.Layout do
   defp ambiguous_reference!(segments, count) do
     raise ArgumentError,
           "invalid presentation reference #{inspect(segments)}: expected exactly " <>
-            "one semantic occurrence, found #{count}"
+            "one semantic node, found #{count}"
   end
 
   defp wrong_kind_reference!(segments, expected_kind, found_kind) do
     raise ArgumentError,
           "invalid presentation reference #{inspect(segments)}: expected a " <>
-            "#{expected_kind} occurrence, found #{found_kind}"
+            "#{expected_kind} node, found #{found_kind}"
   end
 end
