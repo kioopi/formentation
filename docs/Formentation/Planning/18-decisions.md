@@ -1219,6 +1219,42 @@ form decoding, blockers, and render preparation derive concrete paths from
 the occurrence enumeration or traversal cursor. Collections can later make
 the binding data-dependent without changing its callers.
 
+## D-051 — The form runtime pipeline is decomposed into internal modules
+
+*2026-08-12*
+
+**Context.** `Formentation.Form` had a coherent public façade but owned the
+whole runtime pipeline — decoding, candidate materialization, blocker
+classification — in one 674-line file. Milestone B collections will heavily
+extend exactly those regions; without a decomposition, `form.ex` becomes the
+collection engine by accretion. The extraction was done under a
+byte-identical-behavior gate while the Wave A behavioral net was fresh.
+
+**Decision.** Three internal modules under `Formentation.Form.*`, each pure
+data-in/data-out and never holding the `%Form{}` struct:
+`Form.Decoder` (definition + normalized domain params →
+`{transports, operations, issues}`), `Form.Materializer` (definition +
+original + operations → `{:ok, candidate} | :none`, owning the
+[[18-decisions#D-026 — Content-derived presence for nested objects|D-026]]
+presence rule), and `Form.Submission` (definition + candidate + issues →
+blockers). The path-keyed operations map is the only currency between them.
+Each module owns its own `Formentation.Occurrence` enumeration: `Decoder`
+enumerates over the incoming domain params, `Submission` over the
+materialized candidate — the two shapes coincide only while the tree is
+static and legitimately diverge under collections, so a shared
+per-transition enumeration was considered and rejected. Initialization and
+default application stay in `Form` (they run only at `new/3`, never on
+transitions). The modules carry real moduledocs rather than
+`@moduledoc false` — the `Render.Preparation.Context` precedent — because
+their contracts are what Milestone B developers extend.
+
+**Consequences.** Collections extend `Decoder`, `Materializer`, and
+`Submission` instead of growing `form.ex`; `Form` keeps the struct, public
+API, transition orchestration, validation dispatch, and display values.
+Public API and `format_version` are unchanged; the five form suites pinned
+byte-identical behavior across the extraction, and each module carries a
+thin contract test file of its own.
+
 ## Related notes
 
 - [[19-north-star-architecture|North-star architecture]]
