@@ -26,7 +26,7 @@ defmodule Formentation.Form do
       "42"
   """
 
-  alias Formentation.{Definition, InstancePath, Issue, Occurrence}
+  alias Formentation.{Definition, InstancePath, Issue}
 
   alias Formentation.Definition.Semantic
   alias Formentation.Definition.ValidationPlan
@@ -36,6 +36,7 @@ defmodule Formentation.Form do
     FieldState,
     Materializer,
     Params,
+    Submission,
     SubmissionBlocker,
     Transport
   }
@@ -148,11 +149,7 @@ defmodule Formentation.Form do
   def submission_blockers(%__MODULE__{candidate: :none}), do: []
 
   def submission_blockers(%__MODULE__{candidate: {:ok, candidate}} = form) do
-    form.definition
-    |> Occurrence.occurrences(candidate)
-    |> Enum.filter(fn {entry, _path} -> entry.kind == :unsupported end)
-    |> Enum.map(fn {entry, path} -> {path, entry.node} end)
-    |> Enum.flat_map(fn {path, node} -> classify(form, path, node, candidate) end)
+    Submission.blockers(form.definition, candidate, form.issues)
   end
 
   @doc """
@@ -409,80 +406,6 @@ defmodule Formentation.Form do
     else
       Map.put(acc, name, child)
     end
-  end
-
-  # A preserve-only node blocks when a required value is missing from an
-  # active parent, or when it owns authoritative validation issues at/below
-  # its path. Missing-required wins the code; owned issues always ride along.
-  defp classify(form, path, %Semantic.Unsupported{} = node, candidate) do
-    owned = owned_issues(form, path)
-
-    cond do
-      missing_required?(node, path, candidate) ->
-        [blocker(path, node, :unsupported_required, owned)]
-
-      owned != [] ->
-        [blocker(path, node, :unsupported_invalid, owned)]
-
-      true ->
-        []
-    end
-  end
-
-  defp blocker(path, node, code, owned) do
-    %SubmissionBlocker{
-      path: path,
-      node_id: node.id,
-      code: code,
-      message: blocker_message(code),
-      issues: owned
-    }
-  end
-
-  defp blocker_message(:unsupported_required) do
-    "This required property cannot be supplied by this form because its declaration is unsupported."
-  end
-
-  defp blocker_message(:unsupported_invalid) do
-    "This property cannot be corrected by this form because its declaration is unsupported and its original value is preserved."
-  end
-
-  # Source-neutral: requiredness and candidate presence are facts on the
-  # definition and the post-#1 candidate, not on any validator's code. An
-  # inactive nested parent (absent object) makes the child inactive (D-026).
-  defp missing_required?(%Semantic.Unsupported{required?: false}, _path, _candidate), do: false
-
-  defp missing_required?(%Semantic.Unsupported{name: name, required?: true}, path, candidate) do
-    case parent_object(candidate, path) do
-      {:ok, object} when is_map(object) -> not Map.has_key?(object, name)
-      _absent_or_non_map -> false
-    end
-  end
-
-  defp parent_object(candidate, %InstancePath{segments: segments}) do
-    fetch_in(candidate, Enum.drop(segments, -1))
-  end
-
-  defp fetch_in(value, []), do: {:ok, value}
-
-  defp fetch_in(map, [segment | rest]) when is_map(map) do
-    case Map.fetch(map, segment) do
-      {:ok, value} -> fetch_in(value, rest)
-      :error -> :error
-    end
-  end
-
-  defp fetch_in(_value, _segments), do: :error
-
-  # Issues at or below the unsupported path, validation-source only, in a
-  # deterministic order (by path segments; validator order within a path).
-  defp owned_issues(%__MODULE__{issues: issues}, unsupported_path) do
-    issues
-    |> Enum.filter(fn {issue_path, _list} ->
-      InstancePath.ancestor_or_self?(unsupported_path, issue_path)
-    end)
-    |> Enum.sort_by(fn {issue_path, _list} -> issue_path.segments end)
-    |> Enum.flat_map(fn {_path, list} -> Enum.filter(list, &(&1.source == :validation)) end)
   end
 
   defp ordered_issues(%__MODULE__{issues: issues}) do
