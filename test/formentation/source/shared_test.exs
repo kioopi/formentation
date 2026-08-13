@@ -1,8 +1,10 @@
 defmodule Formentation.Source.SharedTest do
   use ExUnit.Case, async: true
 
+  alias Formentation.Definition.{Presentation, Semantic}
   alias Formentation.Diagnostic
   alias Formentation.Source.Shared
+  alias Formentation.Source.Shared.Build
   alias Formentation.Source.Shared.Context
   alias Formentation.TemplatePath
 
@@ -143,6 +145,50 @@ defmodule Formentation.Source.SharedTest do
         |> Context.add_diagnostic(second)
 
       assert Enum.map(ctx.diagnostics, & &1.code) == [:second, :first]
+    end
+  end
+
+  describe "finalize/1" do
+    test "produces a definition carrying the build's diagnostics and validation plan" do
+      root = TemplatePath.new!([])
+      field = Semantic.Field.new("a", TemplatePath.child(root, "a"), :string)
+      semantic = Semantic.Object.new(nil, root, [field])
+      presentation = Presentation.Object.new(semantic.id, [Presentation.Field.new(field.id)])
+
+      warning = %Diagnostic{
+        severity: :warning,
+        code: :example,
+        message: "example",
+        origin: nil,
+        template_path: root
+      }
+
+      build = %Build{
+        semantic: semantic,
+        presentation: presentation,
+        diagnostics: [warning],
+        validation: :a_plan
+      }
+
+      assert {:ok, definition, diagnostics} = Shared.finalize(build)
+      assert diagnostics == [warning]
+      assert definition.diagnostics == [warning]
+      assert definition.validation == :a_plan
+      assert definition.semantic == semantic
+      assert definition.presentation == presentation
+      assert %Semantic.Index{} = definition.semantic_index
+    end
+
+    test "returns finalizer errors as diagnostics instead of raising" do
+      root = TemplatePath.new!([])
+      field = Semantic.Field.new("a", TemplatePath.child(root, "a"), :string)
+      semantic = Semantic.Object.new(nil, root, [field, field])
+      presentation = Presentation.Object.new(semantic.id, [Presentation.Field.new(field.id)])
+      build = %Build{semantic: semantic, presentation: presentation, diagnostics: []}
+
+      assert {:error, [%Diagnostic{} = diagnostic]} = Shared.finalize(build)
+      assert diagnostic.severity == :error
+      assert diagnostic.code == :duplicate_property_name
     end
   end
 end

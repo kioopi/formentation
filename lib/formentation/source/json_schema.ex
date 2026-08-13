@@ -119,7 +119,9 @@ defmodule Formentation.Source.JSONSchema do
   end
 
   defp walk(schema, opts) do
-    Shared.compile_compiled_impl(schema, __MODULE__, opts, &compile_object/3)
+    with {:ok, build} <- Shared.walk(schema, __MODULE__, opts, &compile_object/3) do
+      Shared.finalize(build)
+    end
   end
 
   defp check_shape(schema) when is_map(schema), do: :ok

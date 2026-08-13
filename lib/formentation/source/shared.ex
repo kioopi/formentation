@@ -82,6 +82,12 @@ defmodule Formentation.Source.Shared do
     defstruct [:semantic, :presentation]
   end
 
+  defmodule Build do
+    @moduledoc false
+
+    defstruct [:semantic, :presentation, :validation, diagnostics: []]
+  end
+
   defmodule PresentationGroupSpec do
     @moduledoc false
 
@@ -102,23 +108,32 @@ defmodule Formentation.Source.Shared do
     for {key, origin} <- entries, origin != nil, do: {key, origin}
   end
 
-  def compile_compiled_impl(source, dialect, opts, compile_object_fn) do
+  def walk(source, dialect, opts, compile_object_fn) do
     ctx = context(dialect, opts)
 
     case compile_object_fn.(source, nil, ctx) do
       {:ok, %Compiled{} = compiled, ctx} ->
-        finalize_compiled(compiled, ctx)
+        {:ok, build(compiled, ctx)}
 
       {:error, %Diagnostic{} = diagnostic} ->
         {:error, [diagnostic]}
     end
   end
 
-  def finalize_compiled(%Compiled{} = compiled, %Context{} = ctx) do
-    diagnostics = Enum.reverse(ctx.diagnostics, policy_diagnostics(compiled.semantic))
+  def build(%Compiled{} = compiled, %Context{} = ctx) do
+    %Build{
+      semantic: compiled.semantic,
+      presentation: compiled.presentation,
+      diagnostics: Enum.reverse(ctx.diagnostics, policy_diagnostics(compiled.semantic))
+    }
+  end
 
-    case Finalizer.finalize(compiled.semantic, compiled.presentation, diagnostics: diagnostics) do
-      {:ok, definition} -> {:ok, definition, diagnostics}
+  def finalize(%Build{} = build) do
+    case Finalizer.finalize(build.semantic, build.presentation,
+           diagnostics: build.diagnostics,
+           validation: build.validation
+         ) do
+      {:ok, definition} -> {:ok, definition, build.diagnostics}
       {:error, finalizer_diagnostics} -> {:error, finalizer_diagnostics}
     end
   end

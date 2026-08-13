@@ -43,7 +43,9 @@ defmodule Formentation.Source.Map do
   """
   @impl Formentation.Source
   def compile(declaration, opts \\ []) do
-    Shared.compile_compiled_impl(declaration, __MODULE__, opts, &compile_object/3)
+    with {:ok, build} <- Shared.walk(declaration, __MODULE__, opts, &compile_object/3) do
+      Shared.finalize(build)
+    end
   end
 
   @doc false
