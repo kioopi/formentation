@@ -4,6 +4,19 @@ defmodule Formentation.Source.Shared do
   alias Formentation.Definition.{Finalizer, Presentation, Semantic}
   alias Formentation.{Diagnostic, TemplatePath}
 
+  defmodule Dialect do
+    @moduledoc false
+
+    @doc "Noun used in this adapter's budget diagnostics."
+    @callback noun() :: String.t()
+
+    @doc "Builds this adapter's origin tag from a source path."
+    @callback origin(source_path :: list()) :: Formentation.Origin.t()
+
+    @doc "This adapter's source-path segment for a named object property."
+    @callback property_segment(name :: String.t()) :: list()
+  end
+
   defmodule Context do
     @moduledoc false
     defstruct template_path: %TemplatePath{segments: []},
@@ -11,7 +24,43 @@ defmodule Formentation.Source.Shared do
               diagnostics: [],
               depth: 0,
               max_depth: 16,
-              nodes_left: 1_000
+              nodes_left: 1_000,
+              dialect: nil
+
+    def check_depth(%__MODULE__{depth: depth, max_depth: max_depth} = ctx)
+        when depth > max_depth do
+      {:error,
+       budget_diagnostic(
+         :max_depth_exceeded,
+         "#{ctx.dialect.noun()} exceeds maximum depth of #{max_depth}",
+         ctx
+       )}
+    end
+
+    def check_depth(%__MODULE__{}), do: :ok
+
+    def take_budget(%__MODULE__{nodes_left: nodes_left} = ctx) when nodes_left <= 0 do
+      {:error,
+       budget_diagnostic(
+         :max_nodes_exceeded,
+         "#{ctx.dialect.noun()} node budget exhausted",
+         ctx
+       )}
+    end
+
+    def take_budget(%__MODULE__{nodes_left: nodes_left} = ctx) do
+      {:ok, %{ctx | nodes_left: nodes_left - 1}}
+    end
+
+    defp budget_diagnostic(code, message, %__MODULE__{} = ctx) do
+      %Diagnostic{
+        severity: :error,
+        code: code,
+        message: message,
+        origin: ctx.dialect.origin(ctx.source_path),
+        template_path: ctx.template_path
+      }
+    end
   end
 
   defmodule Compiled do
@@ -26,8 +75,9 @@ defmodule Formentation.Source.Shared do
     defstruct [:id, :label, :label_origin, :fields]
   end
 
-  def context(opts) do
+  def context(dialect, opts) when is_atom(dialect) do
     %Context{
+      dialect: dialect,
       max_depth: Keyword.get(opts, :max_depth, 16),
       nodes_left: Keyword.get(opts, :max_nodes, 1_000)
     }
@@ -39,8 +89,8 @@ defmodule Formentation.Source.Shared do
     for {key, origin} <- entries, origin != nil, do: {key, origin}
   end
 
-  def compile_compiled_impl(source, opts, compile_object_fn) do
-    ctx = context(opts)
+  def compile_compiled_impl(source, dialect, opts, compile_object_fn) do
+    ctx = context(dialect, opts)
 
     case compile_object_fn.(source, nil, ctx) do
       {:ok, %Compiled{} = compiled, ctx} ->

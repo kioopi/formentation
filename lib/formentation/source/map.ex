@@ -24,6 +24,8 @@ defmodule Formentation.Source.Map do
   alias Formentation.{Diagnostic, NodeId, TemplatePath}
   alias Formentation.Source.Shared
 
+  @behaviour Shared.Dialect
+
   @scalar_kinds [:string, :integer, :number, :boolean]
 
   @constraint_keys [:min_length, :max_length, :min, :max]
@@ -39,14 +41,26 @@ defmodule Formentation.Source.Map do
   Compiles a map declaration. Options: `:max_depth` (default 16) and
   `:max_nodes` (default 1000) budget overrides.
   """
-  @impl true
+  @impl Formentation.Source
   def compile(declaration, opts \\ []) do
-    Shared.compile_compiled_impl(declaration, opts, &compile_object/3)
+    Shared.compile_compiled_impl(declaration, __MODULE__, opts, &compile_object/3)
   end
 
+  @doc false
+  @impl Shared.Dialect
+  def noun, do: "declaration"
+
+  @doc false
+  @impl Shared.Dialect
+  def origin(source_path), do: {:map_source, source_path}
+
+  @doc false
+  @impl Shared.Dialect
+  def property_segment(name), do: [:properties, name]
+
   defp compile_object(%{kind: :object} = declaration, name, ctx) do
-    with :ok <- check_depth(ctx),
-         {:ok, ctx} <- take_budget(ctx),
+    with :ok <- Shared.Context.check_depth(ctx),
+         {:ok, ctx} <- Shared.Context.take_budget(ctx),
          {:ok, children, ctx} <- compile_children(declaration, ctx),
          {:ok, groups} <- fetch_groups(declaration, ctx),
          {:ok, {label, label_origin}} <-
@@ -84,36 +98,6 @@ defmodule Formentation.Source.Map do
 
   defp compile_object(declaration, _name, ctx) do
     {:error, invalid("expected an object declaration, got: #{inspect(declaration)}", ctx)}
-  end
-
-  defp check_depth(%Shared.Context{depth: depth, max_depth: max_depth} = ctx)
-       when depth > max_depth do
-    {:error,
-     budget_diagnostic(
-       :max_depth_exceeded,
-       "declaration exceeds maximum depth of #{max_depth}",
-       ctx
-     )}
-  end
-
-  defp check_depth(_ctx), do: :ok
-
-  defp take_budget(%Shared.Context{nodes_left: nodes_left} = ctx) when nodes_left <= 0 do
-    {:error, budget_diagnostic(:max_nodes_exceeded, "declaration node budget exhausted", ctx)}
-  end
-
-  defp take_budget(%Shared.Context{nodes_left: nodes_left} = ctx) do
-    {:ok, %{ctx | nodes_left: nodes_left - 1}}
-  end
-
-  defp budget_diagnostic(code, message, ctx) do
-    %Diagnostic{
-      severity: :error,
-      code: code,
-      message: message,
-      origin: {:map_source, ctx.source_path},
-      template_path: ctx.template_path
-    }
   end
 
   defp compile_children(declaration, ctx) do
@@ -385,7 +369,7 @@ defmodule Formentation.Source.Map do
   end
 
   defp compile_property(name, %{kind: kind}, required?, ctx) when is_atom(kind) do
-    with {:ok, ctx} <- take_budget(ctx) do
+    with {:ok, ctx} <- Shared.Context.take_budget(ctx) do
       template_path = TemplatePath.child(ctx.template_path, name)
       source_path = ctx.source_path ++ [:properties, name]
 
@@ -565,7 +549,7 @@ defmodule Formentation.Source.Map do
     template_path = TemplatePath.child(ctx.template_path, name)
     source_path = ctx.source_path ++ [:properties, name]
 
-    with {:ok, ctx} <- take_budget(ctx),
+    with {:ok, ctx} <- Shared.Context.take_budget(ctx),
          {:ok, examples, examples_origin} <-
            fetch_examples(spec, name, source_path, template_path, ctx),
          {:ok, options, options_origin, ctx} <-
