@@ -52,6 +52,19 @@ defmodule Formentation.Source.Shared do
       {:ok, %{ctx | nodes_left: nodes_left - 1}}
     end
 
+    def enter_property(%__MODULE__{} = ctx, name) when is_binary(name) do
+      %{
+        ctx
+        | depth: ctx.depth + 1,
+          template_path: TemplatePath.child(ctx.template_path, name),
+          source_path: ctx.source_path ++ ctx.dialect.property_segment(name)
+      }
+    end
+
+    def add_diagnostic(%__MODULE__{} = ctx, %Diagnostic{} = diagnostic) do
+      %{ctx | diagnostics: [diagnostic | ctx.diagnostics]}
+    end
+
     defp budget_diagnostic(code, message, %__MODULE__{} = ctx) do
       %Diagnostic{
         severity: :error,

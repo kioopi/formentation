@@ -261,12 +261,7 @@ defmodule Formentation.Source.JSONSchema do
   end
 
   defp compile_property(name, %{"type" => "object"} = schema, required?, ctx) do
-    child_ctx = %{
-      ctx
-      | depth: ctx.depth + 1,
-        template_path: TemplatePath.child(ctx.template_path, name),
-        source_path: ctx.source_path ++ ["properties", name]
-    }
+    child_ctx = Shared.Context.enter_property(ctx, name)
 
     with {:ok, %Shared.Compiled{} = compiled, child_ctx} <-
            compile_object(schema, name, child_ctx) do
@@ -399,7 +394,7 @@ defmodule Formentation.Source.JSONSchema do
       }
 
       {:ok, %Shared.Compiled{semantic: semantic, presentation: nil},
-       %{ctx | diagnostics: [diagnostic | ctx.diagnostics]}}
+       Shared.Context.add_diagnostic(ctx, diagnostic)}
     end
   end
 
@@ -440,7 +435,7 @@ defmodule Formentation.Source.JSONSchema do
           template_path: template_path
         }
 
-        {nil, nil, %{ctx | diagnostics: [warning | ctx.diagnostics]}}
+        {nil, nil, Shared.Context.add_diagnostic(ctx, warning)}
 
       {:ok, value} ->
         {value, {:json_schema, JSONPointer.join(source_path ++ ["default"])}, ctx}

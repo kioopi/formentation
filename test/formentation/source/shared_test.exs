@@ -4,6 +4,7 @@ defmodule Formentation.Source.SharedTest do
   alias Formentation.Diagnostic
   alias Formentation.Source.Shared
   alias Formentation.Source.Shared.Context
+  alias Formentation.TemplatePath
 
   describe "the map dialect" do
     test "names the declaration, tags map-source origins, and uses atom property segments" do
@@ -71,6 +72,77 @@ defmodule Formentation.Source.SharedTest do
       assert {:error, %Diagnostic{} = diagnostic} = Context.take_budget(ctx)
       assert diagnostic.message == "declaration node budget exhausted"
       assert diagnostic.origin == {:map_source, [:properties, "a"]}
+    end
+  end
+
+  describe "enter_property/2" do
+    test "descends one map property: depth, template path, atom-keyed source path" do
+      ctx = Shared.context(Formentation.Source.Map, [])
+      child = Context.enter_property(ctx, "user")
+
+      assert child.depth == 1
+      assert child.template_path == TemplatePath.new!(["user"])
+      assert child.source_path == [:properties, "user"]
+      assert child.dialect == Formentation.Source.Map
+      assert child.nodes_left == ctx.nodes_left
+      assert child.max_depth == ctx.max_depth
+    end
+
+    test "descends one json schema property: string-keyed source path" do
+      ctx = Shared.context(Formentation.Source.JSONSchema, [])
+      child = Context.enter_property(ctx, "user")
+
+      assert child.depth == 1
+      assert child.template_path == TemplatePath.new!(["user"])
+      assert child.source_path == ["properties", "user"]
+    end
+
+    test "nests, appending to the paths it was given" do
+      ctx = Shared.context(Formentation.Source.JSONSchema, [])
+      grandchild = ctx |> Context.enter_property("user") |> Context.enter_property("name")
+
+      assert grandchild.depth == 2
+      assert grandchild.template_path == TemplatePath.new!(["user", "name"])
+      assert grandchild.source_path == ["properties", "user", "properties", "name"]
+    end
+
+    test "carries accumulated diagnostics into the child" do
+      diagnostic = %Diagnostic{
+        severity: :warning,
+        code: :example,
+        message: "example",
+        origin: nil,
+        template_path: TemplatePath.new!([])
+      }
+
+      ctx =
+        Formentation.Source.Map
+        |> Shared.context([])
+        |> Context.add_diagnostic(diagnostic)
+
+      assert Context.enter_property(ctx, "user").diagnostics == [diagnostic]
+    end
+  end
+
+  describe "add_diagnostic/2" do
+    test "prepends, so accumulation is reverse order" do
+      first = %Diagnostic{
+        severity: :warning,
+        code: :first,
+        message: "first",
+        origin: nil,
+        template_path: TemplatePath.new!([])
+      }
+
+      second = %{first | code: :second, message: "second"}
+
+      ctx =
+        Formentation.Source.Map
+        |> Shared.context([])
+        |> Context.add_diagnostic(first)
+        |> Context.add_diagnostic(second)
+
+      assert Enum.map(ctx.diagnostics, & &1.code) == [:second, :first]
     end
   end
 end

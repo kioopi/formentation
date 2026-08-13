@@ -352,12 +352,7 @@ defmodule Formentation.Source.Map do
   end
 
   defp compile_property(name, %{kind: :object} = spec, required?, ctx) do
-    child_ctx = %{
-      ctx
-      | depth: ctx.depth + 1,
-        template_path: TemplatePath.child(ctx.template_path, name),
-        source_path: ctx.source_path ++ [:properties, name]
-    }
+    child_ctx = Shared.Context.enter_property(ctx, name)
 
     with {:ok, %Shared.Compiled{} = compiled, child_ctx} <- compile_object(spec, name, child_ctx) do
       Shared.require_compiled_object(compiled, child_ctx, ctx, required?)
@@ -390,7 +385,7 @@ defmodule Formentation.Source.Map do
       }
 
       {:ok, %Shared.Compiled{semantic: semantic, presentation: nil},
-       %{ctx | diagnostics: [diagnostic | ctx.diagnostics]}}
+       Shared.Context.add_diagnostic(ctx, diagnostic)}
     end
   end
 
@@ -654,7 +649,7 @@ defmodule Formentation.Source.Map do
           template_path: template_path
         }
 
-        {:ok, {nil, nil, %{ctx | diagnostics: [warning | ctx.diagnostics]}}}
+        {:ok, {nil, nil, Shared.Context.add_diagnostic(ctx, warning)}}
 
       {:ok, value} ->
         if default_compatible?(kind, value) do
@@ -699,7 +694,7 @@ defmodule Formentation.Source.Map do
           template_path: template_path
         }
 
-        {false, nil, %{ctx | diagnostics: [warning | ctx.diagnostics]}}
+        {false, nil, Shared.Context.add_diagnostic(ctx, warning)}
 
       :error ->
         {false, nil, ctx}
@@ -829,7 +824,7 @@ defmodule Formentation.Source.Map do
           template_path: template_path
         }
 
-        {:ok, nil, nil, %{ctx | diagnostics: [warning | ctx.diagnostics]}}
+        {:ok, nil, nil, Shared.Context.add_diagnostic(ctx, warning)}
 
       {:ok, other} ->
         {:error,
@@ -958,7 +953,7 @@ defmodule Formentation.Source.Map do
         template_path: ctx.template_path
       }
 
-      %{ctx | diagnostics: [diagnostic | ctx.diagnostics]}
+      Shared.Context.add_diagnostic(ctx, diagnostic)
     end)
   end
 end
