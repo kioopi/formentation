@@ -10,6 +10,29 @@ first; see
 for the reasoning behind each one. Releases are consumed as Git tags, not from
 Hex.
 
+## Unreleased
+
+### Changed
+
+- **Breaking:** the `Formentation.Info.Layout` descriptors address template
+  positions instead of instance occurrences. `Info.Layout.Object` and
+  `Info.Layout.Field` both replace `semantic_path :: Formentation.InstancePath.t()`
+  with `template_path :: Formentation.TemplatePath.t()`; the field is in
+  `@enforce_keys` on both structs, so code that pattern-matches or constructs
+  a descriptor must be updated. A layout descriptor describes a declared node,
+  which has one static position and — once collections land — many occurrences,
+  so an instance path was never the right type for it. No compatibility field
+  is kept
+  ([D-050](docs/Formentation/Planning/18-decisions.md#d-050--occurrence-is-the-runtime-binding-of-a-template-node)).
+
+Runtime behaviour is otherwise unchanged across the unreleased waves: the form
+runtime decomposition
+([D-051](docs/Formentation/Planning/18-decisions.md#d-051--the-form-runtime-pipeline-is-decomposed-into-internal-modules))
+and the source-adapter compiler cleanup
+([D-052](docs/Formentation/Planning/18-decisions.md#d-052--a-definition-is-final))
+are internal refactors that produce identical definitions, diagnostics, and
+form transitions.
+
 ## 0.2.0 — 2026-08-09
 
 ### Added
