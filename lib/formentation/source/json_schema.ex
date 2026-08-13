@@ -16,15 +16,9 @@ defmodule Formentation.Source.JSONSchema do
 
   @behaviour Formentation.Source
 
-  alias Formentation.{
-    Definition,
-    Diagnostic,
-    JSONPointer,
-    NodeId,
-    TemplatePath
-  }
+  alias Formentation.{Diagnostic, JSONPointer, NodeId, TemplatePath}
 
-  alias Formentation.Definition.{Finalizer, Presentation, Semantic, ValidationPlan}
+  alias Formentation.Definition.{Presentation, Semantic, ValidationPlan}
   alias Formentation.Source.JSONSchema.Validator
   alias Formentation.Source.Shared
 
@@ -74,8 +68,8 @@ defmodule Formentation.Source.JSONSchema do
          :ok <- check_hints(ui),
          :ok <- check_dialect(schema),
          :ok <- Validator.validate_schema(schema),
-         {:ok, definition, _diagnostics} <- walk(schema, opts) do
-      definition |> apply_hints(ui) |> with_validation(schema)
+         {:ok, build} <- walk(schema, opts) do
+      build |> apply_hints(ui) |> with_validation(schema) |> Shared.finalize()
     end
   end
 
@@ -91,19 +85,17 @@ defmodule Formentation.Source.JSONSchema do
   @impl Shared.Dialect
   def property_segment(name), do: ["properties", name]
 
-  # apply_hints/2 always succeeds (invalid hints are already rejected by
-  # check_hints/1 earlier in the `with` chain above), so this has a
-  # single clause — a catch-all error clause here is unreachable and
-  # trips `--warnings-as-errors`.
-  defp with_validation({:ok, definition, diagnostics}, schema) do
+  defp with_validation(%Shared.Build{} = build, schema) do
     case Validator.build_instance_validator(schema) do
       {:ok, artifact} ->
-        plan = %ValidationPlan{module: Validator, artifact: artifact}
-        {:ok, %{definition | validation: plan}, diagnostics}
+        %{build | validation: %ValidationPlan{module: Validator, artifact: artifact}}
 
       {:error, message} ->
-        diagnostics = diagnostics ++ [validator_unavailable_diagnostic(message)]
-        {:ok, %{definition | validation: nil, diagnostics: diagnostics}, diagnostics}
+        %{
+          build
+          | validation: nil,
+            diagnostics: build.diagnostics ++ [validator_unavailable_diagnostic(message)]
+        }
     end
   end
 
@@ -119,9 +111,7 @@ defmodule Formentation.Source.JSONSchema do
   end
 
   defp walk(schema, opts) do
-    with {:ok, build} <- Shared.walk(schema, __MODULE__, opts, &compile_object/3) do
-      Shared.finalize(build)
-    end
+    Shared.walk(schema, __MODULE__, opts, &compile_object/3)
   end
 
   defp check_shape(schema) when is_map(schema), do: :ok
@@ -491,10 +481,7 @@ defmodule Formentation.Source.JSONSchema do
   defp semantic_origins(origins), do: Shared.fact_origins(origins, @semantic_origin_keys)
   defp presentation_origins(origins), do: Shared.fact_origins(origins, @presentation_origin_keys)
 
-  defp apply_hints(
-         %Definition{semantic: semantic, presentation: presentation} = definition,
-         ui
-       ) do
+  defp apply_hints(%Shared.Build{semantic: semantic, presentation: presentation} = build, ui) do
     fields = Map.get(ui, "fields", %{})
     {semantic, field_warnings} = apply_native_semantic_field_hints(semantic, fields)
 
@@ -508,20 +495,12 @@ defmodule Formentation.Source.JSONSchema do
     {presentation, order_warnings} =
       apply_native_order(presentation, Map.get(ui, "order"), semantic)
 
-    diagnostics = definition.diagnostics ++ field_warnings ++ group_warnings ++ order_warnings
-
-    {:ok, native_definition} =
-      Finalizer.finalize(semantic, presentation, diagnostics: diagnostics)
-
-    definition = %{
-      definition
-      | semantic: native_definition.semantic,
-        semantic_index: native_definition.semantic_index,
-        presentation: native_definition.presentation,
-        diagnostics: diagnostics
+    %{
+      build
+      | semantic: semantic,
+        presentation: presentation,
+        diagnostics: build.diagnostics ++ field_warnings ++ group_warnings ++ order_warnings
     }
-
-    {:ok, definition, diagnostics}
   end
 
   defp flatten_warnings(warnings), do: warnings |> Enum.reverse() |> List.flatten()
