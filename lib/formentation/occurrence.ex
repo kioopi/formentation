@@ -10,9 +10,14 @@ defmodule Formentation.Occurrence do
   definition *and* the data, because only the data can say how many
   occurrences a collection node has.
 
-  In Milestone A the binding is the trivial 1:1 projection and `data`
-  goes unused; Milestone B changes only this module's internals, never
-  its callers.
+  What this binds is *location*: which instance path a template node
+  occupies. It is not stable item identity — the question of what makes
+  an item "the same item" across add, remove, and reorder is open, and
+  may need form-owned state rather than a function of the definition and
+  the data alone. In Milestone A the binding is the trivial 1:1
+  projection and `data` goes unused; Milestone B may change this
+  module's signature, not only its internals, which is why it is
+  internal and kept out of the published docs.
   """
 
   alias Formentation.{Definition, InstancePath}
