@@ -10,7 +10,7 @@ status: current
 
 # Source adapters
 
-> [!note] As of 2026-08-09 · Map-source declaration totality (D-048); source-neutral validation dispatch; adapter selection (D-046); module paths refreshed for the lib-tree restructure (D-047)
+> [!note] As of 2026-08-13 · Wave C compiler cleanup (D-052); Map-source declaration totality (D-048); source-neutral validation dispatch; adapter selection (D-046); module paths refreshed for the lib-tree restructure (D-047)
 > Describes the two adapters as built. Node shapes are deferred to
 > [[definition-and-node|Definition and Node]], the origin model to
 > [[diagnostics-and-origins|Diagnostics and origins]], and the addressing
@@ -119,11 +119,13 @@ flowchart TD
 `depth`/`nodes_left` [[#Guards and compile-time policy|guards]] (defaults
 `max_depth: 16`, `nodes_left: 1_000`).
 
-**`Shared.compile_impl/3`** is the common driver. Each adapter hands it the
-raw source and its own `compile_object/3`; it seeds the `Context` from
-`:max_depth`/`:max_nodes`, walks the root, appends the source-independent
-[[#Guards and compile-time policy|policy diagnostics]], and wraps the result
-in a `%Definition{}`.
+The shared compiler pipeline is **walk → build → (transform) → finalize**.
+`Context` owns depth and budget checks, property descent, and diagnostic
+accumulation; `Shared.Dialect` supplies each adapter's noun, origin builder,
+and property source-path segment. `%Shared.Build{}` is the whole-walk value
+(semantic and presentation trees, diagnostics, validation), distinct from the
+per-node `%Shared.Compiled{}`. JSON Schema transforms Build for hints and
+validation; Map has no transform. Finalization runs once at the adapter edge.
 
 **Shared node constructors** — `create_group_node/4`, `attach_group/3`
 (presentation grouping: it stamps membership onto member `Field`s and places
@@ -212,9 +214,9 @@ Two safeguards run through every compile, independent of source:
   shared `Context`; each adapter enforces them at its own recursion points
   with identical semantics, turning adversarial or runaway input into a
   `:max_depth_exceeded` / `:max_nodes_exceeded` diagnostic instead of a
-  stack overflow.
-- **Policy diagnostics.** After the tree is built, `Shared.compile_impl/3`
-  walks it once for source-independent advisories: a property name that
+  stack overflow. Leaves take budget inline without entering a child context.
+- **Policy diagnostics.** When the walk closes, `Shared.build/2`
+  walks the tree once for source-independent advisories: a property name that
   collides with a reserved transport name
   ([[18-decisions#D-014 — Usage is a first-class interaction axis|D-014]]),
   and a required string that still permits `""`

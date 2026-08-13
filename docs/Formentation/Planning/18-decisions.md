@@ -1255,6 +1255,22 @@ Public API and `format_version` are unchanged; the five form suites pinned
 byte-identical behavior across the extraction, and each module carries a
 thin contract test file of its own.
 
+## D-052 — A `%Definition{}` is final
+
+*2026-08-13*
+
+**Decision.** `Definition.Finalizer.finalize/3` runs exactly once per compile,
+at the edge of the adapter. Nothing writes to a definition after it is
+returned. Adapters accumulate into an internal `%Source.Shared.Build{}` —
+semantic tree, presentation tree, diagnostics, validation plan — and UI-hint
+transformations apply to the Build.
+
+**Consequences.** "This definition passed all structural invariants" is true
+wherever a `%Definition{}` is in hand; finalizer errors surface as diagnostics
+rather than a `MatchError` from a hard match on a second finalize; and
+Milestone B's collection invariants are checked once rather than once per
+pass.
+
 ## Related notes
 
 - [[19-north-star-architecture|North-star architecture]]
