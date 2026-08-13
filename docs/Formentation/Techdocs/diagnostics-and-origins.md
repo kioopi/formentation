@@ -11,7 +11,7 @@ status: current
 
 # Diagnostics and origins
 
-> [!note] As of 2026-08-08 · adapter selection and diagnostics; module paths refreshed for the lib-tree restructure ([[18-decisions#D-047 — The lib tree is restructured to state the north-star architecture|D-047]])
+> [!note] As of 2026-08-13 · policy diagnostics relocated to `Shared.build/2` by the Wave C compiler cleanup ([[18-decisions#D-052 — A `%Definition{}` is final|D-052]]); adapter selection and diagnostics; module paths refreshed for the lib-tree restructure ([[18-decisions#D-047 — The lib tree is restructured to state the north-star architecture|D-047]])
 > Describes the explainability model as built: the `Diagnostic` struct,
 > the origin tags nodes carry, the guards, and the one *projection*-time
 > diagnostic that now exists. The full `Decision` / `Info.explain/3`
@@ -145,7 +145,7 @@ a required string without `minLength: 1` accepts `""`, because JSON
 Schema's `required` checks presence, not blankness
 ([[18-decisions#D-010 — Empty-string, null, and absent-key decode policies|D-010]]).
 Both depend only on the finished node tree, never on the input
-vocabulary, so they run once in `Shared.compile_impl/3` after the walk
+vocabulary, so they run once in `Shared.build/2` as the walk closes
 and fire identically for both sources.
 
 ## Diagnostics are no longer compile-time only

@@ -26,11 +26,20 @@ defmodule Formentation.Form do
       "42"
   """
 
-  alias Formentation.{Definition, Info, InstancePath, Issue}
+  alias Formentation.{Definition, InstancePath, Issue}
 
   alias Formentation.Definition.Semantic
   alias Formentation.Definition.ValidationPlan
-  alias Formentation.Form.{Codec, FieldState, Params, SubmissionBlocker, Transport}
+
+  alias Formentation.Form.{
+    Decoder,
+    FieldState,
+    Materializer,
+    Params,
+    Submission,
+    SubmissionBlocker,
+    Transport
+  }
 
   @enforce_keys [:definition, :original]
   defstruct [
@@ -140,9 +149,7 @@ defmodule Formentation.Form do
   def submission_blockers(%__MODULE__{candidate: :none}), do: []
 
   def submission_blockers(%__MODULE__{candidate: {:ok, candidate}} = form) do
-    form.definition
-    |> Info.unsupported_nodes_with_paths()
-    |> Enum.flat_map(fn {path, node} -> classify(form, path, node, candidate) end)
+    Submission.blockers(form.definition, candidate, form.issues)
   end
 
   @doc """
@@ -243,7 +250,7 @@ defmodule Formentation.Form do
     normalized = Transport.normalize(params.values)
 
     {transports, operations, decode_issues} =
-      decode(form.definition, normalized.domain_params)
+      Decoder.decode(form.definition, normalized.domain_params)
 
     %__MODULE__{
       form
@@ -253,7 +260,7 @@ defmodule Formentation.Form do
         operations: operations,
         issues: decode_issues,
         usage: Map.merge(form.usage, normalized.usage),
-        candidate: materialize(form, operations)
+        candidate: Materializer.materialize(form.definition, form.original, operations)
     }
     |> revalidate()
   end
@@ -399,233 +406,6 @@ defmodule Formentation.Form do
     else
       Map.put(acc, name, child)
     end
-  end
-
-  defp decode(definition, domain_params) do
-    definition
-    |> Semantic.fields()
-    |> Enum.reduce({%{}, %{}, %{}}, fn entry, {transports, operations, issues} ->
-      path = entry.instance_path
-      transport = transport_at(domain_params, path)
-      operation = operation_for(entry.node, transport, path)
-
-      issues =
-        case operation do
-          {:invalid, issue} -> Map.put(issues, path, [issue])
-          _other -> issues
-        end
-
-      {Map.put(transports, path, transport), Map.put(operations, path, operation), issues}
-    end)
-  end
-
-  # D-016: read-only fields do not participate in the replace scope —
-  # whatever the transport carried, the original value is kept.
-  defp operation_for(%Semantic.Field{read_only?: true}, _transport, _path), do: :keep
-  defp operation_for(_node, :not_provided, _path), do: :unset
-  defp operation_for(node, {:provided, raw}, path), do: Codec.decode(node.value_type, raw, path)
-
-  defp transport_at(params, %InstancePath{segments: segments}) do
-    {parent_segments, [name]} = Enum.split(segments, -1)
-
-    case params_at(params, parent_segments) do
-      {:ok, parent} -> fetch_transport(parent, name)
-      :error -> :not_provided
-    end
-  end
-
-  defp fetch_transport(params, name) when is_map(params) do
-    case Map.fetch(params, name) do
-      {:ok, raw} -> {:provided, raw}
-      :error -> :not_provided
-    end
-  end
-
-  defp fetch_transport(_params, _name), do: :not_provided
-
-  defp params_at(params, []), do: {:ok, params}
-
-  defp params_at(params, [segment | rest]) when is_map(params) do
-    case Map.fetch(params, segment) do
-      {:ok, child} -> params_at(child, rest)
-      :error -> :error
-    end
-  end
-
-  defp params_at(_params, _segments), do: :error
-
-  defp materialize(form, operations) do
-    invalid? =
-      Enum.any?(operations, fn {_path, operation} -> match?({:invalid, _}, operation) end)
-
-    if invalid? do
-      :none
-    else
-      root = Semantic.root(form.definition)
-      {:ok, materialize_object(root, form.original, [], operations)}
-    end
-  end
-
-  # Declared children rebuild from operations; keys the definition does
-  # not describe are preserved from the original data, as are unsupported
-  # nodes' values (preserve inactive data — D-009).
-  defp materialize_object(%Semantic.Entry{kind: :object} = entry, original, _prefix, operations) do
-    original = if is_map(original), do: original, else: %{}
-
-    {declared_result, declared_names} =
-      materialize_children(entry, original, operations)
-
-    original
-    |> Map.drop(MapSet.to_list(declared_names))
-    |> Map.merge(declared_result)
-  end
-
-  # Content-derived presence (D-026): a data-nesting object is emitted only
-  # when recursive materialization leaves at least one declared or preserved
-  # key. `required?` is a validation constraint and never manufactures an
-  # object; presence is decided only after declared-child materialization and
-  # original unknown/unsupported-data preservation have run. The explicit
-  # `:absent | {:present, map()}` result is the extension point for future
-  # collections, branches, and group-level presence transport — do not
-  # collapse it into an `if value == %{}` at the call site.
-  defp materialize_nested_object(entry, original, operations) do
-    case materialize_object(entry, original, [], operations) do
-      map when map_size(map) == 0 -> :absent
-      map -> {:present, map}
-    end
-  end
-
-  defp materialize_children(%Semantic.Entry{kind: :object} = entry, original, operations) do
-    entry
-    |> Semantic.direct_children()
-    |> Enum.reduce({%{}, MapSet.new()}, fn child, {acc, declared} ->
-      materialize_child(child, original, operations, acc, declared)
-    end)
-  end
-
-  defp materialize_child(
-         %Semantic.Entry{kind: :field, name: name, instance_path: path},
-         original,
-         operations,
-         acc,
-         declared
-       ) do
-    declared = MapSet.put(declared, name)
-
-    case Map.get(operations, path, :keep) do
-      {:set, value} -> {Map.put(acc, name, value), declared}
-      :unset -> {acc, declared}
-      :keep -> {put_original(acc, original, name), declared}
-    end
-  end
-
-  defp materialize_child(
-         %Semantic.Entry{kind: :object, name: name} = entry,
-         original,
-         operations,
-         acc,
-         declared
-       ) do
-    # Claim the name even when the object is absent, so an originally
-    # present group is not accidentally restored by unknown-key
-    # preservation in `materialize_object/4` (D-026).
-    declared = MapSet.put(declared, name)
-
-    case materialize_nested_object(entry, Map.get(original, name, %{}), operations) do
-      {:present, value} -> {Map.put(acc, name, value), declared}
-      :absent -> {acc, declared}
-    end
-  end
-
-  defp materialize_child(
-         %Semantic.Entry{kind: :unsupported, name: name},
-         original,
-         _operations,
-         acc,
-         declared
-       ) do
-    {put_original(acc, original, name), MapSet.put(declared, name)}
-  end
-
-  defp put_original(acc, original, name) do
-    case Map.fetch(original, name) do
-      {:ok, value} -> Map.put(acc, name, value)
-      :error -> acc
-    end
-  end
-
-  # A preserve-only node blocks when a required value is missing from an
-  # active parent, or when it owns authoritative validation issues at/below
-  # its path. Missing-required wins the code; owned issues always ride along.
-  defp classify(form, path, %Semantic.Unsupported{} = node, candidate) do
-    owned = owned_issues(form, path)
-
-    cond do
-      missing_required?(node, path, candidate) ->
-        [blocker(path, node, :unsupported_required, owned)]
-
-      owned != [] ->
-        [blocker(path, node, :unsupported_invalid, owned)]
-
-      true ->
-        []
-    end
-  end
-
-  defp blocker(path, node, code, owned) do
-    %SubmissionBlocker{
-      path: path,
-      node_id: node.id,
-      code: code,
-      message: blocker_message(code),
-      issues: owned
-    }
-  end
-
-  defp blocker_message(:unsupported_required) do
-    "This required property cannot be supplied by this form because its declaration is unsupported."
-  end
-
-  defp blocker_message(:unsupported_invalid) do
-    "This property cannot be corrected by this form because its declaration is unsupported and its original value is preserved."
-  end
-
-  # Source-neutral: requiredness and candidate presence are facts on the
-  # definition and the post-#1 candidate, not on any validator's code. An
-  # inactive nested parent (absent object) makes the child inactive (D-026).
-  defp missing_required?(%Semantic.Unsupported{required?: false}, _path, _candidate), do: false
-
-  defp missing_required?(%Semantic.Unsupported{name: name, required?: true}, path, candidate) do
-    case parent_object(candidate, path) do
-      {:ok, object} when is_map(object) -> not Map.has_key?(object, name)
-      _absent_or_non_map -> false
-    end
-  end
-
-  defp parent_object(candidate, %InstancePath{segments: segments}) do
-    fetch_in(candidate, Enum.drop(segments, -1))
-  end
-
-  defp fetch_in(value, []), do: {:ok, value}
-
-  defp fetch_in(map, [segment | rest]) when is_map(map) do
-    case Map.fetch(map, segment) do
-      {:ok, value} -> fetch_in(value, rest)
-      :error -> :error
-    end
-  end
-
-  defp fetch_in(_value, _segments), do: :error
-
-  # Issues at or below the unsupported path, validation-source only, in a
-  # deterministic order (by path segments; validator order within a path).
-  defp owned_issues(%__MODULE__{issues: issues}, unsupported_path) do
-    issues
-    |> Enum.filter(fn {issue_path, _list} ->
-      InstancePath.ancestor_or_self?(unsupported_path, issue_path)
-    end)
-    |> Enum.sort_by(fn {issue_path, _list} -> issue_path.segments end)
-    |> Enum.flat_map(fn {_path, list} -> Enum.filter(list, &(&1.source == :validation)) end)
   end
 
   defp ordered_issues(%__MODULE__{issues: issues}) do

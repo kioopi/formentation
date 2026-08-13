@@ -13,7 +13,7 @@ defmodule Formentation.Source.JSONSchemaTest do
   end
 
   defp presentation_key(%PresentationInfo.Group{id: id}), do: id
-  defp presentation_key(%PresentationInfo.Field{semantic_path: path}), do: path.segments
+  defp presentation_key(%PresentationInfo.Field{template_path: path}), do: path.segments
 
   defp schema_with_group do
     %{
@@ -791,9 +791,9 @@ defmodule Formentation.Source.JSONSchemaTest do
       definition = compile!(schema_with_group(), ui: hints)
 
       assert [
-               %PresentationInfo.Field{semantic_path: %{segments: ["serial_number"]}},
+               %PresentationInfo.Field{template_path: %{segments: ["serial_number"]}},
                %PresentationInfo.Group{id: "/#electrical"},
-               %PresentationInfo.Field{semantic_path: %{segments: ["notes"]}}
+               %PresentationInfo.Field{template_path: %{segments: ["notes"]}}
              ] = Info.presentation_root(definition).children
     end
 
@@ -802,9 +802,9 @@ defmodule Formentation.Source.JSONSchemaTest do
       definition = compile!(schema_with_group(), ui: hints)
 
       assert [
-               %PresentationInfo.Field{semantic_path: %{segments: ["notes"]}},
+               %PresentationInfo.Field{template_path: %{segments: ["notes"]}},
                %PresentationInfo.Group{id: "/#electrical"},
-               %PresentationInfo.Field{semantic_path: %{segments: ["serial_number"]}}
+               %PresentationInfo.Field{template_path: %{segments: ["serial_number"]}}
              ] = Info.presentation_root(definition).children
     end
 
@@ -812,7 +812,7 @@ defmodule Formentation.Source.JSONSchemaTest do
       hints = %{"order" => ["notes", "notes"]}
       definition = compile!(schema_with_group(), ui: hints)
 
-      assert Enum.map(Info.presentation_root(definition).children, & &1.semantic_path.segments) ==
+      assert Enum.map(Info.presentation_root(definition).children, & &1.template_path.segments) ==
                [["notes"], ["insulation_ok"], ["serial_number"], ["voltage"]]
     end
 
@@ -828,7 +828,7 @@ defmodule Formentation.Source.JSONSchemaTest do
       assert [%Formentation.Diagnostic{severity: :warning, code: :unknown_order_entry}] =
                diagnostics
 
-      assert %PresentationInfo.Field{semantic_path: %{segments: ["notes"]}} =
+      assert %PresentationInfo.Field{template_path: %{segments: ["notes"]}} =
                List.first(Info.presentation_root(definition).children)
     end
   end
@@ -1085,6 +1085,45 @@ defmodule Formentation.Source.JSONSchemaTest do
 
       codes = Enum.map(diagnostics, & &1.code)
       assert Enum.count(codes, &(&1 == :reserved_property_name)) == 2
+    end
+  end
+
+  describe "diagnostic ordering across the compile pipeline" do
+    # The four diagnostic categories are produced at four different stages, and
+    # the order they end up in is a compile-pipeline fact rather than an
+    # accident of any one stage: the walk accumulates context diagnostics,
+    # `Shared.build/2` appends policy warnings as the walk closes,
+    # `apply_hints/2` appends hint warnings to the build, and
+    # `with_validation/2` appends last (D-052). Every other diagnostics
+    # assertion in this suite checks membership or counts, so without this test
+    # a reordering passes CI silently — Milestone B adds a fifth category at
+    # collection nodes.
+    test "runs context, then policy, then hints, then validator" do
+      schema = %{
+        "type" => "object",
+        "properties" => %{
+          # context: an unsupported keyword, raised during the walk
+          "ref" => %{"$ref" => "#/$defs/missing"},
+          # policy: a reserved transport name, judged on the finished tree
+          "_target" => %{"type" => "string"}
+        }
+      }
+
+      # hints: a field hint naming a property that does not exist
+      ui = %{"fields" => %{"nope" => %{"widget" => "text"}}}
+
+      {:ok, definition, diagnostics} =
+        Formentation.compile(schema, adapter: Formentation.Source.JSONSchema, ui: ui)
+
+      # validator: the dangling $ref also leaves the instance validator unbuildable
+      assert Enum.map(diagnostics, & &1.code) == [
+               :unsupported_keyword,
+               :reserved_property_name,
+               :unknown_hint_field,
+               :validator_unavailable
+             ]
+
+      assert diagnostics == definition.diagnostics
     end
   end
 

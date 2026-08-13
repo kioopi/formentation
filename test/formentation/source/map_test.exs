@@ -640,9 +640,9 @@ defmodule Formentation.Source.MapTest do
       definition = compile!(grouped_declaration())
 
       assert [
-               %PresentationInfo.Field{semantic_path: %{segments: ["serial_number"]}},
+               %PresentationInfo.Field{template_path: %{segments: ["serial_number"]}},
                group,
-               %PresentationInfo.Field{semantic_path: %{segments: ["notes"]}}
+               %PresentationInfo.Field{template_path: %{segments: ["notes"]}}
              ] =
                Info.presentation_root(definition).children
 
@@ -650,8 +650,8 @@ defmodule Formentation.Source.MapTest do
                id: "/#electrical",
                label: "Electrical",
                children: [
-                 %PresentationInfo.Field{semantic_path: %{segments: ["voltage"]}},
-                 %PresentationInfo.Field{semantic_path: %{segments: ["insulation_ok"]}}
+                 %PresentationInfo.Field{template_path: %{segments: ["voltage"]}},
+                 %PresentationInfo.Field{template_path: %{segments: ["insulation_ok"]}}
                ]
              } = group
     end
@@ -754,13 +754,13 @@ defmodule Formentation.Source.MapTest do
                %PresentationInfo.Group{
                  id: "/#one",
                  children: [
-                   %PresentationInfo.Field{semantic_path: %{segments: ["a"]}},
-                   %PresentationInfo.Field{semantic_path: %{segments: ["b"]}}
+                   %PresentationInfo.Field{template_path: %{segments: ["a"]}},
+                   %PresentationInfo.Field{template_path: %{segments: ["b"]}}
                  ]
                },
                %PresentationInfo.Group{
                  id: "/#two",
-                 children: [%PresentationInfo.Field{semantic_path: %{segments: ["c"]}}]
+                 children: [%PresentationInfo.Field{template_path: %{segments: ["c"]}}]
                }
              ] = Info.presentation_root(definition).children
     end
@@ -866,7 +866,7 @@ defmodule Formentation.Source.MapTest do
 
       assert [
                %PresentationInfo.Group{id: "/#electrical"},
-               %PresentationInfo.Field{semantic_path: %{segments: ["notes"]}}
+               %PresentationInfo.Field{template_path: %{segments: ["notes"]}}
              ] = Info.presentation_root(definition).children
     end
 
@@ -923,7 +923,7 @@ defmodule Formentation.Source.MapTest do
       assert [%PresentationInfo.Group{id: "/#electrical"}, %PresentationInfo.Group{id: "/#size"}] =
                Info.presentation_root(definition).children
 
-      assert {:ok, %PresentationInfo.Field{semantic_path: %{segments: ["width"]}}} =
+      assert {:ok, %PresentationInfo.Field{template_path: %{segments: ["width"]}}} =
                Info.presentation_at(definition, ["width"])
 
       assert Info.diagnostics(definition) == []

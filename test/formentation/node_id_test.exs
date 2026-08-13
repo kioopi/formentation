@@ -32,6 +32,23 @@ defmodule Formentation.NodeIdTest do
     refute field_id == group_id
   end
 
+  describe ":item encoding" do
+    test "encodes :item as ~3" do
+      path = TemplatePath.new!(["addresses", :item, "street"])
+      assert NodeId.from_path(path) == "/addresses/~3/street"
+    end
+
+    test "a property literally named item cannot collide" do
+      named = TemplatePath.new!(["addresses", "item", "street"])
+      marker = TemplatePath.new!(["addresses", :item, "street"])
+      refute NodeId.from_path(named) == NodeId.from_path(marker)
+    end
+
+    test "no escaped binary segment can produce ~3" do
+      assert NodeId.escape_segment("~3") == "~03"
+    end
+  end
+
   property "distinct segment lists produce distinct ids" do
     segment = StreamData.string(:printable, min_length: 1, max_length: 8)
 

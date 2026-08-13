@@ -15,6 +15,47 @@ defmodule Formentation.InstancePathTest do
     assert_raise ArgumentError, fn -> InstancePath.new!(["addresses", -1]) end
   end
 
+  describe "child/2" do
+    test "appends a string segment" do
+      path = InstancePath.new!(["addresses"])
+      assert InstancePath.child(path, "street") == InstancePath.new!(["addresses", "street"])
+    end
+
+    test "appends an integer index" do
+      path = InstancePath.new!(["addresses"])
+      assert InstancePath.child(path, 0) == InstancePath.new!(["addresses", 0])
+    end
+
+    test "rejects an invalid segment" do
+      assert_raise ArgumentError, fn ->
+        InstancePath.child(InstancePath.new!([]), :item)
+      end
+    end
+  end
+
+  describe "parent/1" do
+    test "drops the last segment" do
+      assert InstancePath.parent(InstancePath.new!(["addresses", 0, "street"])) ==
+               InstancePath.new!(["addresses", 0])
+    end
+
+    test "root stays root" do
+      assert InstancePath.parent(InstancePath.new!([])) == InstancePath.new!([])
+    end
+  end
+
+  describe "to_template/1" do
+    test "replaces integer segments with :item" do
+      assert InstancePath.new!(["addresses", 0, "street"]) |> InstancePath.to_template() ==
+               Formentation.TemplatePath.new!(["addresses", :item, "street"])
+    end
+
+    test "a string segment named like a number stays a string" do
+      assert InstancePath.new!(["0"]) |> InstancePath.to_template() ==
+               Formentation.TemplatePath.new!(["0"])
+    end
+  end
+
   describe "ancestor_or_self?/2" do
     test "a path is its own ancestor" do
       p = InstancePath.new!(["tags"])

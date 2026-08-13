@@ -12,9 +12,10 @@ status: current
 
 # Form state and transitions
 
-> [!note] As of 2026-08-08 · content-derived nested-object presence (D-026); derived submission status (D-028); submit decision result (D-032); form/2 façade (D-046); module paths refreshed for the lib-tree restructure (D-047)
-> Describes the runtime state layer as built: `Formentation.Form`,
-> `Formentation.Form.Transport`, and `Formentation.Form.Codec` — now including the
+> [!note] As of 2026-08-12 · content-derived nested-object presence (D-026); derived submission status (D-028); submit decision result (D-032); form/2 façade (D-046); occurrence-based enumeration (D-050); runtime pipeline decomposed into internal Decoder/Materializer/Submission modules (D-051)
+> Describes the runtime state layer as built: `Formentation.Form` and its
+> internal pipeline modules — `Form.Transport`, `Form.Codec`, `Form.Decoder`,
+> `Form.Materializer`, `Form.Submission` — now including the
 > `validate/2`/`submit/2` LiveView entry points and the derived
 > `submission_status/1`/`submission_blockers/1` pair. This layer has **no
 > Phoenix dependency** and is fully usable from IEx. How the state is
@@ -163,11 +164,11 @@ flowchart TD
 ```
 
 1. **Normalize** the envelope's values into the three views.
-2. **Decode** every *declared* field — the walk descends through
+2. **Decode** every *declared* field (`Formentation.Form.Decoder`) — the walk descends through
    semantic objects with one path segment per named object, producing one
    transport and one operation per field. Undeclared keys are never decoded;
    `Semantic.Unsupported` never decodes.
-3. **Materialize the candidate** — the JSON instance this form would
+3. **Materialize the candidate** (`Formentation.Form.Materializer`) — the JSON instance this form would
    submit.
 4. **Validate** the candidate by dispatching `plan.module.validate(plan.artifact, instance)`,
    if the definition carries a `ValidationPlan` (`Definition.validation`).
@@ -217,7 +218,7 @@ presence signal, so an intentional empty object cannot be represented — an
 originally present `%{}`, or a non-object value such as `nil`/`"invalid"` at a
 group path, is dropped on the next replace transition when no child survives.
 Invalid decoding still defers the whole candidate to `:none` before presence is
-decided. Internally the materializer returns `:absent | {:present, map()}` per
+decided. Internally `Formentation.Form.Materializer` returns `:absent | {:present, map()}` per
 data-nesting group; the root is always a map.
 
 ### Defaults
@@ -330,10 +331,11 @@ fresh on every call; nothing new lives on the `%Form{}` struct
 4. **`:ready`** — no blockers, no issues.
 
 A `Formentation.Form.SubmissionBlocker` relates one unsupported node to a
-concrete, observed problem. `submission_blockers/1` walks every
-unsupported node from `Info.unsupported_nodes_with_paths/1` and
-classifies each, in semantic declaration order, against the materialized
-candidate and `form.issues`:
+concrete, observed problem. `submission_blockers/1` delegates to
+`Formentation.Form.Submission`, which enumerates every unsupported
+occurrence through `Formentation.Occurrence.occurrences/2` over the
+materialized candidate and classifies each, in declaration order,
+against that candidate and `form.issues`:
 
 - **`:unsupported_required`** — the node is `required?: true` and its
   name is absent from its own (present) parent object in the candidate.
@@ -396,6 +398,9 @@ global defaults, and extensibility is [[phase-3-extensibility|Phase 3]].
 | Concern | Module | File |
 | --- | --- | --- |
 | Form state and transitions | `Formentation.Form` | `lib/formentation/form.ex` |
+| Transition decoding | `Formentation.Form.Decoder` | `lib/formentation/form/decoder.ex` |
+| Candidate materialization | `Formentation.Form.Materializer` | `lib/formentation/form/materializer.ex` |
+| Blocker classification | `Formentation.Form.Submission` | `lib/formentation/form/submission.ex` |
 | Per-field read model | `Formentation.Form.FieldState` | `lib/formentation/form/field_state.ex` |
 | Transition envelope | `Formentation.Form.Params` | `lib/formentation/form/params.ex` |
 | Transport normalization | `Formentation.Form.Transport` | `lib/formentation/form/transport.ex` |

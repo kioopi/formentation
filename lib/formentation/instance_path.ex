@@ -6,6 +6,8 @@ defmodule Formentation.InstancePath do
   (collection indexes, Milestone B). Never atoms.
   """
 
+  alias Formentation.TemplatePath
+
   @enforce_keys [:segments]
   defstruct segments: []
 
@@ -26,6 +28,53 @@ defmodule Formentation.InstancePath do
   def new!(segments) when is_list(segments) do
     Enum.each(segments, &validate_segment!/1)
     %__MODULE__{segments: segments}
+  end
+
+  @doc """
+  The path one segment below this one; raises `ArgumentError` on a
+  segment that is not a string or a non-negative integer.
+
+      iex> Formentation.InstancePath.new!(["addresses"]) |> Formentation.InstancePath.child(0)
+      %Formentation.InstancePath{segments: ["addresses", 0]}
+  """
+  @spec child(t(), segment()) :: t()
+  def child(%__MODULE__{segments: segments}, segment) do
+    validate_segment!(segment)
+    %__MODULE__{segments: segments ++ [segment]}
+  end
+
+  @doc """
+  The path one segment above this one; the root is its own parent, which
+  keeps callers total.
+
+      iex> Formentation.InstancePath.new!(["addresses", 0]) |> Formentation.InstancePath.parent()
+      %Formentation.InstancePath{segments: ["addresses"]}
+  """
+  @spec parent(t()) :: t()
+  def parent(%__MODULE__{segments: []} = path), do: path
+
+  def parent(%__MODULE__{segments: segments}) do
+    %__MODULE__{segments: Enum.drop(segments, -1)}
+  end
+
+  @doc """
+  Projects this instance path onto the template: every integer segment
+  becomes the `:item` marker, strings pass through. Total and
+  deterministic; the reverse mapping is one-to-many (one template node,
+  many occurrences). Projection is syntactic — whether the projected path
+  names a real node still requires a definition lookup.
+
+      iex> Formentation.InstancePath.new!(["addresses", 0, "street"]) |> Formentation.InstancePath.to_template()
+      %Formentation.TemplatePath{segments: ["addresses", :item, "street"]}
+  """
+  @spec to_template(t()) :: TemplatePath.t()
+  def to_template(%__MODULE__{segments: segments}) do
+    TemplatePath.new!(
+      Enum.map(segments, fn
+        index when is_integer(index) -> :item
+        name -> name
+      end)
+    )
   end
 
   @doc """

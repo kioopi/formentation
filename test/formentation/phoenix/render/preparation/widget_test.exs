@@ -6,8 +6,8 @@ defmodule Formentation.Phoenix.Render.Preparation.WidgetTest do
 
   alias Formentation.Definition.Semantic
   alias Formentation.Info.Layout
-  alias Formentation.{InstancePath, TemplatePath}
   alias Formentation.Phoenix.Render.Preparation.Widget
+  alias Formentation.TemplatePath
 
   # These properties deliberately never restate `Widget`'s clause order. An
   # oracle copied from the implementation shares its bugs and goes stale the
@@ -74,7 +74,7 @@ defmodule Formentation.Phoenix.Render.Preparation.WidgetTest do
 
   defp presentation_field(hint, hidden?) do
     %Layout.Field{
-      semantic_path: InstancePath.new!(["field"]),
+      template_path: TemplatePath.new!(["field"]),
       label: nil,
       help: nil,
       widget: hint,

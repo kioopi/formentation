@@ -23,7 +23,7 @@ defmodule Formentation.Info do
       false
   """
 
-  alias Formentation.{Definition, Diagnostic, InstancePath, Origin}
+  alias Formentation.{Definition, Diagnostic, InstancePath, Origin, TemplatePath}
   alias Formentation.Definition.Semantic
   alias Formentation.Info.Layout
 
@@ -56,17 +56,7 @@ defmodule Formentation.Info do
   """
   @spec unsupported_nodes(Definition.t()) :: [Semantic.Unsupported.t()]
   def unsupported_nodes(%Definition{} = definition) do
-    definition |> unsupported_nodes_with_paths() |> Enum.map(fn {_path, node} -> node end)
-  end
-
-  @doc false
-  @spec unsupported_nodes_with_paths(Definition.t()) :: [
-          {InstancePath.t(), Semantic.Unsupported.t()}
-        ]
-  def unsupported_nodes_with_paths(%Definition{} = definition) do
-    definition
-    |> Semantic.unsupported()
-    |> Enum.map(fn entry -> {entry.instance_path, entry.node} end)
+    definition |> Semantic.unsupported() |> Enum.map(& &1.node)
   end
 
   @doc """
@@ -74,7 +64,7 @@ defmodule Formentation.Info do
   carries it.
 
   Semantic IDs are resolved through the definition's semantic index first.
-  Presentation layout IDs are resolved only when no semantic occurrence uses
+  Presentation layout IDs are resolved only when no semantic node uses
   the same ID.
   """
   @spec node(Definition.t(), String.t()) ::
@@ -110,12 +100,12 @@ defmodule Formentation.Info do
   end
 
   @doc """
-  Classifies the semantic occurrence at an instance path.
+  Classifies the semantic node at an instance path.
 
-  Returns `nil` when the path names no semantic occurrence. Presentation
+  Returns `nil` when the path names no semantic node. Presentation
   group identifiers are never semantic path segments and therefore return
   `nil`. Returns `:object`, `:field`, or `:unsupported` for known semantic
-  occurrences. Raises when a malformed hand-built definition makes the path
+  nodes. Raises when a malformed hand-built definition makes the path
   ambiguous.
   """
   @spec semantic_kind(Definition.t(), [InstancePath.segment()]) ::
@@ -126,25 +116,25 @@ defmodule Formentation.Info do
     case Semantic.find_unique(definition, segments) do
       :not_found -> nil
       {:ok, %Semantic.Entry{kind: kind}} -> kind
-      {:ambiguous, count} -> raise_ambiguous_semantic_path!(segments, count)
+      {:ambiguous, count} -> raise_ambiguous_template_path!(segments, count)
     end
   end
 
   @doc false
   @spec semantic_node_index(Definition.t()) :: %{
-          InstancePath.t() => Semantic.Object.t() | Semantic.Field.t() | Semantic.Unsupported.t()
+          TemplatePath.t() => Semantic.Object.t() | Semantic.Field.t() | Semantic.Unsupported.t()
         }
   def semantic_node_index(%Definition{} = definition) do
     definition
     |> Semantic.root()
     |> semantic_entries()
-    |> Enum.group_by(& &1.instance_path)
+    |> Enum.group_by(& &1.template_path)
     |> Map.new(fn
       {path, [entry]} ->
         {path, entry.node}
 
       {path, matches} ->
-        raise_ambiguous_semantic_path!(path.segments, length(matches))
+        raise_ambiguous_template_path!(path.segments, length(matches))
     end)
   end
 
@@ -152,9 +142,9 @@ defmodule Formentation.Info do
     [entry | Enum.flat_map(Semantic.direct_children(entry), &semantic_entries/1)]
   end
 
-  defp raise_ambiguous_semantic_path!(segments, count) do
+  defp raise_ambiguous_template_path!(segments, count) do
     raise ArgumentError,
-          "ambiguous semantic path #{inspect(segments)}: found #{count} occurrences"
+          "ambiguous semantic path #{inspect(segments)}: found #{count} nodes"
   end
 
   @doc """
@@ -162,7 +152,7 @@ defmodule Formentation.Info do
 
   Presentation traversal is layout ordered and may differ from semantic
   declaration order. Field and object descriptors reference semantic
-  occurrences by `Formentation.InstancePath`; presentation groups carry
+  nodes by `Formentation.TemplatePath`; presentation groups carry
   layout identity only.
   """
   @spec presentation_root(Definition.t()) :: Layout.Object.t()
@@ -171,7 +161,7 @@ defmodule Formentation.Info do
   @doc """
   Looks up the presentation descriptor for a semantic instance path.
 
-  Returns `:not_found` when no semantic occurrence exists and
+  Returns `:not_found` when no semantic node exists and
   `:unsupported` when the path names a preserve-only node that has no
   renderable presentation descriptor.
   """
@@ -186,7 +176,7 @@ defmodule Formentation.Info do
   def diagnostics(%Definition{diagnostics: diagnostics}), do: diagnostics
 
   @doc """
-  The merged semantic and presentation provenance for the occurrence at
+  The merged semantic and presentation provenance for the node at
   `path` — `[]` when the path names nothing.
 
   Semantic facts and presentation facts intentionally live on separate stored

@@ -16,17 +16,13 @@ defmodule Formentation.Source.JSONSchema do
 
   @behaviour Formentation.Source
 
-  alias Formentation.{
-    Definition,
-    Diagnostic,
-    JSONPointer,
-    NodeId,
-    TemplatePath
-  }
+  alias Formentation.{Diagnostic, JSONPointer, NodeId, TemplatePath}
 
-  alias Formentation.Definition.{Finalizer, Presentation, Semantic, ValidationPlan}
+  alias Formentation.Definition.{Presentation, Semantic, ValidationPlan}
   alias Formentation.Source.JSONSchema.Validator
   alias Formentation.Source.Shared
+
+  @behaviour Shared.Dialect
 
   @scalar_types %{
     "string" => {:text, :string_default},
@@ -64,7 +60,7 @@ defmodule Formentation.Source.JSONSchema do
   with optional `"fields"`, `"groups"`, and `"order"` keys — plus the
   `:max_depth`/`:max_nodes` budgets shared with the map source.
   """
-  @impl true
+  @impl Formentation.Source
   def compile(schema, opts \\ []) do
     ui = Keyword.get(opts, :ui, %{})
 
@@ -72,24 +68,34 @@ defmodule Formentation.Source.JSONSchema do
          :ok <- check_hints(ui),
          :ok <- check_dialect(schema),
          :ok <- Validator.validate_schema(schema),
-         {:ok, definition, _diagnostics} <- walk(schema, opts) do
-      definition |> apply_hints(ui) |> with_validation(schema)
+         {:ok, build} <- walk(schema, opts) do
+      build |> apply_hints(ui) |> with_validation(schema) |> Shared.finalize()
     end
   end
 
-  # apply_hints/2 always succeeds (invalid hints are already rejected by
-  # check_hints/1 earlier in the `with` chain above), so this has a
-  # single clause — a catch-all error clause here is unreachable and
-  # trips `--warnings-as-errors`.
-  defp with_validation({:ok, definition, diagnostics}, schema) do
+  @doc false
+  @impl Shared.Dialect
+  def noun, do: "schema"
+
+  @doc false
+  @impl Shared.Dialect
+  def origin(source_path), do: {:json_schema, JSONPointer.join(source_path)}
+
+  @doc false
+  @impl Shared.Dialect
+  def property_segment(name), do: ["properties", name]
+
+  defp with_validation(%Shared.Build{} = build, schema) do
     case Validator.build_instance_validator(schema) do
       {:ok, artifact} ->
-        plan = %ValidationPlan{module: Validator, artifact: artifact}
-        {:ok, %{definition | validation: plan}, diagnostics}
+        %{build | validation: %ValidationPlan{module: Validator, artifact: artifact}}
 
       {:error, message} ->
-        diagnostics = diagnostics ++ [validator_unavailable_diagnostic(message)]
-        {:ok, %{definition | validation: nil, diagnostics: diagnostics}, diagnostics}
+        %{
+          build
+          | validation: nil,
+            diagnostics: build.diagnostics ++ [validator_unavailable_diagnostic(message)]
+        }
     end
   end
 
@@ -105,7 +111,7 @@ defmodule Formentation.Source.JSONSchema do
   end
 
   defp walk(schema, opts) do
-    Shared.compile_compiled_impl(schema, opts, &compile_object/3)
+    Shared.walk(schema, __MODULE__, opts, &compile_object/3)
   end
 
   defp check_shape(schema) when is_map(schema), do: :ok
@@ -188,8 +194,8 @@ defmodule Formentation.Source.JSONSchema do
   end
 
   defp compile_object(%{"type" => "object"} = schema, name, ctx) do
-    with :ok <- check_depth(ctx),
-         {:ok, ctx} <- take_budget(ctx) do
+    with :ok <- Shared.Context.check_depth(ctx),
+         {:ok, ctx} <- Shared.Context.take_budget(ctx) do
       required = Map.get(schema, "required", [])
       properties = Map.get(schema, "properties", %{})
 
@@ -230,32 +236,6 @@ defmodule Formentation.Source.JSONSchema do
      }}
   end
 
-  defp check_depth(%Shared.Context{depth: depth, max_depth: max_depth} = ctx)
-       when depth > max_depth do
-    {:error,
-     budget_diagnostic(:max_depth_exceeded, "schema exceeds maximum depth of #{max_depth}", ctx)}
-  end
-
-  defp check_depth(_ctx), do: :ok
-
-  defp take_budget(%Shared.Context{nodes_left: nodes_left} = ctx) when nodes_left <= 0 do
-    {:error, budget_diagnostic(:max_nodes_exceeded, "schema node budget exhausted", ctx)}
-  end
-
-  defp take_budget(%Shared.Context{nodes_left: nodes_left} = ctx) do
-    {:ok, %{ctx | nodes_left: nodes_left - 1}}
-  end
-
-  defp budget_diagnostic(code, message, ctx) do
-    %Diagnostic{
-      severity: :error,
-      code: code,
-      message: message,
-      origin: {:json_schema, JSONPointer.join(ctx.source_path)},
-      template_path: ctx.template_path
-    }
-  end
-
   defp compile_properties(properties, required, ctx) when is_map(properties) do
     properties
     |> Map.keys()
@@ -273,12 +253,7 @@ defmodule Formentation.Source.JSONSchema do
   end
 
   defp compile_property(name, %{"type" => "object"} = schema, required?, ctx) do
-    child_ctx = %{
-      ctx
-      | depth: ctx.depth + 1,
-        template_path: TemplatePath.child(ctx.template_path, name),
-        source_path: ctx.source_path ++ ["properties", name]
-    }
+    child_ctx = Shared.Context.enter_property(ctx, name)
 
     with {:ok, %Shared.Compiled{} = compiled, child_ctx} <-
            compile_object(schema, name, child_ctx) do
@@ -340,7 +315,7 @@ defmodule Formentation.Source.JSONSchema do
   end
 
   defp compile_scalar(name, schema, required?, ctx) do
-    with {:ok, ctx} <- take_budget(ctx) do
+    with {:ok, ctx} <- Shared.Context.take_budget(ctx) do
       template_path = TemplatePath.child(ctx.template_path, name)
       source_path = ctx.source_path ++ ["properties", name]
       {label, label_origin} = resolve_label(schema, name, source_path)
@@ -387,7 +362,7 @@ defmodule Formentation.Source.JSONSchema do
   end
 
   defp unsupported(name, _schema, required?, ctx, code, reason) do
-    with {:ok, ctx} <- take_budget(ctx) do
+    with {:ok, ctx} <- Shared.Context.take_budget(ctx) do
       template_path = TemplatePath.child(ctx.template_path, name)
       source_path = ctx.source_path ++ ["properties", name]
 
@@ -411,7 +386,7 @@ defmodule Formentation.Source.JSONSchema do
       }
 
       {:ok, %Shared.Compiled{semantic: semantic, presentation: nil},
-       %{ctx | diagnostics: [diagnostic | ctx.diagnostics]}}
+       Shared.Context.add_diagnostic(ctx, diagnostic)}
     end
   end
 
@@ -452,7 +427,7 @@ defmodule Formentation.Source.JSONSchema do
           template_path: template_path
         }
 
-        {nil, nil, %{ctx | diagnostics: [warning | ctx.diagnostics]}}
+        {nil, nil, Shared.Context.add_diagnostic(ctx, warning)}
 
       {:ok, value} ->
         {value, {:json_schema, JSONPointer.join(source_path ++ ["default"])}, ctx}
@@ -506,10 +481,7 @@ defmodule Formentation.Source.JSONSchema do
   defp semantic_origins(origins), do: Shared.fact_origins(origins, @semantic_origin_keys)
   defp presentation_origins(origins), do: Shared.fact_origins(origins, @presentation_origin_keys)
 
-  defp apply_hints(
-         %Definition{semantic: semantic, presentation: presentation} = definition,
-         ui
-       ) do
+  defp apply_hints(%Shared.Build{semantic: semantic, presentation: presentation} = build, ui) do
     fields = Map.get(ui, "fields", %{})
     {semantic, field_warnings} = apply_native_semantic_field_hints(semantic, fields)
 
@@ -523,20 +495,12 @@ defmodule Formentation.Source.JSONSchema do
     {presentation, order_warnings} =
       apply_native_order(presentation, Map.get(ui, "order"), semantic)
 
-    diagnostics = definition.diagnostics ++ field_warnings ++ group_warnings ++ order_warnings
-
-    {:ok, native_definition} =
-      Finalizer.finalize(semantic, presentation, diagnostics: diagnostics)
-
-    definition = %{
-      definition
-      | semantic: native_definition.semantic,
-        semantic_index: native_definition.semantic_index,
-        presentation: native_definition.presentation,
-        diagnostics: diagnostics
+    %{
+      build
+      | semantic: semantic,
+        presentation: presentation,
+        diagnostics: build.diagnostics ++ field_warnings ++ group_warnings ++ order_warnings
     }
-
-    {:ok, definition, diagnostics}
   end
 
   defp flatten_warnings(warnings), do: warnings |> Enum.reverse() |> List.flatten()

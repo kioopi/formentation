@@ -110,15 +110,19 @@ defmodule Formentation.FormPropertyTest do
     definition = pump_definition()
     form = Form.new(definition)
 
-    # Warm up all code paths so lazily-loaded modules do not skew the count.
+    # Warm up all code paths so lazily-loaded modules do not skew the count:
+    # the transition itself, and the generator — StreamData's machinery
+    # loads on first use, which lands inside the measured window whenever
+    # the seed shuffles this property to run first.
+    keys_generator =
+      StreamData.list_of(StreamData.string(:alphanumeric, min_length: 1), max_length: 6)
+
     _ = Form.transition(form, %Params{values: %{"warmup" => "x"}})
+    _ = Enum.take(keys_generator, 1)
 
     before = :erlang.system_info(:atom_count)
 
-    check all(
-            keys <-
-              StreamData.list_of(StreamData.string(:alphanumeric, min_length: 1), max_length: 6)
-          ) do
+    check all(keys <- keys_generator) do
       values = Map.new(keys, fn key -> {"k_" <> key, "value"} end)
       _ = Form.transition(form, %Params{values: values})
 

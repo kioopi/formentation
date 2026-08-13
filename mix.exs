@@ -120,8 +120,22 @@ defmodule Formentation.MixProject do
   # The single prefix replaces a hand-maintained module list: a new module
   # under Render.* is covered without a mix.exs edit, so the directory
   # boundary and the documentation boundary are now the same line.
+  #
+  # The transition-pipeline modules (D-051) and Formentation.Occurrence (D-050)
+  # follow the same rule for the same reason: both decisions call them internal,
+  # both keep real moduledocs because they are worth reading in IEx, and neither
+  # has a caller outside the library. Occurrence in particular must stay
+  # unpublished until Milestone B settles stable item identity — its enumeration
+  # signature may not survive that work. These are listed one by one rather than
+  # by an `Elixir.Formentation.Form.` prefix, because that directory is mixed:
+  # Form.Codec, Form.Params, Form.Transport, Form.FieldState, and
+  # Form.SubmissionBlocker are published API.
   defp internal_documentation_module?(module) do
     module in [
+      Formentation.Form.Decoder,
+      Formentation.Form.Materializer,
+      Formentation.Form.Submission,
+      Formentation.Occurrence,
       Formentation.Phoenix.ProjectedForm,
       Formentation.Phoenix.UI.Reference
     ] or

@@ -10,7 +10,7 @@ status: current
 
 # Definition
 
-*As of 2026-08-08 (native semantic/presentation storage for the built-in
+*As of 2026-08-11 (native semantic/presentation storage for the built-in
 sources and native-backed semantic/presentation query seams, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; module paths refreshed for the lib-tree restructure, [[18-decisions#D-047 — The lib tree is restructured to state the north-star architecture|D-047]]).*
 
 `Formentation.Definition` is the compiler's product and the system's
@@ -65,9 +65,10 @@ no authoritative instance validation (the map source, currently).
 | `Semantic.Field` | `id`, `name`, `template_path`, `value_type` | `role`, `required?`, `read_only?`, `constraints`, `options`, `default`, `examples`, `origins` |
 | `Semantic.Unsupported` | `id`, `name`, `template_path` | `required?`, `origins` |
 
-`Formentation.Definition.Semantic` now reads `Definition.semantic` when it exists. It
-derives current `InstancePath`s from the tree position and node names for
-query results, rather than storing an instance path on each semantic node.
+`Formentation.Definition.Semantic` now reads `Definition.semantic` when it exists.
+Static entries carry only their `TemplatePath`; concrete runtime paths are
+introduced by `Formentation.Occurrence.occurrences/2`, which binds every
+semantic node to an `InstancePath` for a definition and data instance.
 
 ## Native presentation structs
 
@@ -80,8 +81,8 @@ query results, rather than storing an instance path on each semantic node.
 `Formentation.Info.presentation_root/1` and
 `Formentation.Info.presentation_at/2` now read `Definition.presentation` when
 it exists and resolve semantic IDs through `semantic_index`. Their public
-descriptor contract is unchanged: object and field descriptors expose computed
-semantic `InstancePath`s, and presentation groups expose layout identity only.
+descriptor contract is static: object and field descriptors expose their
+semantic `TemplatePath`, and presentation groups expose layout identity only.
 
 ## Presentation traversal descriptors
 
@@ -91,19 +92,28 @@ They read the native presentation tree and semantic index, then return typed
 descriptors under `Formentation.Info.Layout`:
 
 - `Object` — root or nested semantic-object layout boundary, carrying a
-  normalized `InstancePath`.
-- `Field` — scalar field reference, carrying a normalized `InstancePath`
+  `TemplatePath`.
+- `Field` — scalar field reference, carrying a `TemplatePath`
   plus presentation-owned label, help, widget hint, hidden intent, and
   origins.
 - `Group` — presentation-only grouping, carrying layout identity and
   children but no semantic path.
 
-Presentation groups never add instance-path segments. A nested object
+Presentation groups never add template-path segments. A nested object
 `details` contributes `["details"]`; a presentation group such as
 `technical` inside it does not, so a field remains
 `["details", "width"]`, never `["details", "technical", "width"]`.
 `presentation_at/2` accepts only semantic root/object/field paths and
 distinguishes `:not_found` from `:unsupported`.
+
+## Template nodes and runtime occurrences
+
+`TemplatePath` identifies a declared semantic node independently of concrete
+collection indexes. `Formentation.Occurrence` is the static/runtime bridge:
+`occurrences(definition, data)` walks the semantic tree in declaration order
+and pairs each node with its concrete `InstancePath`. Milestone A is 1:1 and
+does not use `data`; Milestone B can enumerate collection items from it without
+changing static descriptors or the semantic index.
 
 ## Unsupported nodes are a preserve-only capability
 

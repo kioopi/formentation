@@ -12,7 +12,8 @@ status: current
 
 # Rendering
 
-*As of 2026-08-09 (remaining "projector" prose replaced with "render preparation":
+*As of 2026-08-11 (template/occurrence boundary and cursor-owned runtime identity;
+remaining "projector" prose replaced with "render preparation":
 the stage was renamed twice — `Projector` → `RenderPreparation` → `Render.Preparation` —
 and the old noun outlived the module; projection-context resolution and cursor ownership extracted
 to `Render.Preparation.Context`; object-level error-summary entries link to their rendered,
@@ -58,16 +59,17 @@ The walk consumes `Formentation.Info.presentation_root/1` and
 `presentation_at/2`. Those queries read the native `Definition.presentation`
 tree and return typed presentation descriptors:
 
-- **Object descriptors** carry a semantic `InstancePath` and form a
+- **Object descriptors** carry a semantic `TemplatePath` and form a
   layout boundary for the root or a nested data object.
 - **Group descriptors** carry presentation layout identity only. They
   project their children under the same Phoenix form; a fieldset never
   introduces name nesting.
-- **Field descriptors** carry a semantic `InstancePath` plus presentation
+- **Field descriptors** carry a semantic `TemplatePath` plus presentation
   facts such as label, help, hidden-control intent, and widget hint.
 
-Render preparation builds one semantic-node lookup from `Definition.semantic` and
-uses descriptor paths to resolve field facts through that backing store. This
+Render preparation builds one semantic-node lookup from `Definition.semantic`,
+keyed by `TemplatePath`, and uses descriptor paths to resolve field facts through
+that backing store. This
 keeps declaration order and layout order as separate contracts: for example,
 semantic fields can enumerate as `["a", "c"]` while a presentation group
 renders them as `["c", "a"]`. Unsupported nodes do not appear in renderable

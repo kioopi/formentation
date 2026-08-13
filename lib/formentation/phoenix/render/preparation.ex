@@ -153,16 +153,13 @@ defmodule Formentation.Phoenix.Render.Preparation do
     end)
   end
 
-  defp project_descriptor(%Layout.Object{semantic_path: path} = object, form, ctx) do
+  defp project_descriptor(%Layout.Object{template_path: path} = object, form, ctx) do
     {form, ctx} = object_context(object, path.segments, form, ctx)
     {children, diagnostics} = project_children(object.children, form, ctx)
 
-    # The aligned cursor, not the descriptor's static semantic_path: today
-    # they always agree (Phase 1 has no collections), but occurrence is
-    # what a future collection item's runtime integer segment would live
-    # on, and it must be the single source for both the DOM identity and
-    # the occurrence_path key summary linking indexes by — so the two can
-    # never drift apart from each other.
+    # The cursor is the single source of runtime identity: the occurrence
+    # path keys summary linking and mints DOM ids, and a future collection
+    # item's integer segment lives here, never on the static descriptor.
     occurrence = InstancePath.new!(ctx.path)
 
     dom = %Node.GroupDOM{
@@ -200,7 +197,7 @@ defmodule Formentation.Phoenix.Render.Preparation do
   end
 
   defp project_descriptor(%Layout.Field{} = field, form, ctx) do
-    case Map.fetch(ctx.semantic_nodes, field.semantic_path) do
+    case Map.fetch(ctx.semantic_nodes, field.template_path) do
       {:ok, %Semantic.Field{} = node} -> project_field(field, node, form, ctx)
       {:ok, other} -> invariant!("field descriptor resolved to #{inspect(other)}")
       :error -> invariant!("field descriptor resolved to no semantic occurrence")
@@ -245,15 +242,15 @@ defmodule Formentation.Phoenix.Render.Preparation do
   defp project_field(%Layout.Field{} = presentation, %Semantic.Field{} = node, form, ctx) do
     field = form[access_key(node.name)]
     {widget, diagnostics} = Widget.resolve(presentation, node)
-    path = presentation.semantic_path.segments
-    instance_path = presentation.semantic_path
+    occurrence = InstancePath.new!(ctx.path) |> InstancePath.child(node.name)
+    path = occurrence.segments
 
     dom = %Node.FieldDOM{
-      control: DOMIdentity.field(ctx.dom_namespace, instance_path, :control),
-      container: DOMIdentity.field(ctx.dom_namespace, instance_path, :container),
-      help: DOMIdentity.field(ctx.dom_namespace, instance_path, :help),
-      errors: DOMIdentity.field(ctx.dom_namespace, instance_path, :errors),
-      options: DOMIdentity.field_options(ctx.dom_namespace, instance_path, node.options)
+      control: DOMIdentity.field(ctx.dom_namespace, occurrence, :control),
+      container: DOMIdentity.field(ctx.dom_namespace, occurrence, :container),
+      help: DOMIdentity.field(ctx.dom_namespace, occurrence, :help),
+      errors: DOMIdentity.field(ctx.dom_namespace, occurrence, :errors),
+      options: DOMIdentity.field_options(ctx.dom_namespace, occurrence, node.options)
     }
 
     {%Node.Field{
@@ -273,11 +270,11 @@ defmodule Formentation.Phoenix.Render.Preparation do
      }, diagnostics}
   end
 
-  defp object_legend(%Layout.Object{label: label, semantic_path: %{segments: []}}) do
+  defp object_legend(%Layout.Object{label: label, template_path: %{segments: []}}) do
     label || "/"
   end
 
-  defp object_legend(%Layout.Object{label: label, semantic_path: path}) do
+  defp object_legend(%Layout.Object{label: label, template_path: path}) do
     label || humanize(List.last(path.segments))
   end
 
@@ -285,11 +282,11 @@ defmodule Formentation.Phoenix.Render.Preparation do
     label || humanize(id)
   end
 
-  defp descriptor_parent_path(%Layout.Field{semantic_path: path}) do
+  defp descriptor_parent_path(%Layout.Field{template_path: path}) do
     Enum.drop(path.segments, -1)
   end
 
-  defp descriptor_parent_path(%Layout.Object{semantic_path: path}) do
+  defp descriptor_parent_path(%Layout.Object{template_path: path}) do
     Enum.drop(path.segments, -1)
   end
 

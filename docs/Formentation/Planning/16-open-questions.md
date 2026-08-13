@@ -150,6 +150,18 @@ not concrete UI components.
 - Under embedding, `Formentation.Phoenix.fields/1` renders the submit-gated error summary at the top of the Formentation fields block, before the group/field markup — which lands mid-form whenever hand-written parent inputs precede the embedded block (observed live in the pump-inspection demo, where `asset[name]` precedes the payload fields). Acceptable for [[phase-1-walking-skeleton|Phase 1]], which has no slot mechanism; the [[phase-3-extensibility|Phase 3]] UI-contract/slot design should let callers reposition or suppress the summary — [[18-decisions#D-021 — LiveView integration is wrappers plus a demo, not framework machinery|D-021]].
 - ~~Step 7 showed that `Phoenix.LiveViewTest` never runs the browser's `LiveSocket` hook, so it cannot observe `_unused_` marker gating at all — the LiveView test suite and a real browser check had to disagree on record to both be right ([[18-decisions#D-021 — LiveView integration is wrappers plus a demo, not framework machinery|D-021]]). Should Formentation adopt browser-real end-to-end tests (Playwright, Wallaby) to close that gap with automated coverage, and if so, at what layer — library test suite, demo-only, or both? Flagged for discussion after step 7.~~ Answered 2026-07-24: adopted PhoenixTest + Playwright as an opt-in, demo-driven suite — the layer is the library's test suite (`test/browser/`) driving the demo, tagged `browser: :chromium`, run via `mix test.browser`, excluded from `mix test`/`mix ci` — [[18-decisions#D-022 — Browser-real tests are an opt-in, demo-driven Playwright suite|D-022]].
 
+## Namespace vocabulary
+
+- Should the flat top-level modules gain namespaces? Dependency clusters
+  exist: provenance (`Origin`, `Diagnostic`, with `JSONPointer` as a
+  source-location detail), addressing (`TemplatePath`, `InstancePath`,
+  `NodeId`, `Occurrence`), and runtime vocabulary (`Issue`, shared by
+  `Definition.Validation` and `Form`). Deliberately deferred: pervasive
+  vocabulary types are defensible flat, renames are churn, and the right
+  grouping will be clearer after Milestone B shows which modules travel
+  together. If a vocabulary namespace happens, all path/identity siblings
+  move in one dedicated change.
+
 ## Extensions
 
 - At what point do pass ordering and descriptors warrant adopting Spark?

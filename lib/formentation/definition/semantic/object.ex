@@ -1,6 +1,6 @@
 defmodule Formentation.Definition.Semantic.Object do
   @moduledoc """
-  Native semantic object occurrence.
+  Native semantic object node.
 
   Objects own semantic children in declaration order. Presentation groups never
   appear in this child list.

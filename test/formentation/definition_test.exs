@@ -62,7 +62,7 @@ defmodule Formentation.DefinitionTest do
   test "native presentation field references do not carry semantic facts" do
     keys = Presentation.Field.__struct__() |> Map.from_struct() |> Map.keys()
 
-    refute :semantic_path in keys
+    refute :template_path in keys
     refute :value_type in keys
     refute :role in keys
     refute :required? in keys

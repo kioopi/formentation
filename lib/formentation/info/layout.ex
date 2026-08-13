@@ -7,7 +7,7 @@ defmodule Formentation.Info.Layout do
   stored presentation structs themselves.
   """
 
-  alias Formentation.{Definition, InstancePath, Origin}
+  alias Formentation.{Definition, InstancePath, Origin, TemplatePath}
   alias Formentation.Definition.Presentation, as: Layout
   alias Formentation.Definition.Semantic
 
@@ -15,16 +15,16 @@ defmodule Formentation.Info.Layout do
     @moduledoc """
     A root or nested semantic-object layout boundary.
 
-    `semantic_path` identifies the object occurrence. `id` is layout identity
+    `template_path` identifies the object node. `id` is layout identity
     for the current descriptor and must not be parsed as an instance path.
     """
 
-    @enforce_keys [:id, :semantic_path, :label, :help, :origins, :children]
-    defstruct [:id, :semantic_path, :label, :help, :origins, children: []]
+    @enforce_keys [:id, :template_path, :label, :help, :origins, :children]
+    defstruct [:id, :template_path, :label, :help, :origins, children: []]
 
     @type t :: %__MODULE__{
             id: String.t(),
-            semantic_path: InstancePath.t(),
+            template_path: TemplatePath.t(),
             label: String.t() | nil,
             help: String.t() | nil,
             origins: [{atom(), Origin.t()}],
@@ -35,11 +35,11 @@ defmodule Formentation.Info.Layout do
   defmodule Field do
     @moduledoc "A scalar field reference carrying presentation-owned facts."
 
-    @enforce_keys [:semantic_path, :label, :help, :widget, :hidden?, :origins]
-    defstruct [:semantic_path, :label, :help, :widget, :origins, hidden?: false]
+    @enforce_keys [:template_path, :label, :help, :widget, :hidden?, :origins]
+    defstruct [:template_path, :label, :help, :widget, :origins, hidden?: false]
 
     @type t :: %__MODULE__{
-            semantic_path: InstancePath.t(),
+            template_path: TemplatePath.t(),
             label: String.t() | nil,
             help: String.t() | nil,
             widget: atom() | nil,
@@ -101,7 +101,7 @@ defmodule Formentation.Info.Layout do
     entry = semantic_entry_by_id!(definition, object.semantic_id, :object)
 
     %Object{
-      semantic_path: entry.instance_path,
+      template_path: entry.template_path,
       id: object.id,
       label: object.label,
       help: object.help,
@@ -134,7 +134,7 @@ defmodule Formentation.Info.Layout do
     entry = semantic_entry_by_id!(definition, field.semantic_id, :field)
 
     %Field{
-      semantic_path: entry.instance_path,
+      template_path: entry.template_path,
       label: field.label,
       help: field.help,
       widget: field.widget,
@@ -158,7 +158,7 @@ defmodule Formentation.Info.Layout do
       :error ->
         raise ArgumentError,
               "invalid presentation reference #{inspect(semantic_id)}: expected a " <>
-                "#{expected_kind} occurrence, found none"
+                "#{expected_kind} node, found none"
     end
   end
 
@@ -167,7 +167,6 @@ defmodule Formentation.Info.Layout do
       kind: kind,
       name: name,
       node: node,
-      instance_path: InstancePath.new!(template_path.segments),
       template_path: template_path
     }
   end
@@ -219,12 +218,12 @@ defmodule Formentation.Info.Layout do
   defp ambiguous_reference!(segments, count) do
     raise ArgumentError,
           "invalid presentation reference #{inspect(segments)}: expected exactly " <>
-            "one semantic occurrence, found #{count}"
+            "one semantic node, found #{count}"
   end
 
   defp wrong_kind_reference!(segments, expected_kind, found_kind) do
     raise ArgumentError,
           "invalid presentation reference #{inspect(segments)}: expected a " <>
-            "#{expected_kind} occurrence, found #{found_kind}"
+            "#{expected_kind} node, found #{found_kind}"
   end
 end

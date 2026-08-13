@@ -118,7 +118,7 @@ defmodule Formentation.InfoTest do
 
     definition = %Formentation.Definition{semantic: semantic}
 
-    assert_raise ArgumentError, ~r/ambiguous semantic path \["name"\]: found 2 occurrences/, fn ->
+    assert_raise ArgumentError, ~r/ambiguous semantic path \["name"\]: found 2 nodes/, fn ->
       Info.semantic_kind(definition, ["name"])
     end
   end
@@ -132,7 +132,7 @@ defmodule Formentation.InfoTest do
 
     definition = %Formentation.Definition{semantic: semantic}
 
-    assert_raise ArgumentError, ~r/ambiguous semantic path \["name"\]: found 2 occurrences/, fn ->
+    assert_raise ArgumentError, ~r/ambiguous semantic path \["name"\]: found 2 nodes/, fn ->
       Info.semantic_node_index(definition)
     end
   end
@@ -168,15 +168,6 @@ defmodule Formentation.InfoTest do
     assert Info.unsupported_nodes(definition) == []
   end
 
-  test "unsupported_nodes_with_paths/1 pairs nodes with instance paths through both group flavors" do
-    paths =
-      definition()
-      |> Info.unsupported_nodes_with_paths()
-      |> Enum.map(fn {path, node} -> {path.segments, node.name} end)
-
-    assert paths == [{["electrical", "legacy"], "legacy"}, {["gadget"], "gadget"}]
-  end
-
   test "semantic entries expose object boundaries and computed paths" do
     {:ok, definition, [_unsupported_warning]} =
       Formentation.compile(
@@ -202,30 +193,30 @@ defmodule Formentation.InfoTest do
       )
 
     root = Semantic.root(definition)
-    assert %Semantic.Entry{kind: :object, name: nil, instance_path: %{segments: []}} = root
+    assert %Semantic.Entry{kind: :object, name: nil, template_path: %{segments: []}} = root
 
     assert [
-             %Semantic.Entry{kind: :field, name: "title", instance_path: %{segments: ["title"]}},
+             %Semantic.Entry{kind: :field, name: "title", template_path: %{segments: ["title"]}},
              %Semantic.Entry{
                kind: :object,
                name: "dimensions",
-               instance_path: %{segments: ["dimensions"]}
+               template_path: %{segments: ["dimensions"]}
              },
              %Semantic.Entry{
                kind: :unsupported,
                name: "legacy",
-               instance_path: %{segments: ["legacy"]}
+               template_path: %{segments: ["legacy"]}
              }
            ] = Semantic.direct_children(root)
 
     dimensions = Semantic.find(definition, ["dimensions"])
 
     assert Enum.map(Semantic.direct_children(dimensions), fn entry ->
-             {entry.kind, entry.name, entry.instance_path.segments, entry.template_path.segments}
+             {entry.kind, entry.name, entry.template_path.segments}
            end) == [
-             {:field, "width", ["dimensions", "width"], ["dimensions", "width"]},
-             {:field, "depth", ["dimensions", "depth"], ["dimensions", "depth"]},
-             {:field, "height", ["dimensions", "height"], ["dimensions", "height"]}
+             {:field, "width", ["dimensions", "width"]},
+             {:field, "depth", ["dimensions", "depth"]},
+             {:field, "height", ["dimensions", "height"]}
            ]
 
     assert Semantic.find(definition, ["main", "legacy"]) == nil
@@ -282,7 +273,7 @@ defmodule Formentation.InfoTest do
                  label: "Identity",
                  children: [
                    %Formentation.Info.Layout.Field{
-                     semantic_path: %{segments: ["name"]},
+                     template_path: %{segments: ["name"]},
                      label: "Display name",
                      help: "Shown to technicians.",
                      widget: :textarea,

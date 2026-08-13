@@ -1,8 +1,8 @@
 defmodule Formentation.Definition.Semantic.Unsupported do
   @moduledoc """
-  Native semantic preserve-only occurrence.
+  Native semantic preserve-only node.
 
-  Unsupported occurrences remain discoverable through semantic traversal but
+  Unsupported nodes remain discoverable through semantic traversal but
   cannot be referenced by presentation field controls.
   """
 
