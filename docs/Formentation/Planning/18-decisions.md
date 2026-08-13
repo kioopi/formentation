@@ -1266,10 +1266,18 @@ semantic tree, presentation tree, diagnostics, validation plan — and UI-hint
 transformations apply to the Build.
 
 **Consequences.** "This definition passed all structural invariants" is true
-wherever a `%Definition{}` is in hand; finalizer errors surface as diagnostics
-rather than a `MatchError` from a hard match on a second finalize; and
-Milestone B's collection invariants are checked once rather than once per
-pass.
+wherever a `%Definition{}` is in hand; the finalizer errors it *returns* stay
+diagnostics instead of becoming a `MatchError` from a hard match on a second
+finalize; and Milestone B's collection invariants are checked once rather than
+once per pass.
+
+The finalizer has two failure modes and this decision only changes one of them.
+Structural violations that indicate a broken adapter still raise
+`ArgumentError` through `Finalizer.invariant!/3` — deliberately, since no
+caller can act on them. Only violations returned as `{:error, diagnostics}`
+travel the diagnostics path, and today `reject_duplicate_child_names/1` is the
+sole one. Milestone B's cardinality and item-template checks are expected to
+join it, which is what makes the single error-handled finalize worth having.
 
 ## Related notes
 
