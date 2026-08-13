@@ -1088,6 +1088,45 @@ defmodule Formentation.Source.JSONSchemaTest do
     end
   end
 
+  describe "diagnostic ordering across the compile pipeline" do
+    # The four diagnostic categories are produced at four different stages, and
+    # the order they end up in is a compile-pipeline fact rather than an
+    # accident of any one stage: the walk accumulates context diagnostics,
+    # `Shared.build/2` appends policy warnings as the walk closes,
+    # `apply_hints/2` appends hint warnings to the build, and
+    # `with_validation/2` appends last (D-052). Every other diagnostics
+    # assertion in this suite checks membership or counts, so without this test
+    # a reordering passes CI silently — Milestone B adds a fifth category at
+    # collection nodes.
+    test "runs context, then policy, then hints, then validator" do
+      schema = %{
+        "type" => "object",
+        "properties" => %{
+          # context: an unsupported keyword, raised during the walk
+          "ref" => %{"$ref" => "#/$defs/missing"},
+          # policy: a reserved transport name, judged on the finished tree
+          "_target" => %{"type" => "string"}
+        }
+      }
+
+      # hints: a field hint naming a property that does not exist
+      ui = %{"fields" => %{"nope" => %{"widget" => "text"}}}
+
+      {:ok, definition, diagnostics} =
+        Formentation.compile(schema, adapter: Formentation.Source.JSONSchema, ui: ui)
+
+      # validator: the dangling $ref also leaves the instance validator unbuildable
+      assert Enum.map(diagnostics, & &1.code) == [
+               :unsupported_keyword,
+               :reserved_property_name,
+               :unknown_hint_field,
+               :validator_unavailable
+             ]
+
+      assert diagnostics == definition.diagnostics
+    end
+  end
+
   test "compiled definitions carry an instance validator; map-source ones do not" do
     {:ok, from_json, []} =
       Formentation.compile(
