@@ -1354,6 +1354,76 @@ only producers of finalized definitions ([[18-decisions#D-052 — A `%Definition
 Milestone B runtime modules never meet a nested `Collection` and need no
 defensive clauses for it.
 
+## D-054 — Collection source vocabularies and the degradation table
+
+*2026-08-14*
+
+**Context.** With the semantic model fixed by
+[[18-decisions#D-053 — Collections are a dedicated semantic node owning one item template|D-053]],
+Milestone B's second blocking decision
+([[phase-1-milestone-b-collections#MB-D2 — Declaration-source vocabularies|MB-D2]])
+is how a collection is spelled in each declaration source and what every
+non-conforming array declaration compiles to. The two adapters have
+deliberately different failure philosophies — the Map source hard-errors on
+malformed declarations ([[18-decisions#D-048 — Map-source declarations are total at the compile boundary|D-048]])
+because they are developer-authored code, while the JSON Schema adapter
+meta-validates the document up front and degrades everything beyond the
+supported subset to preserve-only `Unsupported` nodes with warnings, because a
+valid schema it cannot fully interpret is not a broken one. Collections must
+slot into both without blurring the line.
+
+**Decision.**
+
+- **Map spelling.** `kind: :collection` — Map kinds name the semantic model
+  1:1, so declaring `:collection` and querying `Info.semantic_kind/2` use the
+  same word; `:array` (JSON Schema's word) and `:list` are rejected. The item
+  template is a **singular `item:`** key holding an ordinary spec map
+  (`item: %{kind: :number}`, `item: %{kind: :object, properties: [...]}`),
+  which states the one-template invariant in the vocabulary, makes tuple
+  arrays inexpressible, and lets item compilation recurse through the
+  existing property machinery — an object item's own `properties:`,
+  `required:` (list, applying to the item's properties), and `groups:` work
+  unchanged. Cardinality is `min_items:`/`max_items:` on the collection spec,
+  validated through the existing constraint machinery (non-negative integers,
+  low ≤ high). `title:`/`help:` are accepted as on objects and fields.
+- **JSON Schema spelling.** The pinned 2020-12 subset: `"type": "array"` with
+  a supported homogeneous object-form `items` schema, plus
+  `minItems`/`maxItems`.
+- **Degradation table.** Map, strict per D-048: `kind: :collection` with a
+  missing or non-map `item:` is an `:invalid_declaration` **error**, as is a
+  malformed `min_items`/`max_items`. JSON Schema, tolerant: `"type": "array"`
+  with **no `items`** (legal JSON Schema meaning "any items"), boolean
+  `items` schemas, `prefixItems`, and other structural/dynamic shapes compile
+  to `Unsupported` **with a warning** — and the new array clauses must give
+  sharper reasons than today's generic "unsupported type". Both sources: a
+  well-formed collection whose item declaration is valid but unsupported
+  compiles to a supported collection with an `Unsupported` **item template**
+  (per-item runtime blockers via
+  [[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]]),
+  and any array nested below an `:item` segment compiles to `Unsupported`
+  with the D-053 "nested collections are not yet supported" diagnostic.
+- **Item-level `required` is special-cased in the Map adapter.** The DSL is
+  deliberately permissive about unknown keys (D-048), so the D-053 diagnostic
+  for a boolean `required` on an item spec must be looked for explicitly —
+  otherwise it would be silently swallowed as an unknown key.
+
+**Consequences.** MB-T2/MB-T3's test matrices fall directly out of the
+degradation table; the Map validation battery grows `item:`/`min_items:`/
+`max_items:` clauses to keep D-048 totality, and the JSON Schema property
+clause ladder gains a supported array clause *above* the catch-all while
+structural shapes keep falling through to `unsupported/6`. Because
+`:min_items`/`:max_items` spell the D-053 semantic constraint keys 1:1,
+origin tracking is mechanical (`{:map_source, [..., :min_items]}` vs
+`{:json_schema, ".../minItems"}`). One asymmetry is accepted and named: only
+the JSON Schema adapter builds a `ValidationPlan`, so `min_items` on a
+Map-declared form is enforced only as compiled cardinality (UI legality and
+mutation rejection), never as a submit-time validity issue — consistent with
+scalar constraints today, and the reason the differential collection fixtures
+assert **`Info` equivalence apart from origins only**, never validation
+equivalence. The decision is resolved to MB-D2's exit criterion: the paired
+scalar-collection and object-collection fixtures are now writable in both
+spellings.
+
 ## Related notes
 
 - [[19-north-star-architecture|North-star architecture]]

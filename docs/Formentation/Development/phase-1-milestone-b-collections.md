@@ -416,10 +416,9 @@ flowchart TD
     classDef ready fill:#0d47a1,stroke:#64b5f6,color:#ffffff
     classDef blocked fill:#455a64,stroke:#78909c,color:#eceff1
 
-    class A,D1 done
-    class D2 inprogress
-    class T1,D4,D8 ready
-    class T2,T3,D3,T4,T5,G1,D5,T6,T7,G2,D6,D7,T8,G3,D9,D10,T9,T10,D11,T11,G4,D12,T12,T13,DONE blocked
+    class A,D1,D2 done
+    class T1,T2,T3,D4,D8 ready
+    class D3,T4,T5,G1,D5,T6,T7,G2,D6,D7,T8,G3,D9,D10,T9,T10,D11,T11,G4,D12,T12,T13,DONE blocked
 ```
 
 Node colors track current execution state: **green** = done (decisions
@@ -472,27 +471,30 @@ This decision does not choose runtime item identity — that remains MB-D4.
 
 ### MB-D2 — Declaration-source vocabularies
 
-**Status:** open after MB-D1.
+**Status:** decided — recorded as
+[[18-decisions#D-054 — Collection source vocabularies and the degradation table|D-054]]
+(2026-08-14).
 
-JSON Schema has an obvious source spelling for the supported subset:
+The settled answers, in full in D-054:
 
-```json
-{
-  "type": "array",
-  "items": { "type": "string" }
-}
-```
-
-or an object-valued `items` schema.
-
-The Map adapter needs an equivalent compact declaration. Exact syntax should be
-chosen for clarity rather than by blindly mirroring JSON Schema. Candidate
-questions include `kind: :collection` versus `kind: :array`, and `item:` versus
-`items:`.
-
-The decision must also pin what unsupported array shapes do: compile an
-unsupported semantic node/diagnostic rather than partly interpreting an
-advanced schema.
+- Map spelling: `kind: :collection` (matching the semantic model 1:1, like
+  every existing Map kind), singular `item:` holding an ordinary spec map,
+  `min_items:`/`max_items:` through the existing constraint machinery,
+  `title:`/`help:` as usual;
+- JSON Schema spelling: `"type": "array"` with a supported homogeneous
+  object-form `items` schema plus `minItems`/`maxItems`;
+- degradation table: Map stays strict per D-048 (missing/non-map `item:` and
+  malformed cardinality are errors); JSON Schema stays tolerant (`items`
+  absent, boolean `items`, `prefixItems`, dynamic shapes → `Unsupported` +
+  warning with sharper reasons); both sources compile a valid-but-unsupported
+  item declaration to a supported collection with an `Unsupported` item
+  template, and any array below `:item` to `Unsupported` per D-053;
+- item-level boolean `required` is explicitly special-cased in the Map
+  adapter so the D-053 diagnostic actually fires despite the permissive
+  unknown-key DSL;
+- accepted asymmetry: Map forms have no `ValidationPlan`, so their
+  `min_items` is compiled cardinality only; differential fixtures assert
+  `Info` equivalence apart from origins, never validation equivalence.
 
 **Unblocks:** MB-T2 and MB-T3.
 
@@ -1292,7 +1294,7 @@ issues. Keep graph IDs stable even if an issue covers several adjacent tasks.
 | Graph node(s) | Issue | PR | Status | Notes |
 |---|---:|---:|---|---|
 | MB-D1 / MB-T1 | — | — | planned | MB-D1 decided ([[18-decisions#D-053 — Collections are a dedicated semantic node owning one item template|D-053]]); MB-T1 is the first implementation target |
-| MB-D2 / MB-T2 / MB-T3 | — | — | planned | Both source adapters + differential fixture |
+| MB-D2 / MB-T2 / MB-T3 | — | — | planned | MB-D2 decided ([[18-decisions#D-054 — Collection source vocabularies and the degradation table|D-054]]); adapters + differential fixture ready to slice |
 | MB-D3 / MB-T4 / MB-T5 / MB-G1 | — | — | planned | Existing-data indexed round-trip |
 | MB-D4 / MB-D5 / MB-T6 / MB-T7 / MB-G2 | — | — | planned | Stable identity/reconciliation |
 | MB-D6 / MB-D7 / MB-D8 / MB-T8 / MB-G3 | — | — | planned | Pure mutations |

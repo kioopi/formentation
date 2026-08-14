@@ -81,8 +81,20 @@ a dedicated `Semantic.Collection` struct owning one anonymous item template at
 axes; validity-only array keywords flow through to authoritative validation
 while structural ones compile to unsupported; nested collections legal in the
 recursive model but compiled to `Semantic.Unsupported` (with diagnostic) in
-Milestone B. No implementation yet — MB-T1 is the next target after MB-D2
-settles the Map spelling.
+Milestone B.
+
+✅ Decided (2026-08-14) — Milestone B's second blocking decision,
+[[phase-1-milestone-b-collections#MB-D2 — Declaration-source vocabularies|MB-D2]]
+(declaration-source vocabularies), is resolved as
+[[18-decisions#D-054 — Collection source vocabularies and the degradation table|D-054]]:
+Map spells collections as `kind: :collection` with a singular `item:` spec and
+`min_items:`/`max_items:`; JSON Schema compiles the pinned
+`"type": "array"`/`items`/`minItems`/`maxItems` subset; a degradation table
+keeps the strict-Map ([[18-decisions#D-048 — Map-source declarations are total at the compile boundary|D-048]])
+versus tolerant-JSON-Schema split explicit, with valid-but-unsupported item
+declarations compiling to a supported collection with an `Unsupported` item
+template. With MB-D1 and MB-D2 both decided, the MB-S1 static-definition slice
+(MB-T1/T2/T3 and the differential collection fixtures) is ready to implement.
 
 Supplementary to the numbered steps: an opt-in, demo-driven browser-real test suite (PhoenixTest + Playwright, [[18-decisions#D-022 — Browser-real tests are an opt-in, demo-driven Playwright suite|D-022]]) now covers truths `Phoenix.LiveViewTest` cannot observe — real `_unused_` marker gating, number-widget raw-text preservation under an actual browser, and error-summary focus movement — and surfaced the pump-inspection demo's native-validation toggle ([[18-decisions#D-023 — The demo keeps native validation, behind a toggle|D-023]]). It runs via `mix test.browser`, stays out of `mix ci` by design, and is not itself a phase-1 step; see [[browser-testing|Techdocs/Browser testing]].
 
