@@ -271,7 +271,11 @@ defmodule Formentation.Phoenix.StateViewTest do
           %{
             "type" => "object",
             "properties" => %{
-              "tags" => %{"type" => "array", "items" => %{"type" => "integer"}}
+              "tags" => %{
+                "type" => "array",
+                "prefixItems" => [%{"type" => "integer"}],
+                "items" => %{"type" => "integer"}
+              }
             }
           },
           %{"tags" => ["x"]},
@@ -323,7 +327,11 @@ defmodule Formentation.Phoenix.StateViewTest do
                 "required" => ["street"],
                 "properties" => %{"street" => %{"type" => "string", "minLength" => 1}}
               },
-              "tags" => %{"type" => "array", "items" => %{"type" => "integer"}}
+              "tags" => %{
+                "type" => "array",
+                "prefixItems" => [%{"type" => "integer"}],
+                "items" => %{"type" => "integer"}
+              }
             }
           },
           %{"tags" => ["x"]},

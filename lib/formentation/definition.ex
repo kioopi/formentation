@@ -4,7 +4,8 @@ defmodule Formentation.Definition do
 
   Safe to cache and inspect; never contains runtime params, field errors,
   or DOM identifiers. `format_version` names the layout of this struct so
-  cached definitions can be invalidated across releases. `validation` is
+  cached definitions can be invalidated across releases; any stored node or
+  field-vocabulary change bumps it (D-055). `validation` is
   an optional `Formentation.Definition.ValidationPlan` — an executable module paired
   with the opaque artifact that module owns and interprets; `nil` when the
   source supplies no authoritative instance validation (the map source,
@@ -14,7 +15,7 @@ defmodule Formentation.Definition do
   alias Formentation.Definition.{Presentation, Semantic, ValidationPlan}
   alias Formentation.Diagnostic
 
-  @format_version 3
+  @format_version 4
 
   defstruct [
     :semantic,

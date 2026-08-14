@@ -1872,4 +1872,187 @@ defmodule Formentation.Source.MapTest do
       assert %Semantic.Object{} = Info.node_at(definition, [])
     end
   end
+
+  describe "collection declarations" do
+    defp collection_declaration(collection_spec) do
+      %{kind: :object, properties: [{"measurements", collection_spec}]}
+    end
+
+    defp compile_collection(collection_spec, opts \\ []) do
+      Formentation.compile(
+        collection_declaration(collection_spec),
+        [adapter: Formentation.Source.Map] ++ opts
+      )
+    end
+
+    test "a scalar collection compiles with cardinality facts and per-aspect origins" do
+      {:ok, definition, []} =
+        compile_collection(%{
+          kind: :collection,
+          item: %{kind: :number},
+          min_items: 1,
+          max_items: 10,
+          title: "Measurements",
+          help: "One per probe"
+        })
+
+      assert Info.semantic_kind(definition, ["measurements"]) == :collection
+
+      assert %Semantic.Field{name: nil, value_type: :number} =
+               Info.item_template(definition, ["measurements"])
+
+      assert Info.constraints(definition, ["measurements"]) == %{min_items: 1, max_items: 10}
+
+      origins = Info.origins(definition, ["measurements"])
+      assert origins[:kind] == {:map_source, [:properties, "measurements", :kind]}
+      assert origins[:min_items] == {:map_source, [:properties, "measurements", :min_items]}
+      assert origins[:max_items] == {:map_source, [:properties, "measurements", :max_items]}
+
+      assert {:ok, %PresentationInfo.Collection{label: "Measurements", help: "One per probe"}} =
+               Info.presentation_at(definition, ["measurements"])
+    end
+
+    test "a collection without a title gets the humanized label like every named node" do
+      {:ok, definition, []} =
+        compile_collection(%{kind: :collection, item: %{kind: :number}})
+
+      assert {:ok, %PresentationInfo.Collection{label: "Measurements"} = descriptor} =
+               Info.presentation_at(definition, ["measurements"])
+
+      assert descriptor.origins[:label] == {:inference, :label_from_name}
+    end
+
+    test "an object item compiles recursively with its own required list" do
+      {:ok, definition, []} =
+        compile_collection(%{
+          kind: :collection,
+          item: %{
+            kind: :object,
+            required: ["street"],
+            properties: [
+              {"street", %{kind: :string, min_length: 1}},
+              {"zip", %{kind: :string}}
+            ]
+          }
+        })
+
+      assert Info.semantic_kind(definition, ["measurements", 0]) == :object
+      assert Info.required?(definition, ["measurements", 0, "street"])
+      refute Info.required?(definition, ["measurements", 0, "zip"])
+    end
+
+    # -- degradation table: Map rows ---------------------------------
+
+    test "missing item is an :invalid_declaration error with a precise origin" do
+      assert {:error, [d]} = compile_collection(%{kind: :collection})
+      assert d.code == :invalid_declaration
+      assert d.origin == {:map_source, [:properties, "measurements", :item]}
+      assert d.template_path.segments == ["measurements"]
+    end
+
+    test "non-map item is an :invalid_declaration error" do
+      assert {:error, [%{code: :invalid_declaration}]} =
+               compile_collection(%{kind: :collection, item: "nope"})
+    end
+
+    test "malformed cardinality is an :invalid_declaration error at the compile boundary" do
+      for {bad, origin_key} <- [
+            {%{kind: :collection, item: %{kind: :number}, min_items: -1}, :min_items},
+            {%{kind: :collection, item: %{kind: :number}, max_items: "ten"}, :max_items},
+            {%{kind: :collection, item: %{kind: :number}, min_items: 5, max_items: 2}, :max_items}
+          ] do
+        assert {:error, [d]} = compile_collection(bad)
+        assert d.code == :invalid_declaration
+        assert d.origin == {:map_source, [:properties, "measurements", origin_key]}
+      end
+    end
+
+    test "a valid-but-unsupported item kind degrades to an unsupported item template" do
+      {:ok, definition, [warning]} =
+        compile_collection(%{kind: :collection, item: %{kind: :datetime}})
+
+      assert Info.semantic_kind(definition, ["measurements"]) == :collection
+
+      assert %Semantic.Unsupported{name: nil} =
+               Info.item_template(definition, ["measurements"])
+
+      assert [%Semantic.Unsupported{name: nil}] = Info.unsupported_nodes(definition)
+      assert warning.code == :unsupported_kind
+      assert warning.template_path.segments == ["measurements", :item]
+      assert warning.origin == {:map_source, [:properties, "measurements", :item, :kind]}
+    end
+
+    test "boolean item-level required compiles with the min_items warning" do
+      for item <- [
+            %{kind: :string, required: true},
+            %{kind: :object, required: true, properties: [{"street", %{kind: :string}}]}
+          ] do
+        {:ok, definition, [warning]} = compile_collection(%{kind: :collection, item: item})
+
+        assert Info.semantic_kind(definition, ["measurements"]) == :collection
+        refute Info.required?(definition, ["measurements", 0])
+        assert warning.code == :collection_item_required
+        assert warning.severity == :warning
+        assert warning.message =~ "min_items"
+        assert warning.origin == {:map_source, [:properties, "measurements", :item, :required]}
+      end
+    end
+
+    test "non-boolean required on a scalar item is a strict :invalid_declaration error" do
+      assert {:error, [d]} =
+               compile_collection(%{kind: :collection, item: %{kind: :string, required: "yes"}})
+
+      assert d.code == :invalid_declaration
+      assert d.origin == {:map_source, [:properties, "measurements", :item, :required]}
+    end
+
+    test "a direct nested collection degrades to an unsupported item template" do
+      {:ok, definition, [warning]} =
+        compile_collection(%{
+          kind: :collection,
+          item: %{kind: :collection, item: %{kind: :number}}
+        })
+
+      assert Info.semantic_kind(definition, ["measurements"]) == :collection
+
+      assert %Semantic.Unsupported{name: nil} =
+               Info.item_template(definition, ["measurements"])
+
+      assert warning.code == :nested_collection
+      assert warning.template_path.segments == ["measurements", :item]
+    end
+
+    test "an array property inside an object item degrades with the nested diagnostic" do
+      {:ok, definition, [warning]} =
+        compile_collection(%{
+          kind: :collection,
+          item: %{
+            kind: :object,
+            properties: [{"tags", %{kind: :collection, item: %{kind: :string}}}]
+          }
+        })
+
+      assert Info.semantic_kind(definition, ["measurements", 0, "tags"]) == :unsupported
+      assert warning.code == :nested_collection
+      assert warning.template_path.segments == ["measurements", :item, "tags"]
+    end
+
+    test "item-spec validation errors name the item template, not the root object" do
+      assert {:error, [d]} =
+               compile_collection(%{kind: :collection, item: %{kind: :string, help: 123}})
+
+      assert d.code == :invalid_declaration
+      assert d.message =~ "the item template"
+      refute d.message =~ "root object"
+    end
+
+    test "the collection and its item each consume one node-budget unit" do
+      # root object (1) + collection (1) + item (1) = 3
+      assert {:ok, _, []} =
+               compile_collection(%{kind: :collection, item: %{kind: :number}}, max_nodes: 3)
+
+      assert {:error, [%{code: :max_nodes_exceeded}]} =
+               compile_collection(%{kind: :collection, item: %{kind: :number}}, max_nodes: 2)
+    end
+  end
 end

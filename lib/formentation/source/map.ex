@@ -60,6 +60,10 @@ defmodule Formentation.Source.Map do
   @impl Shared.Dialect
   def property_segment(name), do: [:properties, name]
 
+  @doc false
+  @impl Shared.Dialect
+  def item_segment, do: [:item]
+
   defp compile_object(%{kind: :object} = declaration, name, ctx) do
     with :ok <- Shared.Context.check_depth(ctx),
          {:ok, ctx} <- Shared.Context.take_budget(ctx),
@@ -71,7 +75,7 @@ defmodule Formentation.Source.Map do
            fetch_optional_string(
              declaration,
              :help,
-             label_subject(name),
+             subject(name, ctx.template_path),
              ctx.source_path,
              ctx.template_path,
              ctx
@@ -365,6 +369,17 @@ defmodule Formentation.Source.Map do
     compile_field(name, spec, required?, ctx)
   end
 
+  # Nested collections are legal in the recursive semantic model but
+  # deferred by compilation in Milestone B (D-053): any array declared
+  # below an :item segment degrades to a preserve-only Unsupported node.
+  defp compile_property(name, %{kind: :collection} = spec, required?, ctx) do
+    if below_item?(ctx) do
+      nested_collection_unsupported(name, required?, ctx)
+    else
+      compile_collection(name, spec, required?, ctx)
+    end
+  end
+
   defp compile_property(name, %{kind: kind}, required?, ctx) when is_atom(kind) do
     with {:ok, ctx} <- Shared.Context.take_budget(ctx) do
       template_path = TemplatePath.child(ctx.template_path, name)
@@ -409,6 +424,269 @@ defmodule Formentation.Source.Map do
        ctx.source_path ++ [:properties, name, :kind],
        TemplatePath.child(ctx.template_path, name)
      )}
+  end
+
+  defp below_item?(%Shared.Context{template_path: %TemplatePath{segments: segments}}),
+    do: :item in segments
+
+  defp compile_collection(name, spec, required?, ctx) do
+    template_path = TemplatePath.child(ctx.template_path, name)
+    source_path = ctx.source_path ++ [:properties, name]
+
+    with {:ok, ctx} <- Shared.Context.take_budget(ctx),
+         {:ok, constraints} <-
+           validate_collection_constraints(spec, name, source_path, template_path, ctx),
+         {:ok, item_spec} <- fetch_item_spec(spec, name, source_path, template_path, ctx),
+         {:ok, {label, label_origin}} <-
+           resolve_label(spec, name, source_path, template_path, ctx),
+         {:ok, help} <-
+           fetch_optional_string(
+             spec,
+             :help,
+             subject(name, template_path),
+             source_path,
+             template_path,
+             ctx
+           ),
+         {:ok, item_spec, ctx} <-
+           resolve_item_required(item_spec, name, source_path, template_path, ctx),
+         {:ok, %Shared.Compiled{} = item, item_ctx} <-
+           compile_item(
+             item_spec,
+             ctx |> Shared.Context.enter_property(name) |> Shared.Context.enter_item()
+           ) do
+      ctx = %{ctx | diagnostics: item_ctx.diagnostics, nodes_left: item_ctx.nodes_left}
+
+      semantic =
+        Semantic.Collection.new(name, template_path, item.semantic,
+          required?: required?,
+          constraints: constraints,
+          origins:
+            Shared.origin_entries(
+              kind: {:map_source, source_path ++ [:kind]},
+              min_items: key_origin(spec, :min_items, source_path),
+              max_items: key_origin(spec, :max_items, source_path)
+            )
+        )
+
+      presentation =
+        Presentation.Collection.new(semantic.id, item.presentation,
+          label: label,
+          help: help,
+          origins:
+            Shared.origin_entries(
+              label: label_origin,
+              help: key_origin(spec, :help, source_path)
+            )
+        )
+
+      {:ok, %Shared.Compiled{semantic: semantic, presentation: presentation}, ctx}
+    end
+  end
+
+  @collection_constraint_keys [:min_items, :max_items]
+
+  defp validate_collection_constraints(spec, name, source_path, template_path, ctx) do
+    @collection_constraint_keys
+    |> Enum.reduce_while({:ok, %{}}, fn key, {:ok, acc} ->
+      case validate_collection_bound(spec, key, name, source_path, template_path, ctx) do
+        :absent -> {:cont, {:ok, acc}}
+        {:ok, value} -> {:cont, {:ok, Map.put(acc, key, value)}}
+        {:error, diagnostic} -> {:halt, {:error, diagnostic}}
+      end
+    end)
+    |> case do
+      {:ok, constraints} ->
+        with :ok <-
+               check_bounds(
+                 constraints,
+                 :min_items,
+                 :max_items,
+                 name,
+                 source_path,
+                 template_path,
+                 ctx
+               ) do
+          {:ok, constraints}
+        end
+
+      {:error, diagnostic} ->
+        {:error, diagnostic}
+    end
+  end
+
+  defp validate_collection_bound(spec, key, name, source_path, template_path, ctx) do
+    case Map.fetch(spec, key) do
+      :error ->
+        :absent
+
+      {:ok, value} when is_integer(value) and value >= 0 ->
+        {:ok, value}
+
+      {:ok, value} ->
+        {:error,
+         invalid(
+           "#{key} for property #{inspect(name)} must be a non-negative integer, " <>
+             "got: #{inspect(value)}",
+           ctx,
+           source_path ++ [key],
+           template_path
+         )}
+    end
+  end
+
+  defp fetch_item_spec(spec, name, source_path, template_path, ctx) do
+    case Map.fetch(spec, :item) do
+      {:ok, item_spec} when is_map(item_spec) ->
+        {:ok, item_spec}
+
+      {:ok, other} ->
+        {:error,
+         invalid(
+           "item for property #{inspect(name)} must be a spec map, got: #{inspect(other)}",
+           ctx,
+           source_path ++ [:item],
+           template_path
+         )}
+
+      :error ->
+        {:error,
+         invalid(
+           "collection property #{inspect(name)} is missing an :item spec",
+           ctx,
+           source_path ++ [:item],
+           template_path
+         )}
+    end
+  end
+
+  # Item requiredness is cardinality (D-053). Boolean required is
+  # stripped with a warning; an object item's required LIST is its
+  # ordinary required-properties spelling and passes through; anything
+  # else is a strict error — the key is recognized vocabulary here.
+  defp resolve_item_required(item_spec, name, source_path, template_path, ctx) do
+    case Map.fetch(item_spec, :required) do
+      :error ->
+        {:ok, item_spec, ctx}
+
+      {:ok, value} when is_boolean(value) ->
+        warning = %Diagnostic{
+          severity: :warning,
+          code: :collection_item_required,
+          message:
+            "required on the item spec of collection #{inspect(name)} is ignored; " <>
+              "item requiredness is cardinality — use min_items",
+          origin: {:map_source, source_path ++ [:item, :required]},
+          template_path: template_path
+        }
+
+        {:ok, Map.delete(item_spec, :required), Shared.Context.add_diagnostic(ctx, warning)}
+
+      {:ok, list} when is_list(list) ->
+        if match?(%{kind: :object}, item_spec) do
+          {:ok, item_spec, ctx}
+        else
+          item_required_error(name, list, source_path, template_path, ctx)
+        end
+
+      {:ok, other} ->
+        item_required_error(name, other, source_path, template_path, ctx)
+    end
+  end
+
+  defp item_required_error(name, value, source_path, template_path, ctx) do
+    {:error,
+     invalid(
+       "required on the item spec of collection #{inspect(name)} must be a boolean " <>
+         "(ignored — use min_items) or, for object items, a list of required " <>
+         "property names, got: #{inspect(value)}",
+       ctx,
+       source_path ++ [:item, :required],
+       template_path
+     )}
+  end
+
+  # Item dispatch: the ctx is already inside the item (enter_property +
+  # enter_item), so anonymous nodes use the ctx paths directly.
+  defp compile_item(%{kind: :object} = item_spec, item_ctx),
+    do: compile_object(item_spec, nil, item_ctx)
+
+  defp compile_item(%{kind: :collection}, item_ctx) do
+    unsupported_item(item_ctx, :nested_collection, "nested collections are not yet supported")
+  end
+
+  defp compile_item(%{kind: kind} = item_spec, item_ctx) when kind in @scalar_kinds,
+    do: compile_field(nil, item_spec, false, item_ctx)
+
+  defp compile_item(%{kind: kind}, item_ctx) when is_atom(kind) do
+    unsupported_item(item_ctx, :unsupported_kind, "unsupported kind #{inspect(kind)}")
+  end
+
+  defp compile_item(%{kind: kind}, item_ctx) do
+    {:error,
+     invalid(
+       "item kind must be an atom, got: #{inspect(kind)}",
+       item_ctx,
+       item_ctx.source_path ++ [:kind],
+       item_ctx.template_path
+     )}
+  end
+
+  defp compile_item(item_spec, item_ctx) do
+    {:error,
+     invalid(
+       "item spec has no kind: #{inspect(item_spec)}",
+       item_ctx,
+       item_ctx.source_path ++ [:kind],
+       item_ctx.template_path
+     )}
+  end
+
+  defp unsupported_item(item_ctx, code, reason) do
+    with {:ok, item_ctx} <- Shared.Context.take_budget(item_ctx) do
+      origin = {:map_source, item_ctx.source_path ++ [:kind]}
+
+      semantic =
+        Semantic.Unsupported.new(nil, item_ctx.template_path,
+          origins: Shared.origin_entries(kind: origin)
+        )
+
+      diagnostic = %Diagnostic{
+        severity: :warning,
+        code: code,
+        message: "#{reason} for the item template",
+        origin: origin,
+        template_path: item_ctx.template_path
+      }
+
+      {:ok, %Shared.Compiled{semantic: semantic, presentation: nil},
+       Shared.Context.add_diagnostic(item_ctx, diagnostic)}
+    end
+  end
+
+  defp nested_collection_unsupported(name, required?, ctx) do
+    with {:ok, ctx} <- Shared.Context.take_budget(ctx) do
+      template_path = TemplatePath.child(ctx.template_path, name)
+      source_path = ctx.source_path ++ [:properties, name]
+      origin = {:map_source, source_path ++ [:kind]}
+
+      semantic =
+        Semantic.Unsupported.new(name, template_path,
+          required?: required?,
+          origins: Shared.origin_entries(kind: origin)
+        )
+
+      diagnostic = %Diagnostic{
+        severity: :warning,
+        code: :nested_collection,
+        message: "nested collections are not yet supported for property #{inspect(name)}",
+        origin: origin,
+        template_path: template_path
+      }
+
+      {:ok, %Shared.Compiled{semantic: semantic, presentation: nil},
+       Shared.Context.add_diagnostic(ctx, diagnostic)}
+    end
   end
 
   defp validate_constraints(spec, kind, name, source_path, template_path, ctx) do
@@ -543,8 +821,7 @@ defmodule Formentation.Source.Map do
   end
 
   defp compile_field(name, %{kind: kind} = spec, required?, ctx) when kind in @scalar_kinds do
-    template_path = TemplatePath.child(ctx.template_path, name)
-    source_path = ctx.source_path ++ [:properties, name]
+    {template_path, source_path} = field_location(name, ctx)
 
     with {:ok, ctx} <- Shared.Context.take_budget(ctx),
          {:ok, examples, examples_origin} <-
@@ -557,7 +834,7 @@ defmodule Formentation.Source.Map do
            fetch_optional_string(
              spec,
              :help,
-             label_subject(name),
+             subject(name, template_path),
              source_path,
              template_path,
              ctx
@@ -568,7 +845,7 @@ defmodule Formentation.Source.Map do
            fetch_optional_atom(
              spec,
              :widget,
-             label_subject(name),
+             subject(name, template_path),
              source_path,
              template_path,
              ctx
@@ -741,7 +1018,7 @@ defmodule Formentation.Source.Map do
        when not is_nil(title) do
     {:error,
      invalid(
-       "title for #{label_subject(name)} must be a string, got: #{inspect(title)}",
+       "title for #{subject(name, template_path)} must be a string, got: #{inspect(title)}",
        ctx,
        source_path ++ [:title],
        template_path
@@ -754,8 +1031,20 @@ defmodule Formentation.Source.Map do
     {:ok, {Shared.humanize(name), {:inference, :label_from_name}}}
   end
 
-  defp label_subject(nil), do: "the root object"
-  defp label_subject(name), do: "property #{inspect(name)}"
+  # An anonymous node is either the root object or a collection's item
+  # template; the template path tells them apart.
+  defp subject(nil, %TemplatePath{segments: segments}) do
+    if List.last(segments) == :item, do: "the item template", else: "the root object"
+  end
+
+  defp subject(name, _template_path), do: "property #{inspect(name)}"
+
+  # A named field/property derives its own location; the anonymous item
+  # template is compiled inside an already-entered item context.
+  defp field_location(nil, ctx), do: {ctx.template_path, ctx.source_path}
+
+  defp field_location(name, ctx),
+    do: {TemplatePath.child(ctx.template_path, name), ctx.source_path ++ [:properties, name]}
 
   defp resolve_role(%{role: role}, _name, source_path, _template_path, _ctx)
        when is_atom(role) and not is_nil(role) do
@@ -765,7 +1054,7 @@ defmodule Formentation.Source.Map do
   defp resolve_role(%{role: role}, name, source_path, template_path, ctx) when not is_nil(role) do
     {:error,
      invalid(
-       "role for #{label_subject(name)} must be an atom, got: #{inspect(role)}",
+       "role for #{subject(name, template_path)} must be an atom, got: #{inspect(role)}",
        ctx,
        source_path ++ [:role],
        template_path

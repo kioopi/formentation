@@ -24,8 +24,9 @@ Milestone B adds the first repeated data shape to Formentation: homogeneous
 collections of supported scalar and object values, with stable runtime item
 identity and LiveView-friendly add/remove/reorder behaviour.
 
-The short roadmap entry in [[phase-1-walking-skeleton|Phase 1 — Walking
-Skeleton]] remains the scope authority:
+The short roadmap entry in
+[[phase-1-walking-skeleton|Phase 1 — Walking Skeleton]]
+remains the scope authority:
 
 - homogeneous arrays of supported scalars/objects;
 - stable item identity;
@@ -1293,8 +1294,8 @@ issues. Keep graph IDs stable even if an issue covers several adjacent tasks.
 
 | Graph node(s) | Issue | PR | Status | Notes |
 |---|---:|---:|---|---|
-| MB-D1 / MB-T1 | — | — | planned | MB-D1 decided ([[18-decisions#D-053 — Collections are a dedicated semantic node owning one item template|D-053]]); MB-T1 is the first implementation target |
-| MB-D2 / MB-T2 / MB-T3 | — | — | planned | MB-D2 decided ([[18-decisions#D-054 — Collection source vocabularies and the degradation table|D-054]]); adapters + differential fixture ready to slice |
+| MB-D1 / MB-T1 | [#52](https://github.com/kioopi/formentation/issues/52) | [#53](https://github.com/kioopi/formentation/pull/53) | done | MB-D1 decided ([[18-decisions#D-053 — Collections are a dedicated semantic node owning one item template|D-053]]); MB-S1 implemented 2026-08-14 |
+| MB-D2 / MB-T2 / MB-T3 | [#52](https://github.com/kioopi/formentation/issues/52) | [#53](https://github.com/kioopi/formentation/pull/53) | done | MB-D2 decided ([[18-decisions#D-054 — Collection source vocabularies and the degradation table|D-054]]); adapters + differential fixtures implemented 2026-08-14 |
 | MB-D3 / MB-T4 / MB-T5 / MB-G1 | — | — | planned | Existing-data indexed round-trip |
 | MB-D4 / MB-D5 / MB-T6 / MB-T7 / MB-G2 | — | — | planned | Stable identity/reconciliation |
 | MB-D6 / MB-D7 / MB-D8 / MB-T8 / MB-G3 | — | — | planned | Pure mutations |

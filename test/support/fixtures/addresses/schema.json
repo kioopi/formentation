@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "title": "Address book",
+  "properties": {
+    "addresses": {
+      "type": "array",
+      "title": "Addresses",
+      "items": {
+        "type": "object",
+        "title": "Address",
+        "required": ["street"],
+        "properties": {
+          "street": { "type": "string", "title": "Street", "minLength": 1 },
+          "zip": { "type": "string", "title": "ZIP" }
+        }
+      }
+    }
+  }
+}

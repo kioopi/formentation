@@ -10,7 +10,7 @@ status: current
 
 # Source adapters
 
-> [!note] As of 2026-08-13 · Wave C compiler cleanup (D-052); Map-source declaration totality (D-048); source-neutral validation dispatch; adapter selection (D-046); module paths refreshed for the lib-tree restructure (D-047)
+> [!note] As of 2026-08-14 · static collection compilation, MB-S1 (D-053/D-054); previously: Wave C compiler cleanup (D-052); Map-source declaration totality (D-048); source-neutral validation dispatch; adapter selection (D-046); lib-tree restructure (D-047)
 > Describes the two adapters as built. Node shapes are deferred to
 > [[definition-and-node|Definition and Node]], the origin model to
 > [[diagnostics-and-origins|Diagnostics and origins]], and the addressing
@@ -120,9 +120,15 @@ flowchart TD
 `max_depth: 16`, `nodes_left: 1_000`).
 
 The shared compiler pipeline is **walk → build → (transform) → finalize**.
-`Context` owns depth and budget checks, property descent, and diagnostic
-accumulation; `Shared.Dialect` supplies each adapter's noun, origin builder,
-and property source-path segment. `%Shared.Build{}` is the whole-walk value
+`Context` owns depth and budget checks, property descent
+(`enter_property/2`), collection-item descent (`enter_item/1` — one
+depth level, `TemplatePath.item/1`, the dialect's item source segment),
+and diagnostic accumulation; `Shared.Dialect` supplies each adapter's
+noun, origin builder, property source-path segment, and item source
+segment (`[:item]` for Map, `["items"]` for JSON Schema). Budget
+semantics for collections: the collection node consumes one node-budget
+unit and its item template another; entering `:item` costs one depth
+level on top of the property entry. `%Shared.Build{}` is the whole-walk value
 (semantic and presentation trees, diagnostics, validation), distinct from the
 per-node `%Shared.Compiled{}`. JSON Schema transforms Build for hints and
 validation; Map has no transform. Finalization runs once at the adapter edge.
@@ -156,11 +162,29 @@ object keys are unordered, so it sorts property names for a deterministic
 walk and defers presentation order to the `order` hint. It is gated and
 enriched by the two passes below.
 
-The scalar surface both adapters translate is the same: object schemas
+The surface both adapters translate is the same: object schemas
 become `Semantic.Object`s; `string`/`integer`/`number`/`boolean` properties
 become semantic fields with presentation descriptors for label, help, widget,
 and hidden intent; anything outside the subset becomes a
 `Semantic.Unsupported` plus a warning, never a crash.
+
+Since MB-S1 both adapters also compile **homogeneous collections**
+([[18-decisions#D-054 — Collection source vocabularies and the degradation table|D-054]]):
+the Map spelling is `kind: :collection` with a singular `item:` spec map
+and `min_items:`/`max_items:`; the JSON Schema spelling is
+`"type": "array"` with an object-form `items` schema and
+`minItems`/`maxItems`. Both recurse into ordinary item-spec compilation
+through the shared `enter_item` seam, so the compiled facts are
+source-identical apart from origins. The failure philosophies stay
+split: Map hard-errors on malformed collection syntax (missing/non-map
+`item:`, bad bounds, a non-boolean/non-list item-level `required`) with
+`:invalid_declaration`, and warns (`:collection_item_required`) on a
+boolean item-level `required`; JSON Schema degrades valid-but-outside-
+subset arrays (no `items`, boolean `items`, `prefixItems`) to
+`Unsupported` with the `:unsupported_array_shape` warning. In both, a
+valid-but-unsupported item subschema yields a supported collection with
+an anonymous `Unsupported` item template, and any array below an
+`:item` segment degrades with the `:nested_collection` diagnostic.
 
 ## The JSV metaschema pre-pass
 

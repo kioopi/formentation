@@ -85,6 +85,10 @@ defmodule Formentation.Source.JSONSchema do
   @impl Shared.Dialect
   def property_segment(name), do: ["properties", name]
 
+  @doc false
+  @impl Shared.Dialect
+  def item_segment, do: ["items"]
+
   defp with_validation(%Shared.Build{} = build, schema) do
     case Validator.build_instance_validator(schema) do
       {:ok, artifact} ->
@@ -292,6 +296,44 @@ defmodule Formentation.Source.JSONSchema do
     compile_scalar(name, schema, required?, ctx)
   end
 
+  # Nested collections are legal in the recursive semantic model but
+  # deferred by compilation in Milestone B (D-053): any array declared
+  # below an :item segment degrades to a preserve-only Unsupported node.
+  defp compile_property(name, %{"type" => "array"} = schema, required?, ctx) do
+    cond do
+      below_item?(ctx) ->
+        unsupported(
+          name,
+          schema,
+          required?,
+          ctx,
+          :nested_collection,
+          "nested collections are not yet supported"
+        )
+
+      Map.has_key?(schema, "prefixItems") ->
+        unsupported_array_shape(
+          name,
+          required?,
+          ctx,
+          "tuple arrays (prefixItems) are not supported",
+          ["prefixItems"]
+        )
+
+      Map.has_key?(schema, "unevaluatedItems") ->
+        unsupported_array_shape(
+          name,
+          required?,
+          ctx,
+          "dynamic item schemas (unevaluatedItems) are not supported",
+          ["unevaluatedItems"]
+        )
+
+      true ->
+        compile_array(name, schema, required?, ctx)
+    end
+  end
+
   defp compile_property(name, %{"type" => type} = schema, required?, ctx) do
     unsupported(
       name,
@@ -314,10 +356,185 @@ defmodule Formentation.Source.JSONSchema do
     )
   end
 
-  defp compile_scalar(name, schema, required?, ctx) do
+  defp below_item?(%Shared.Context{template_path: %TemplatePath{segments: segments}}),
+    do: :item in segments
+
+  defp compile_array(name, schema, required?, ctx) do
+    case Map.fetch(schema, "items") do
+      {:ok, items} when is_map(items) ->
+        compile_collection(name, schema, items, required?, ctx)
+
+      {:ok, items} when is_boolean(items) ->
+        unsupported_array_shape(
+          name,
+          required?,
+          ctx,
+          "boolean items schemas are not supported",
+          ["items"]
+        )
+
+      # A non-map, non-boolean `items` value fails 2020-12 metaschema
+      # validation before the walk; only the missing-items case remains.
+      :error ->
+        unsupported_array_shape(
+          name,
+          required?,
+          ctx,
+          "arrays without an items schema (any items) are not supported",
+          []
+        )
+    end
+  end
+
+  # Structural array-shape degradations point at the offending keyword
+  # (or, for a missing `items`, at the array property itself).
+  defp unsupported_array_shape(name, required?, ctx, reason, origin_suffix) do
     with {:ok, ctx} <- Shared.Context.take_budget(ctx) do
       template_path = TemplatePath.child(ctx.template_path, name)
       source_path = ctx.source_path ++ ["properties", name]
+      origin = {:json_schema, JSONPointer.join(source_path ++ origin_suffix)}
+
+      semantic =
+        Semantic.Unsupported.new(name, template_path,
+          required?: required?,
+          origins: Shared.origin_entries(kind: origin)
+        )
+
+      diagnostic = %Diagnostic{
+        severity: :warning,
+        code: :unsupported_array_shape,
+        message: "#{reason} for property #{inspect(name)}",
+        origin: origin,
+        template_path: template_path
+      }
+
+      {:ok, %Shared.Compiled{semantic: semantic, presentation: nil},
+       Shared.Context.add_diagnostic(ctx, diagnostic)}
+    end
+  end
+
+  @array_cardinality %{"minItems" => :min_items, "maxItems" => :max_items}
+
+  defp compile_collection(name, schema, items, required?, ctx) do
+    with {:ok, ctx} <- Shared.Context.take_budget(ctx),
+         {:ok, %Shared.Compiled{} = item, item_ctx} <-
+           compile_item(
+             items,
+             ctx |> Shared.Context.enter_property(name) |> Shared.Context.enter_item()
+           ) do
+      ctx = %{ctx | diagnostics: item_ctx.diagnostics, nodes_left: item_ctx.nodes_left}
+      template_path = TemplatePath.child(ctx.template_path, name)
+      source_path = ctx.source_path ++ ["properties", name]
+      {label, label_origin} = resolve_label(schema, name, source_path)
+      {help, help_origin} = resolve_help(schema, source_path)
+
+      constraints =
+        for {keyword, key} <- @array_cardinality, Map.has_key?(schema, keyword), into: %{} do
+          {key, Map.fetch!(schema, keyword)}
+        end
+
+      semantic =
+        Semantic.Collection.new(name, template_path, item.semantic,
+          required?: required?,
+          constraints: constraints,
+          origins:
+            Shared.origin_entries(
+              kind: {:json_schema, JSONPointer.join(source_path ++ ["type"])},
+              min_items: cardinality_origin(schema, "minItems", source_path),
+              max_items: cardinality_origin(schema, "maxItems", source_path)
+            )
+        )
+
+      presentation =
+        Presentation.Collection.new(semantic.id, item.presentation,
+          label: label,
+          help: help,
+          origins: Shared.origin_entries(label: label_origin, help: help_origin)
+        )
+
+      {:ok, %Shared.Compiled{semantic: semantic, presentation: presentation}, ctx}
+    end
+  end
+
+  defp cardinality_origin(schema, keyword, source_path) do
+    if Map.has_key?(schema, keyword),
+      do: {:json_schema, JSONPointer.join(source_path ++ [keyword])}
+  end
+
+  # Item dispatch mirrors the property clause ladder for anonymous
+  # nodes; the ctx is already inside the item (enter_property +
+  # enter_item), so unsupported/scalar items use the ctx paths directly.
+  defp compile_item(%{"type" => "object"} = schema, item_ctx),
+    do: compile_object(schema, nil, item_ctx)
+
+  defp compile_item(%{"type" => "array"} = schema, item_ctx) do
+    unsupported_item(
+      schema,
+      item_ctx,
+      :nested_collection,
+      "nested collections are not yet supported"
+    )
+  end
+
+  defp compile_item(%{"type" => "string", "const" => value} = schema, item_ctx)
+       when is_binary(value),
+       do: compile_scalar(nil, schema, false, item_ctx)
+
+  defp compile_item(%{"const" => _value} = schema, item_ctx) do
+    unsupported_item(schema, item_ctx, :unsupported_keyword, "const on a non-string type")
+  end
+
+  defp compile_item(%{"type" => "string", "enum" => enum} = schema, item_ctx)
+       when is_list(enum) do
+    if Enum.all?(enum, &is_binary/1) do
+      compile_scalar(nil, schema, false, item_ctx)
+    else
+      unsupported_item(schema, item_ctx, :unsupported_keyword, "non-string enum members")
+    end
+  end
+
+  defp compile_item(%{"enum" => enum} = schema, item_ctx) when is_list(enum) do
+    unsupported_item(schema, item_ctx, :unsupported_keyword, "enum on a non-string type")
+  end
+
+  defp compile_item(%{"type" => type} = schema, item_ctx)
+       when is_map_key(@scalar_types, type),
+       do: compile_scalar(nil, schema, false, item_ctx)
+
+  defp compile_item(%{"type" => type} = schema, item_ctx) do
+    unsupported_item(schema, item_ctx, :unsupported_type, "unsupported type #{inspect(type)}")
+  end
+
+  defp compile_item(schema, item_ctx) do
+    unsupported_item(schema, item_ctx, :unsupported_keyword, "no supported type declaration")
+  end
+
+  defp unsupported_item(_schema, item_ctx, code, reason) do
+    with {:ok, item_ctx} <- Shared.Context.take_budget(item_ctx) do
+      origin_suffix = if code == :unsupported_type, do: ["type"], else: []
+      origin = {:json_schema, JSONPointer.join(item_ctx.source_path ++ origin_suffix)}
+
+      semantic =
+        Semantic.Unsupported.new(nil, item_ctx.template_path,
+          origins: Shared.origin_entries(kind: origin)
+        )
+
+      diagnostic = %Diagnostic{
+        severity: :warning,
+        code: code,
+        message: "#{reason} for the item template",
+        origin: origin,
+        template_path: item_ctx.template_path
+      }
+
+      {:ok, %Shared.Compiled{semantic: semantic, presentation: nil},
+       Shared.Context.add_diagnostic(item_ctx, diagnostic)}
+    end
+  end
+
+  defp compile_scalar(name, schema, required?, ctx) do
+    with {:ok, ctx} <- Shared.Context.take_budget(ctx) do
+      {template_path, source_path} = scalar_location(name, ctx)
       {label, label_origin} = resolve_label(schema, name, source_path)
       {role, role_origin} = resolve_role(schema, source_path)
       {help, help_origin} = resolve_help(schema, source_path)
@@ -389,6 +606,13 @@ defmodule Formentation.Source.JSONSchema do
        Shared.Context.add_diagnostic(ctx, diagnostic)}
     end
   end
+
+  # A named property derives its own location; the anonymous item
+  # template is compiled inside an already-entered items context.
+  defp scalar_location(nil, ctx), do: {ctx.template_path, ctx.source_path}
+
+  defp scalar_location(name, ctx),
+    do: {TemplatePath.child(ctx.template_path, name), ctx.source_path ++ ["properties", name]}
 
   defp resolve_label(%{"title" => title}, _name, source_path) when is_binary(title) do
     {title, {:json_schema, JSONPointer.join(source_path ++ ["title"])}}
@@ -584,6 +808,7 @@ defmodule Formentation.Source.JSONSchema do
   defp semantic_kind(%Semantic.Field{}), do: :field
   defp semantic_kind(%Semantic.Object{}), do: :object
   defp semantic_kind(%Semantic.Unsupported{}), do: :unsupported
+  defp semantic_kind(%Semantic.Collection{}), do: :collection
 
   defp field_hint_warnings(fields, field_kind_by_name) do
     fields

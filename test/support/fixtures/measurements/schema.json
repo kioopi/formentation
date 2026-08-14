@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "title": "Measurement log",
+  "required": ["measurements"],
+  "properties": {
+    "measurements": {
+      "type": "array",
+      "title": "Measurements",
+      "items": { "type": "number" },
+      "minItems": 1,
+      "maxItems": 10
+    }
+  }
+}

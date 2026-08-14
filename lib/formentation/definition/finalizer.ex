@@ -70,12 +70,146 @@ defmodule Formentation.Definition.Finalizer do
     put_semantic(unsupported, :unsupported, index)
   end
 
+  defp collect_semantic(%Semantic.Collection{} = collection, index, parent_path) do
+    :ok = validate_child_template_path(collection, parent_path)
+    collect_collection(collection, index)
+  end
+
   defp collect_semantic(node, _index, _parent_path) do
     invariant!(
       :invalid_semantic_child,
-      "semantic children must be semantic object, field, or unsupported nodes",
+      "semantic children must be semantic object, field, unsupported, or collection nodes",
       node
     )
+  end
+
+  defp collect_collection(%Semantic.Collection{} = collection, index) do
+    with :ok <- validate_collection_constraints(collection),
+         {:ok, index} <- put_semantic(collection, :collection, index) do
+      collect_collection_item(collection, index)
+    end
+  end
+
+  defp collect_collection_item(%Semantic.Collection{item: %struct{} = item} = collection, index)
+       when struct in [Semantic.Object, Semantic.Field, Semantic.Unsupported, Semantic.Collection] do
+    item_path = TemplatePath.item(collection.template_path)
+
+    case item do
+      %{name: nil, template_path: ^item_path} ->
+        collect_item_node(item, index)
+
+      %{name: nil} ->
+        invariant!(
+          :invalid_semantic_template_path,
+          "collection item template path must be the collection path plus :item",
+          collection
+        )
+
+      _named ->
+        invariant!(
+          :invalid_collection_item_name,
+          "collection item template must be anonymous (name: nil)",
+          item
+        )
+    end
+  end
+
+  defp collect_collection_item(%Semantic.Collection{} = collection, _index) do
+    invariant!(
+      :invalid_semantic_child,
+      "collection item template must be a semantic object, field, unsupported, or collection node",
+      collection
+    )
+  end
+
+  defp collect_item_node(%Semantic.Object{} = item, index) do
+    with {:ok, index} <- put_semantic(item, :object, index),
+         do: collect_semantic_children(item, index)
+  end
+
+  defp collect_item_node(%Semantic.Field{} = item, index), do: put_semantic(item, :field, index)
+
+  defp collect_item_node(%Semantic.Unsupported{} = item, index),
+    do: put_semantic(item, :unsupported, index)
+
+  # Non-node items are rejected by collect_collection_item's fallback
+  # clause before dispatch reaches here.
+  defp collect_item_node(%Semantic.Collection{} = item, index),
+    do: collect_collection(item, index)
+
+  defp validate_collection_constraints(
+         %Semantic.Collection{constraints: constraints} = collection
+       )
+       when is_map(constraints) do
+    case Map.keys(constraints) -- [:min_items, :max_items] do
+      [] ->
+        validate_cardinality_values(collection)
+
+      _ ->
+        invariant!(
+          :invalid_collection_constraints,
+          "collection constraints are limited to :min_items and :max_items",
+          collection
+        )
+    end
+  end
+
+  # A non-map constraints value is a broken producer, not an actionable
+  # authoring mistake — deliberate invariant instead of a BadMapError.
+  defp validate_collection_constraints(%Semantic.Collection{} = collection) do
+    invariant!(
+      :invalid_collection_constraints,
+      "collection constraints must be a map limited to :min_items and :max_items",
+      collection
+    )
+  end
+
+  defp validate_cardinality_values(%Semantic.Collection{constraints: constraints} = collection) do
+    Enum.reduce_while([:min_items, :max_items], :ok, fn key, :ok ->
+      case Map.fetch(constraints, key) do
+        :error ->
+          {:cont, :ok}
+
+        {:ok, value} when is_integer(value) and value >= 0 ->
+          {:cont, :ok}
+
+        {:ok, value} ->
+          {:halt,
+           {:error,
+            cardinality_diagnostic(
+              "#{key} must be a non-negative integer, got: #{inspect(value)}",
+              collection,
+              key
+            )}}
+      end
+    end)
+    |> validate_cardinality_order(collection)
+  end
+
+  defp validate_cardinality_order(
+         :ok,
+         %Semantic.Collection{constraints: %{min_items: min, max_items: max}} = collection
+       )
+       when min > max,
+       do:
+         {:error,
+          cardinality_diagnostic(
+            "min_items (#{min}) exceeds max_items (#{max})",
+            collection,
+            :max_items
+          )}
+
+  defp validate_cardinality_order(:ok, _collection), do: :ok
+  defp validate_cardinality_order({:error, diagnostic}, _collection), do: {:error, diagnostic}
+
+  defp cardinality_diagnostic(message, collection, bound_key) do
+    %Diagnostic{
+      severity: :error,
+      code: :invalid_cardinality,
+      message: message,
+      origin: Keyword.get(collection.origins, bound_key) || origin(collection),
+      template_path: collection.template_path
+    }
   end
 
   defp collect_semantic_children(%Semantic.Object{} = object, index) do
@@ -206,11 +340,59 @@ defmodule Formentation.Definition.Finalizer do
     end
   end
 
+  defp walk_presentation(%Presentation.Collection{} = collection, semantic_index, seen) do
+    with :ok <- expect_reference(collection, :collection, semantic_index),
+         {:ok, seen} <- put_layout_id(collection, seen),
+         {:ok, seen} <- put_reference(collection, seen) do
+      walk_collection_item(collection, semantic_index, seen)
+    end
+  end
+
   defp walk_presentation(node, _semantic_index, _seen) do
     invariant!(
       :invalid_presentation_child,
-      "presentation children must be object, field, or group descriptors",
+      "presentation children must be object, field, group, or collection descriptors",
       node
+    )
+  end
+
+  defp walk_collection_item(%Presentation.Collection{item: nil}, _semantic_index, seen),
+    do: {:ok, seen}
+
+  # The item slot must reference the collection's OWN item template —
+  # kind and global uniqueness checks alone would let cross-wired or
+  # group-wrapped item descriptors finalize.
+  defp walk_collection_item(
+         %Presentation.Collection{item: item} = collection,
+         semantic_index,
+         seen
+       ) do
+    %{node: %Semantic.Collection{item: semantic_item}} =
+      Map.fetch!(semantic_index.by_id, collection.semantic_id)
+
+    case item do
+      %struct{semantic_id: semantic_id}
+      when struct in [Presentation.Object, Presentation.Field, Presentation.Collection] ->
+        if semantic_id == semantic_item.id do
+          walk_presentation(item, semantic_index, seen)
+        else
+          foreign_item_reference!(collection)
+        end
+
+      %Presentation.Group{} ->
+        foreign_item_reference!(collection)
+
+      _non_descriptor ->
+        walk_presentation(item, semantic_index, seen)
+    end
+  end
+
+  @spec foreign_item_reference!(Presentation.Collection.t()) :: no_return()
+  defp foreign_item_reference!(collection) do
+    invariant!(
+      :invalid_collection_item_reference,
+      "collection item descriptor must reference the collection's own item template",
+      collection
     )
   end
 

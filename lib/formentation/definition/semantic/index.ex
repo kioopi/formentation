@@ -5,7 +5,7 @@ defmodule Formentation.Definition.Semantic.Index do
 
   defstruct by_id: %{}, by_template_path: %{}
 
-  @type kind :: :object | :field | :unsupported
+  @type kind :: :object | :field | :unsupported | :collection
   @type entry :: %{kind: kind(), node: term()}
 
   @type t :: %__MODULE__{

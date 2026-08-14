@@ -82,13 +82,35 @@ defmodule Formentation.Form do
   validated when the definition carries a validation plan.
   `defaults: :apply` fills declared defaults into absent keys — defaults
   never overwrite provided values and never apply again on transitions.
+
+  Definitions containing collections are rejected until runtime
+  collection support lands (MB-T4).
   """
   @spec new(Definition.t(), map(), keyword()) :: t()
   def new(%Definition{} = definition, data \\ %{}, opts \\ []) when is_map(data) do
+    ensure_runtime_supported!(definition)
     original = initial_data(definition, data, Keyword.get(opts, :defaults))
 
     %__MODULE__{definition: definition, original: original, candidate: {:ok, original}}
     |> revalidate()
+  end
+
+  # Temporary MB-S1 guard: collection definitions compile (MB-T1/T2/T3)
+  # but have no runtime occurrence model until MB-T4/T5, so fail loudly
+  # instead of via an incidental crash on the anonymous item template.
+  # Walks the semantic tree, not the index, so hand-built definitions
+  # without an index cannot bypass it. Remove with MB-T4.
+  defp ensure_runtime_supported!(%Definition{} = definition) do
+    case Formentation.Definition.Semantic.collections(definition) do
+      [] ->
+        :ok
+
+      [%{node: %{id: id}} | _rest] ->
+        raise ArgumentError,
+              "definition contains a collection (#{inspect(id)}); " <>
+                "collection runtime support arrives with MB-T4 — " <>
+                "Formentation.Form cannot materialize collection instances yet"
+    end
   end
 
   @doc """

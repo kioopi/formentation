@@ -785,4 +785,43 @@ defmodule Formentation.FormTest do
       assert Form.candidate(form) == {:ok, %{"revision" => 4, "location" => "Hall B"}}
     end
   end
+
+  describe "collection definitions (MB-S1 intermediate state)" do
+    test "Form.new/3 rejects compiled collection definitions deliberately" do
+      {:ok, definition, []} =
+        Formentation.compile(
+          %{
+            kind: :object,
+            properties: [
+              {"measurements", %{kind: :collection, item: %{kind: :number}}}
+            ]
+          },
+          adapter: Formentation.Source.Map
+        )
+
+      assert_raise ArgumentError, ~r/MB-T4/, fn ->
+        Form.new(definition)
+      end
+    end
+
+    test "the guard also covers hand-built definitions without a semantic index" do
+      alias Formentation.Definition.Semantic
+      alias Formentation.TemplatePath
+
+      path = TemplatePath.new!(["measurements"])
+      item = Semantic.Field.new(nil, TemplatePath.item(path), :number)
+      collection = Semantic.Collection.new("measurements", path, item)
+      root = Semantic.Object.new(nil, TemplatePath.new!([]), [collection])
+
+      definition = %Formentation.Definition{
+        semantic: root,
+        semantic_index: nil,
+        presentation: nil
+      }
+
+      assert_raise ArgumentError, ~r/MB-T4/, fn ->
+        Form.new(definition)
+      end
+    end
+  end
 end

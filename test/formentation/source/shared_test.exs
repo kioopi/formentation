@@ -126,6 +126,32 @@ defmodule Formentation.Source.SharedTest do
     end
   end
 
+  describe "enter_item/1" do
+    test "descends into a map collection item: depth, :item template path, :item source path" do
+      ctx = Shared.context(Formentation.Source.Map, [])
+      item = ctx |> Context.enter_property("measurements") |> Context.enter_item()
+
+      assert item.depth == 2
+      assert item.template_path == TemplatePath.new!(["measurements", :item])
+      assert item.source_path == [:properties, "measurements", :item]
+      assert item.nodes_left == ctx.nodes_left
+      assert item.diagnostics == ctx.diagnostics
+    end
+
+    test "descends into a json schema items declaration" do
+      ctx = Shared.context(Formentation.Source.JSONSchema, [])
+      item = ctx |> Context.enter_property("measurements") |> Context.enter_item()
+
+      assert item.template_path == TemplatePath.new!(["measurements", :item])
+      assert item.source_path == ["properties", "measurements", "items"]
+    end
+
+    test "each dialect owns its item source segment" do
+      assert Formentation.Source.Map.item_segment() == [:item]
+      assert Formentation.Source.JSONSchema.item_segment() == ["items"]
+    end
+  end
+
   describe "add_diagnostic/2" do
     test "prepends, so accumulation is reverse order" do
       first = %Diagnostic{

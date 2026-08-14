@@ -37,6 +37,16 @@ defmodule Formentation.FixtureTrackingTest do
     assert tracks?(FormentationDemo.PumpInspection, "pump_inspection/ui.json")
   end
 
+  test "the measurements fixture tracks both of its JSON documents" do
+    assert tracks?(Formentation.Fixtures.Measurements, "measurements/schema.json")
+    assert tracks?(Formentation.Fixtures.Measurements, "measurements/ui.json")
+  end
+
+  test "the addresses fixture tracks both of its JSON documents" do
+    assert tracks?(Formentation.Fixtures.Addresses, "addresses/schema.json")
+    assert tracks?(Formentation.Fixtures.Addresses, "addresses/ui.json")
+  end
+
   test "the embedded declarations still decode to the documents on disk" do
     on_disk =
       "test/support/fixtures/annotations/schema.json"
@@ -70,6 +80,12 @@ defmodule Formentation.FixtureTrackingTest do
     @pump_inspection_source File.read!("demo/formentation_demo/pump_inspection.ex")
     @external_resource "demo/formentation_demo/pump_inspection.ex"
 
+    @measurements_source File.read!("test/support/fixtures/measurements.ex")
+    @external_resource "test/support/fixtures/measurements.ex"
+
+    @addresses_source File.read!("test/support/fixtures/addresses.ex")
+    @external_resource "test/support/fixtures/addresses.ex"
+
     defp file_read_outside_attribute_assignment?(source) do
       source
       |> String.split("\n")
@@ -89,6 +105,14 @@ defmodule Formentation.FixtureTrackingTest do
 
     test "the demo's pump-inspection declaration has no runtime File.read!" do
       refute file_read_outside_attribute_assignment?(@pump_inspection_source)
+    end
+
+    test "the measurements fixture has no runtime File.read!" do
+      refute file_read_outside_attribute_assignment?(@measurements_source)
+    end
+
+    test "the addresses fixture has no runtime File.read!" do
+      refute file_read_outside_attribute_assignment?(@addresses_source)
     end
   end
 end

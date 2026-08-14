@@ -68,7 +68,23 @@ defmodule Formentation.Info.Layout do
           }
   end
 
-  @type descriptor :: Object.t() | Field.t() | Group.t()
+  defmodule Collection do
+    @moduledoc "A collection layout boundary owning its item-template descriptor."
+
+    @enforce_keys [:id, :template_path, :label, :help, :origins, :item]
+    defstruct [:id, :template_path, :label, :help, :origins, :item]
+
+    @type t :: %__MODULE__{
+            id: String.t(),
+            template_path: TemplatePath.t(),
+            label: String.t() | nil,
+            help: String.t() | nil,
+            origins: [{atom(), Origin.t()}],
+            item: Formentation.Info.Layout.descriptor() | nil
+          }
+  end
+
+  @type descriptor :: Object.t() | Field.t() | Group.t() | Collection.t()
   @type lookup_result :: {:ok, descriptor()} | :not_found | :unsupported
 
   @spec root(Definition.t()) :: Object.t()
@@ -96,6 +112,9 @@ defmodule Formentation.Info.Layout do
 
   defp descriptor(%Semantic.Entry{kind: :field} = entry, definition),
     do: definition |> layout_by_semantic_id!(entry.node.id) |> field(definition)
+
+  defp descriptor(%Semantic.Entry{kind: :collection} = entry, definition),
+    do: definition |> layout_by_semantic_id!(entry.node.id) |> collection(definition)
 
   defp object(%Layout.Object{} = object, definition) do
     entry = semantic_entry_by_id!(definition, object.semantic_id, :object)
@@ -129,6 +148,22 @@ defmodule Formentation.Info.Layout do
   end
 
   defp layout_descriptor(%Layout.Field{} = field, definition), do: field(field, definition)
+
+  defp layout_descriptor(%Layout.Collection{} = collection, definition),
+    do: collection(collection, definition)
+
+  defp collection(%Layout.Collection{} = collection, definition) do
+    entry = semantic_entry_by_id!(definition, collection.semantic_id, :collection)
+
+    %Collection{
+      id: collection.id,
+      template_path: entry.template_path,
+      label: collection.label,
+      help: collection.help,
+      origins: collection.origins,
+      item: collection.item && layout_descriptor(collection.item, definition)
+    }
+  end
 
   defp field(%Layout.Field{} = field, definition) do
     entry = semantic_entry_by_id!(definition, field.semantic_id, :field)
@@ -201,6 +236,17 @@ defmodule Formentation.Info.Layout do
     do: field
 
   defp find_layout_by_semantic_id(%Layout.Field{}, _semantic_id), do: nil
+
+  defp find_layout_by_semantic_id(
+         %Layout.Collection{semantic_id: semantic_id} = collection,
+         semantic_id
+       ),
+       do: collection
+
+  defp find_layout_by_semantic_id(%Layout.Collection{item: nil}, _semantic_id), do: nil
+
+  defp find_layout_by_semantic_id(%Layout.Collection{item: item}, semantic_id),
+    do: find_layout_by_semantic_id(item, semantic_id)
 
   defp find_layout_child_by_semantic_id(children, semantic_id) do
     Enum.find_value(children, &find_layout_by_semantic_id(&1, semantic_id))

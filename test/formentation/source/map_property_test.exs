@@ -166,7 +166,11 @@ defmodule Formentation.Source.MapPropertyTest do
     :min_length,
     :max_length,
     :one_of,
-    :examples
+    :examples,
+    :collection,
+    :item,
+    :min_items,
+    :max_items
   ]
 
   defp safe_atom, do: StreamData.member_of(@safe_atoms)
@@ -302,9 +306,65 @@ defmodule Formentation.Source.MapPropertyTest do
   defp almost_valid_property_spec(depth) do
     StreamData.frequency([
       {3, almost_valid_field_spec()},
-      {1, almost_valid_object_spec(depth - 1)}
+      {1, almost_valid_object_spec(depth - 1)},
+      {1, almost_valid_collection_spec(depth - 1)}
     ])
   end
+
+  # Collections join the totality battery: valid specs form often enough
+  # to reach item recursion; corruption covers every degradation row —
+  # missing/non-map items, unsupported and nested item kinds, malformed
+  # bounds, and every item-level `required` spelling.
+  defp almost_valid_item_spec(0), do: almost_valid_field_spec()
+
+  defp almost_valid_item_spec(depth) do
+    StreamData.frequency([
+      {4, almost_valid_field_spec()},
+      {2, almost_valid_object_spec(depth - 1)},
+      {1, StreamData.constant(%{kind: :datetime})},
+      {1, almost_valid_collection_spec(depth - 1)},
+      {1, StreamData.constant(nil)},
+      {1, StreamData.string(:alphanumeric, max_length: 5)}
+    ])
+  end
+
+  defp almost_valid_item_required do
+    StreamData.frequency([
+      {6, StreamData.constant(:absent)},
+      {1, StreamData.boolean()},
+      {1, StreamData.constant("yes")},
+      {1, StreamData.list_of(StreamData.string(:alphanumeric, max_length: 4), max_length: 2)}
+    ])
+  end
+
+  defp almost_valid_collection_spec(depth) do
+    gen all(
+          item <- almost_valid_item_spec(depth),
+          min_items <- StreamData.one_of([StreamData.constant(:absent), almost_valid_bound()]),
+          max_items <- StreamData.one_of([StreamData.constant(:absent), almost_valid_bound()]),
+          required <- almost_valid_item_required(),
+          drop_item? <-
+            StreamData.frequency([
+              {6, StreamData.constant(false)},
+              {1, StreamData.constant(true)}
+            ])
+        ) do
+      item =
+        case {item, required} do
+          {item, _required} when not is_map(item) -> item
+          {item, :absent} -> item
+          {item, required} -> Map.put(item, :required, required)
+        end
+
+      %{kind: :collection}
+      |> put_unless(:item, item, drop_item?)
+      |> put_unless(:min_items, min_items, min_items == :absent)
+      |> put_unless(:max_items, max_items, max_items == :absent)
+    end
+  end
+
+  defp put_unless(spec, _key, _value, true), do: spec
+  defp put_unless(spec, key, value, false), do: Map.put(spec, key, value)
 
   defp almost_valid_property_entry(depth) do
     StreamData.frequency([
@@ -415,7 +475,9 @@ defmodule Formentation.Source.MapPropertyTest do
         {"count", %{kind: :integer, min: 0, max: 10, default: 1}},
         {"weight", %{kind: :number, default: 1.5}},
         {"active", %{kind: :boolean, default: true}},
-        {"nested", %{kind: :object, properties: [{"leaf", %{kind: :string}}]}}
+        {"nested", %{kind: :object, properties: [{"leaf", %{kind: :string}}]}},
+        {"measurements",
+         %{kind: :collection, item: %{kind: :number}, min_items: 1, max_items: 10}}
       ],
       groups: [%{id: "g", title: "Group", fields: ["name", "count"]}]
     }
@@ -453,7 +515,34 @@ defmodule Formentation.Source.MapPropertyTest do
         properties: [{"a", %{kind: :string}}, {"b", %{kind: :string}}],
         groups: [%{id: "g", fields: ["a"]}, %{id: "g", fields: ["b"]}]
       },
-      %{kind: :object, properties: [{"_persistent_id", %{kind: :string}}]}
+      %{kind: :object, properties: [{"_persistent_id", %{kind: :string}}]},
+      %{kind: :object, properties: [{"m", %{kind: :collection}}]},
+      %{kind: :object, properties: [{"m", %{kind: :collection, item: "x"}}]},
+      %{
+        kind: :object,
+        properties: [{"m", %{kind: :collection, item: %{kind: :number}, min_items: -1}}]
+      },
+      %{
+        kind: :object,
+        properties: [
+          {"m", %{kind: :collection, item: %{kind: :number}, min_items: 3, max_items: 1}}
+        ]
+      },
+      %{
+        kind: :object,
+        properties: [{"m", %{kind: :collection, item: %{kind: :string, required: "yes"}}}]
+      },
+      %{
+        kind: :object,
+        properties: [{"m", %{kind: :collection, item: %{kind: :string, required: true}}}]
+      },
+      %{
+        kind: :object,
+        properties: [
+          {"m", %{kind: :collection, item: %{kind: :collection, item: %{kind: :number}}}}
+        ]
+      },
+      %{kind: :object, properties: [{"m", %{kind: :collection, item: %{kind: :datetime}}}]}
     ]
 
     Formentation.compile(valid, adapter: Formentation.Source.Map)
