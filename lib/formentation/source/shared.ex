@@ -15,6 +15,9 @@ defmodule Formentation.Source.Shared do
 
     @doc "This adapter's source-path segment for a named object property."
     @callback property_segment(name :: String.t()) :: list()
+
+    @doc "This adapter's source-path segments for a collection item declaration."
+    @callback item_segment() :: list()
   end
 
   defmodule Context do
@@ -58,6 +61,15 @@ defmodule Formentation.Source.Shared do
         | depth: ctx.depth + 1,
           template_path: TemplatePath.child(ctx.template_path, name),
           source_path: ctx.source_path ++ ctx.dialect.property_segment(name)
+      }
+    end
+
+    def enter_item(%__MODULE__{} = ctx) do
+      %{
+        ctx
+        | depth: ctx.depth + 1,
+          template_path: TemplatePath.item(ctx.template_path),
+          source_path: ctx.source_path ++ ctx.dialect.item_segment()
       }
     end
 
@@ -151,6 +163,9 @@ defmodule Formentation.Source.Shared do
   def presentation_reference_id(%Presentation.Object{semantic_id: semantic_id}), do: semantic_id
   def presentation_reference_id(%Presentation.Group{}), do: nil
 
+  def presentation_reference_id(%Presentation.Collection{semantic_id: semantic_id}),
+    do: semantic_id
+
   def presentation_children_by_name(children, semantic_children) do
     semantic_name_by_id = Map.new(semantic_children, &{&1.id, &1.name})
 
@@ -184,6 +199,7 @@ defmodule Formentation.Source.Shared do
   end
 
   defp children_of(%Semantic.Object{children: children}), do: children
+  defp children_of(%Semantic.Collection{item: item}), do: [item]
   defp children_of(_leaf), do: []
 
   defp maybe_reserved_name(%{name: name} = node, acc) when is_binary(name) do

@@ -60,6 +60,10 @@ defmodule Formentation.Source.Map do
   @impl Shared.Dialect
   def property_segment(name), do: [:properties, name]
 
+  @doc false
+  @impl Shared.Dialect
+  def item_segment, do: [:item]
+
   defp compile_object(%{kind: :object} = declaration, name, ctx) do
     with :ok <- Shared.Context.check_depth(ctx),
          {:ok, ctx} <- Shared.Context.take_budget(ctx),

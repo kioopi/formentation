@@ -85,6 +85,10 @@ defmodule Formentation.Source.JSONSchema do
   @impl Shared.Dialect
   def property_segment(name), do: ["properties", name]
 
+  @doc false
+  @impl Shared.Dialect
+  def item_segment, do: ["items"]
+
   defp with_validation(%Shared.Build{} = build, schema) do
     case Validator.build_instance_validator(schema) do
       {:ok, artifact} ->
