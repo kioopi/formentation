@@ -116,6 +116,18 @@ defmodule Formentation.Definition.CollectionTest do
       assert [%Semantic.Entry{name: "street"}] = Semantic.fields(object)
       assert [%Semantic.Entry{kind: :unsupported, name: "photo"}] = Semantic.unsupported(object)
     end
+
+    test "an anonymous unsupported item template is discoverable" do
+      path = TemplatePath.new!(["attachments"])
+      item = Semantic.Unsupported.new(nil, TemplatePath.item(path))
+      definition = definition_with(Semantic.Collection.new("attachments", path, item))
+
+      assert [%Semantic.Entry{kind: :unsupported, name: nil} = entry] =
+               Semantic.unsupported(definition)
+
+      assert entry.template_path.segments == ["attachments", :item]
+      assert Semantic.fields(definition) == []
+    end
   end
 
   describe "Presentation.Collection" do
