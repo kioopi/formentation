@@ -130,6 +130,22 @@ defmodule Formentation.Info do
   @doc """
   Returns the static item-template node of the collection at an instance path,
   or `nil` when that path does not name a collection.
+
+  No concrete index is ever stored in a definition — `["measurements", 0]`
+  names the item template itself, not a collection, so it answers `nil` here.
+
+      iex> {:ok, definition, []} =
+      ...>   Formentation.compile(
+      ...>     %{kind: :object,
+      ...>       properties: [
+      ...>         {"measurements", %{kind: :collection, item: %{kind: :number}}}
+      ...>       ]},
+      ...>     adapter: Formentation.Source.Map
+      ...>   )
+      iex> Formentation.Info.item_template(definition, ["measurements"]).value_type
+      :number
+      iex> Formentation.Info.item_template(definition, ["measurements", 0])
+      nil
   """
   @spec item_template(Definition.t(), [InstancePath.segment()]) ::
           Semantic.Object.t()
@@ -148,6 +164,20 @@ defmodule Formentation.Info do
   Returns compiled field or collection constraints at an instance path.
 
   Nodes without constraints and missing paths return `%{}`.
+
+      iex> {:ok, definition, []} =
+      ...>   Formentation.compile(
+      ...>     %{kind: :object,
+      ...>       properties: [
+      ...>         {"measurements",
+      ...>          %{kind: :collection, item: %{kind: :number}, min_items: 1}}
+      ...>       ]},
+      ...>     adapter: Formentation.Source.Map
+      ...>   )
+      iex> Formentation.Info.constraints(definition, ["measurements"])
+      %{min_items: 1}
+      iex> Formentation.Info.constraints(definition, ["missing"])
+      %{}
   """
   @spec constraints(Definition.t(), [InstancePath.segment()]) :: map()
   def constraints(%Definition{} = definition, segments) when is_list(segments) do
