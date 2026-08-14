@@ -410,7 +410,23 @@ flowchart TD
     D12 --> T13
     T12 --> T13
     T13 --> DONE
+
+    classDef done fill:#1b5e20,stroke:#4caf50,color:#ffffff
+    classDef inprogress fill:#e65100,stroke:#ffb74d,color:#ffffff
+    classDef ready fill:#0d47a1,stroke:#64b5f6,color:#ffffff
+    classDef blocked fill:#455a64,stroke:#78909c,color:#eceff1
+
+    class A,D1 done
+    class D2 inprogress
+    class T1,D4,D8 ready
+    class T2,T3,D3,T4,T5,G1,D5,T6,T7,G2,D6,D7,T8,G3,D9,D10,T9,T10,D11,T11,G4,D12,T12,T13,DONE blocked
 ```
+
+Node colors track current execution state: **green** = done (decisions
+recorded, tasks implemented, gates passed), **orange** = in progress,
+**blue** = ready (every predecessor is done, work has not started),
+**grey** = blocked on a predecessor. When a node's state changes, move its ID
+between the `class` lines at the bottom of the graph.
 
 The graph makes one important sequencing claim explicit: **stable identity does
 not block proving static collection semantics and indexed round-tripping, but it
