@@ -25,7 +25,9 @@ defmodule Formentation.Definition.Semantic.Collection do
   @doc false
   @spec new(String.t() | nil, TemplatePath.t(), item(), keyword()) :: t()
   def new(name, %TemplatePath{} = template_path, item, opts \\ [])
-      when is_binary(name) or is_nil(name) do
+      when (is_binary(name) or is_nil(name)) and
+             (is_struct(item, Semantic.Object) or is_struct(item, Semantic.Field) or
+                is_struct(item, Semantic.Unsupported) or is_struct(item, __MODULE__)) do
     %__MODULE__{
       id: Keyword.get(opts, :id, NodeId.from_path(template_path)),
       name: name,

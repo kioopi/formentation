@@ -39,6 +39,8 @@ defmodule Formentation.Definition.CollectionFinalizerTest do
     Presentation.Collection.new(item.id, presentation_item(item.item))
   end
 
+  defp presentation_item(_non_node), do: nil
+
   defp finalize(collection) do
     presentation =
       root_presentation([
@@ -143,6 +145,15 @@ defmodule Formentation.Definition.CollectionFinalizerTest do
     end
   end
 
+  test "a non-map constraints value raises the deliberate invariant, not BadMapError" do
+    # Bypasses the constructor the way a broken producer could.
+    coll = %Semantic.Collection{collection() | constraints: nil}
+
+    assert_raise ArgumentError, ~r/invalid_collection_constraints/, fn ->
+      finalize(coll)
+    end
+  end
+
   test "a non-descriptor in the presentation item slot raises" do
     coll = collection()
 
@@ -150,6 +161,57 @@ defmodule Formentation.Definition.CollectionFinalizerTest do
       root_presentation([Presentation.Collection.new(coll.id, :not_a_descriptor)])
 
     assert_raise ArgumentError, ~r/invalid_presentation_child/, fn ->
+      Finalizer.finalize(semantic_root(coll), presentation)
+    end
+  end
+
+  test "a non-node item template raises the accurate invariant" do
+    # Bypasses the constructor guard the way a broken adapter could.
+    coll = %Semantic.Collection{collection() | item: nil}
+
+    assert_raise ArgumentError, ~r/invalid_semantic_child/, fn ->
+      finalize(coll)
+    end
+  end
+
+  test "a collection's item descriptor must reference its own item template" do
+    a = collection()
+
+    b_path = TemplatePath.new!(["extras"])
+
+    b =
+      Semantic.Collection.new(
+        "extras",
+        b_path,
+        Semantic.Field.new(nil, TemplatePath.item(b_path), :number)
+      )
+
+    root = Semantic.Object.new(nil, TemplatePath.new!([]), [a, b])
+
+    # cross-wired: each collection's presentation carries the OTHER's item
+    presentation =
+      root_presentation([
+        Presentation.Collection.new(a.id, Presentation.Field.new(b.item.id)),
+        Presentation.Collection.new(b.id, Presentation.Field.new(a.item.id))
+      ])
+
+    assert_raise ArgumentError, ~r/invalid_collection_item_reference/, fn ->
+      Finalizer.finalize(root, presentation)
+    end
+  end
+
+  test "a group cannot stand in for the item descriptor" do
+    coll = collection()
+
+    presentation =
+      root_presentation([
+        Presentation.Collection.new(
+          coll.id,
+          Presentation.Group.new("wrapper", [Presentation.Field.new(coll.item.id)])
+        )
+      ])
+
+    assert_raise ArgumentError, ~r/invalid_collection_item_reference/, fn ->
       Finalizer.finalize(semantic_root(coll), presentation)
     end
   end

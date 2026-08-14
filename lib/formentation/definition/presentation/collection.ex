@@ -4,7 +4,9 @@ defmodule Formentation.Definition.Presentation.Collection do
 
   It occupies exactly one parent layout position and owns the presentation
   descriptor of the single item template. The `item` is `nil` when that
-  template is unsupported.
+  template is unsupported, and must reference the collection's own item
+  template — a group cannot stand in for it, so `item` is never a
+  `Presentation.Group`.
   """
 
   alias Formentation.Definition.Presentation
@@ -13,8 +15,12 @@ defmodule Formentation.Definition.Presentation.Collection do
   @enforce_keys [:id, :semantic_id]
   defstruct [:id, :semantic_id, :label, :help, :item, origins: []]
 
+  @typedoc "The item template's presentation descriptor."
+  @type item ::
+          Presentation.Object.t() | Presentation.Field.t() | Presentation.Collection.t() | nil
+
   @doc false
-  @spec new(String.t(), Presentation.descriptor() | nil, keyword()) :: t()
+  @spec new(String.t(), item(), keyword()) :: t()
   def new(semantic_id, item, opts \\ []) when is_binary(semantic_id) do
     %__MODULE__{
       id: Keyword.get(opts, :id, Presentation.collection_id(semantic_id)),
@@ -31,7 +37,7 @@ defmodule Formentation.Definition.Presentation.Collection do
           semantic_id: String.t(),
           label: String.t() | nil,
           help: String.t() | nil,
-          item: Presentation.descriptor() | nil,
+          item: item(),
           origins: [{atom(), Origin.t()}]
         }
 end

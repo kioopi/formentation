@@ -38,6 +38,16 @@ defmodule Formentation.Definition.CollectionTest do
       assert item.id == "/attachments/~3"
     end
 
+    test "the item argument must be a semantic node" do
+      path = TemplatePath.new!(["measurements"])
+
+      for bad <- [nil, "spec", %{kind: :number}, [kind: :number]] do
+        assert_raise FunctionClauseError, fn ->
+          Semantic.Collection.new("measurements", path, bad)
+        end
+      end
+    end
+
     test "ordinary named constructors still work" do
       path = TemplatePath.new!(["name"])
       assert %Semantic.Field{name: "name"} = Semantic.Field.new("name", path, :string)
