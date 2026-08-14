@@ -117,4 +117,28 @@ defmodule Formentation.Definition.CollectionTest do
       assert [%Semantic.Entry{kind: :unsupported, name: "photo"}] = Semantic.unsupported(object)
     end
   end
+
+  describe "Presentation.Collection" do
+    alias Formentation.Definition.Presentation
+
+    test "builds a descriptor owning one item descriptor slot" do
+      item = Presentation.Field.new("/measurements/~3")
+
+      collection =
+        Presentation.Collection.new("/measurements", item,
+          label: "Measurements",
+          help: "One per probe"
+        )
+
+      assert collection.id == "layout:collection:/measurements"
+      assert collection.semantic_id == "/measurements"
+      assert collection.item == item
+      assert collection.label == "Measurements"
+    end
+
+    test "an unsupported item template leaves the item slot nil" do
+      collection = Presentation.Collection.new("/attachments", nil, label: "Attachments")
+      assert collection.item == nil
+    end
+  end
 end

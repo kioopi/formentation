@@ -7,9 +7,14 @@ defmodule Formentation.Definition.Presentation do
   decode participation.
   """
 
-  alias Formentation.Definition.Presentation.{Field, Group, Object}
+  alias Formentation.Definition.Presentation.{Collection, Field, Group, Object}
 
-  @type descriptor :: Object.t() | Field.t() | Group.t()
+  @type descriptor :: Object.t() | Field.t() | Group.t() | Collection.t()
+
+  @doc false
+  @spec collection_id(String.t()) :: String.t()
+  def collection_id(semantic_id) when is_binary(semantic_id),
+    do: "layout:collection:" <> semantic_id
 
   @doc false
   @spec object_id(String.t()) :: String.t()
