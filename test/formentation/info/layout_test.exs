@@ -316,6 +316,63 @@ defmodule Formentation.Info.LayoutTest do
                  end
   end
 
+  describe "collection descriptors" do
+    alias Formentation.Definition.Finalizer
+    alias Formentation.NodeId
+
+    defp collection_definition(item_kind) do
+      path = TemplatePath.new!(["measurements"])
+      item_path = TemplatePath.item(path)
+
+      {item, item_descriptor} =
+        case item_kind do
+          :field ->
+            item = Semantic.Field.new(nil, item_path, :number)
+            {item, LayoutStorage.Field.new(item.id, label: "Value")}
+
+          :unsupported ->
+            {Semantic.Unsupported.new(nil, item_path), nil}
+        end
+
+      collection = Semantic.Collection.new("measurements", path, item)
+      root = Semantic.Object.new(nil, TemplatePath.new!([]), [collection])
+
+      presentation =
+        LayoutStorage.Object.new(NodeId.from_path(TemplatePath.new!([])), [
+          LayoutStorage.Collection.new(collection.id, item_descriptor, label: "Measurements")
+        ])
+
+      {:ok, definition} = Finalizer.finalize(root, presentation)
+      definition
+    end
+
+    test "root traversal yields a typed collection descriptor with its item" do
+      root = :field |> collection_definition() |> Info.presentation_root()
+
+      assert [%Layout.Collection{} = descriptor] = root.children
+      assert descriptor.template_path.segments == ["measurements"]
+      assert descriptor.label == "Measurements"
+      assert %Layout.Field{label: "Value"} = descriptor.item
+      assert descriptor.item.template_path.segments == ["measurements", :item]
+    end
+
+    test "at/2 answers at the collection path and at a concrete item path" do
+      definition = collection_definition(:field)
+
+      assert {:ok, %Layout.Collection{}} = Info.presentation_at(definition, ["measurements"])
+      assert {:ok, %Layout.Field{}} = Info.presentation_at(definition, ["measurements", 0])
+    end
+
+    test "an unsupported item template answers :unsupported at item paths" do
+      definition = collection_definition(:unsupported)
+
+      assert {:ok, %Layout.Collection{item: nil}} =
+               Info.presentation_at(definition, ["measurements"])
+
+      assert :unsupported = Info.presentation_at(definition, ["measurements", 0])
+    end
+  end
+
   defp collect_refs(%Layout.Object{template_path: path, children: children}) do
     [{:object, path.segments} | Enum.flat_map(children, &collect_refs/1)]
   end
