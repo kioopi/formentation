@@ -10,8 +10,10 @@ status: current
 
 # Definition
 
-*As of 2026-08-11 (native semantic/presentation storage for the built-in
-sources and native-backed semantic/presentation query seams, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; module paths refreshed for the lib-tree restructure, [[18-decisions#D-047 — The lib tree is restructured to state the north-star architecture|D-047]]).*
+*As of 2026-08-14 (static collection vocabulary, MB-S1:
+[[18-decisions#D-053 — Collections are a dedicated semantic node owning one item template|D-053]],
+[[18-decisions#D-055 — `format_version` bumps on any stored-representation vocabulary change|D-055]];
+previously: native semantic/presentation storage, [[18-decisions#D-033 — Phase 1 layout covers each supported occurrence exactly once|D-033]]; lib-tree restructure, [[18-decisions#D-047 — The lib tree is restructured to state the north-star architecture|D-047]]).*
 
 `Formentation.Definition` is the compiler's product and the system's
 common language: an immutable, source-independent tree of semantic
@@ -24,7 +26,7 @@ produced.
 
 ```elixir
 %Formentation.Definition{
-  format_version: 3,
+  format_version: 4,
   semantic: %Formentation.Definition.Semantic.Object{...},
   semantic_index: %Formentation.Definition.Semantic.Index{...},
   presentation: %Formentation.Definition.Presentation.Object{...},
@@ -64,6 +66,20 @@ no authoritative instance validation (the map source, currently).
 | `Semantic.Object` | `id`, `template_path` | `name`, `required?`, `children`, `origins` |
 | `Semantic.Field` | `id`, `name`, `template_path`, `value_type` | `role`, `required?`, `read_only?`, `constraints`, `options`, `default`, `examples`, `origins` |
 | `Semantic.Unsupported` | `id`, `name`, `template_path` | `required?`, `origins` |
+| `Semantic.Collection` | `id`, `name`, `template_path`, `item` | `required?`, `constraints`, `origins` |
+
+A `Semantic.Collection`
+([[18-decisions#D-053 — Collections are a dedicated semantic node owning one item template|D-053]])
+owns exactly one anonymous item-template child (`name: nil`) at
+`template_path ++ [:item]`; the item is an ordinary semantic node —
+field, object, unsupported, or (in the recursive model) another
+collection. Parent-key requiredness (`required?`) and cardinality
+(`:min_items`/`:max_items` in `constraints`) are independent axes. A
+`nil` node name is legal *only* in the item-template position; the
+finalizer still rejects anonymous ordinary object children. Adding the
+two collection structs bumped `format_version` to 4 under the
+[[18-decisions#D-055 — `format_version` bumps on any stored-representation vocabulary change|D-055]]
+rule: any stored node/field-vocabulary change bumps it.
 
 `Formentation.Definition.Semantic` now reads `Definition.semantic` when it exists.
 Static entries carry only their `TemplatePath`; concrete runtime paths are
@@ -77,6 +93,13 @@ semantic node to an `InstancePath` for a definition and data instance.
 | `Presentation.Object` | `id`, `semantic_id` | `label`, `help`, `children`, `origins` |
 | `Presentation.Field` | `id`, `semantic_id` | `label`, `help`, `widget`, `hidden?`, `origins` |
 | `Presentation.Group` | `id` | `label`, `help`, `children`, `origins` |
+| `Presentation.Collection` | `id`, `semantic_id` | `label`, `help`, `item`, `origins` |
+
+A `Presentation.Collection` occupies exactly one position in the parent
+layout order and holds the item template's descriptor in its `item`
+slot (`nil` when the item template is unsupported). The finalizer
+enforces that the item descriptor references the collection's *own*
+item template — a group cannot stand in for it.
 
 `Formentation.Info.presentation_root/1` and
 `Formentation.Info.presentation_at/2` now read `Definition.presentation` when
@@ -98,13 +121,20 @@ descriptors under `Formentation.Info.Layout`:
   origins.
 - `Group` — presentation-only grouping, carrying layout identity and
   children but no semantic path.
+- `Collection` — collection layout boundary, carrying a `TemplatePath`,
+  label/help/origins, and its single item-template descriptor in `item`
+  (`nil` for an unsupported item template).
 
 Presentation groups never add template-path segments. A nested object
 `details` contributes `["details"]`; a presentation group such as
 `technical` inside it does not, so a field remains
 `["details", "width"]`, never `["details", "technical", "width"]`.
-`presentation_at/2` accepts only semantic root/object/field paths and
-distinguishes `:not_found` from `:unsupported`.
+`presentation_at/2` accepts semantic root/object/field/collection paths
+and distinguishes `:not_found` from `:unsupported`. A concrete item
+instance path such as `["measurements", 0]` resolves to the *item
+template's* descriptor: any non-negative integer segment under a
+collection selects its single `:item` child — no concrete index is ever
+stored in a definition.
 
 ## Template nodes and runtime occurrences
 
@@ -118,9 +148,17 @@ changing static descriptors or the semantic index.
 ## Unsupported nodes are a preserve-only capability
 
 `Semantic.Unsupported` records a declared construct the compiler cannot
-interpret — an array, a `$ref`, an unrecognised map-source `:kind` —
-without discarding it: the node keeps its place in the tree, and its
-value survives materialization untouched (D-009). The struct carries
+interpret — an array outside the supported subset (no `items`, boolean
+`items`, `prefixItems`, a nested collection), a `$ref`, an unrecognised
+map-source `:kind` — without discarding it: the node keeps its place in
+the tree, and its value survives materialization untouched (D-009).
+Homogeneous `minItems`/`maxItems` arrays compile as supported
+collections since MB-S1; the
+[[18-decisions#D-054 — Collection source vocabularies and the degradation table|D-054]]
+degradation table names exactly which array shapes still degrade. An
+unsupported node can also be anonymous: a collection whose *item
+template* is unsupported stays a supported collection carrying an
+anonymous `Semantic.Unsupported` item. The struct carries
 nothing beyond the shared fields, because there is nothing more to say
 about it at compile time; no struct field and no `format_version` bump
 were needed to add runtime blocking, only a query.
@@ -151,9 +189,10 @@ downstream read these declared facts rather than re-deriving the intent:
 operation, [[rendering|render preparation]] for the widget and control
 attributes.
 
-Only semantic objects and presentation containers have `children`. A semantic
-field is a leaf by construction, and presentation group membership is layout
-containment, never a field attribute.
+Semantic objects own named `children`; a semantic collection owns exactly
+one anonymous item template in `item`; a semantic field is a leaf by
+construction. Presentation group membership is layout containment, never
+a field attribute.
 
 ## Related notes
 

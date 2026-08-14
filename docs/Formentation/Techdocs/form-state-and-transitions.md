@@ -12,7 +12,7 @@ status: current
 
 # Form state and transitions
 
-> [!note] As of 2026-08-12 · content-derived nested-object presence (D-026); derived submission status (D-028); submit decision result (D-032); form/2 façade (D-046); occurrence-based enumeration (D-050); runtime pipeline decomposed into internal Decoder/Materializer/Submission modules (D-051)
+> [!note] As of 2026-08-14 · temporary MB-S1 collection guard on `Form.new/3`; previously: content-derived nested-object presence (D-026); derived submission status (D-028); submit decision result (D-032); form/2 façade (D-046); occurrence-based enumeration (D-050); runtime pipeline decomposed into internal Decoder/Materializer/Submission modules (D-051)
 > Describes the runtime state layer as built: `Formentation.Form` and its
 > internal pipeline modules — `Form.Transport`, `Form.Codec`, `Form.Decoder`,
 > `Form.Materializer`, `Form.Submission` — now including the
@@ -222,6 +222,15 @@ decided. Internally `Formentation.Form.Materializer` returns `:absent | {:presen
 data-nesting group; the root is always a map.
 
 ### Defaults
+
+> [!warning] Temporary MB-S1 state
+> Collection definitions compile (MB-T1/T2/T3) but have no runtime
+> occurrence model yet: `Form.new/3` deliberately raises an
+> `ArgumentError` naming MB-T4 when the definition contains a
+> `Semantic.Collection`, instead of crashing incidentally on the
+> anonymous item template. The guard walks the semantic tree, so
+> hand-built definitions without a semantic index cannot bypass it.
+> It is removed by MB-T4/T5.
 
 `Form.new(definition, data, defaults: :apply)` fills declared defaults
 into absent keys, and only there:

@@ -10,7 +10,7 @@ status: current
 
 # Paths and identity
 
-> [!note] As of 2026-07-22 · `node-per-kind-complete`
+> [!note] As of 2026-08-14 · static collections in use, MB-S1 (D-053); previously `node-per-kind-complete` (2026-07-22)
 > Describes the addressing types as built. The origin *model* that
 > `JSONPointer` feeds is deferred to
 > [[diagnostics-and-origins|Diagnostics and origins]]; node shapes and the
@@ -41,7 +41,7 @@ flowchart TD
     JP["JSONPointer — source origin"]
 
     TP -->|"NodeId.from_path / group"| NID
-    TP -.->|"same segments today;<br/>:item → 0,1,2… at Milestone B"| IP
+    TP -.->|":item matches any index<br/>0,1,2… (MB-S1)"| IP
     JP -.->|"feeds origins"| Origins(["Diagnostics and origins"])
 
     class Origins internal-link
@@ -54,9 +54,11 @@ apart — it addresses the source document, not the form.
 ## `TemplatePath` — structural position
 
 The static position of a node in the declaration *template*, independent of
-any concrete data. Segments are property-name strings plus one reserved
-internal marker, `:item`, held back for collections
-([[13-roadmap|Milestone B]]); no other atom is ever a segment.
+any concrete data. Segments are property-name strings plus one internal
+marker, `:item` — since MB-S1 the address of a collection's anonymous
+item template ([[18-decisions#D-053 — Collections are a dedicated semantic node owning one item template|D-053]]);
+no other atom is ever a segment. In node IDs `:item` encodes as `~3`,
+extending the escape family so no property name can spoof it.
 
 ```elixir
 %TemplatePath{segments: ["address", "city"]}
@@ -90,7 +92,12 @@ what the JSON Schema `order` hint matches a group entry against. The
 
 The position of a *value* in a concrete data instance. Unlike a template
 path, it is **indexed**: segments are property strings or non-negative
-integers (collection indexes, [[13-roadmap|Milestone B]]). Never atoms.
+integers (collection indexes). Never atoms — `:item` belongs to
+`TemplatePath` only. Since MB-S1 an integer segment *resolves* against
+the static tree: under a collection, any non-negative integer selects
+the single `:item` child, so `Info.node_at(definition, ["measurements", 0])`
+answers with the item template. No concrete index is ever stored in a
+definition.
 
 This is the runtime layer's addressing key. `Formentation.Form` keys its
 per-field maps by it — `transports`, `operations`, `usage`, `issues` — as do
@@ -127,14 +134,14 @@ one invariant worth stating plainly:
 - **`InstancePath` is data-bound and indexed.** One per value — a location
   in a specific submission.
 
-Today, with flat objects and no collections, every node's template path and
-the instance paths that reach it share the *same string segments*, so the
-distinction can look academic. It is forward-looking: at
-[[13-roadmap|Milestone B]] a single template position like
-`["items", :item]` addresses *many* instance positions — `["items", 0]`,
-`["items", 1]`, … — a one-to-many relationship the flat phase never exercises
-but the types already model, so collections land without reworking
-addressing.
+For flat objects, every node's template path and the instance paths that
+reach it share the *same string segments*, so the distinction can look
+academic. Collections are where it earns its keep: since MB-S1 a single
+template position like `["measurements", :item]` addresses *many*
+instance positions — `["measurements", 0]`, `["measurements", 1]`, … —
+a one-to-many relationship the static model resolves by matching any
+integer against `:item` (`TemplatePath.matches?/2`), while runtime
+occurrence enumeration stays deferred to MB-T4.
 
 The invariant also surfaces at read time. `Info.node_at/2` walks an
 *instance* path but **looks through** presentational groups: a data-nesting

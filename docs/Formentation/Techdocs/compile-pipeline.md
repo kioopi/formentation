@@ -10,7 +10,7 @@ status: draft
 
 # Compile pipeline
 
-> [!note] As of 2026-08-09 · Wave 3 façade (A3) complete; module paths refreshed for the lib-tree restructure ([[18-decisions#D-047 — The lib tree is restructured to state the north-star architecture|D-047]])
+> [!note] As of 2026-08-14 · collection node kinds in the stored vocabulary, MB-S1 (D-053, format_version 4 per D-055); previously: Wave 3 façade (A3) complete; lib-tree restructure ([[18-decisions#D-047 — The lib tree is restructured to state the north-star architecture|D-047]])
 > Describes the compile pipeline as built. The `Node` representation uses one struct per kind ([[18-decisions#D-015 — One struct per node kind|D-015]]); this note stays at pipeline altitude and defers `Node` internals to [[definition-and-node|Definition and Node]].
 
 The **compile pipeline** turns a declarative form description into a static, source-independent [[definition-and-node|`Definition`]] that can be cached, inspected, and queried — with no runtime state attached. It is the first half of Formentation: everything here runs once, ahead of any user interaction. The runtime half consumes the `Definition` and is documented in [[form-state-and-transitions|Form state and transitions]], [[phoenix-form-data|the FormData projection]], and [[rendering|Rendering]]; [[end-to-end-data-flow|End-to-end data flow]] joins both halves into one walk.
@@ -127,8 +127,8 @@ The pipeline stops at `Info`. It produces meaning, not markup: no projection, no
 | Schema validator | `Formentation.Source.JSONSchema.Validator` | `lib/formentation/source/json_schema/validator.ex` |
 | Shared walk context | `Formentation.Source.Shared` | `lib/formentation/source/shared.ex` |
 | Compiled definition | `Formentation.Definition` | `lib/formentation/definition.ex` |
-| Semantic storage | `Formentation.Definition.Semantic.Object` · `Semantic.Field` · `Semantic.Unsupported` | `lib/formentation/definition/semantic/` |
-| Presentation storage | `Formentation.Definition.Presentation.Object` · `Presentation.Field` · `Presentation.Group` | `lib/formentation/definition/presentation/` |
+| Semantic storage | `Formentation.Definition.Semantic.Object` · `Semantic.Field` · `Semantic.Unsupported` · `Semantic.Collection` | `lib/formentation/definition/semantic/` |
+| Presentation storage | `Formentation.Definition.Presentation.Object` · `Presentation.Field` · `Presentation.Group` · `Presentation.Collection` | `lib/formentation/definition/presentation/` |
 | Query surface | `Formentation.Info` | `lib/formentation/info.ex` |
 
 ## Related notes
