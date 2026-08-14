@@ -284,4 +284,72 @@ defmodule Formentation.InfoTest do
              ]
            } = Info.presentation_root(definition)
   end
+
+  describe "collection queries" do
+    setup do
+      path = TemplatePath.new!(["measurements"])
+      item = Semantic.Field.new(nil, TemplatePath.item(path), :number, role: :number)
+
+      collection =
+        Semantic.Collection.new("measurements", path, item,
+          required?: true,
+          constraints: %{min_items: 1, max_items: 10},
+          origins: [min_items: {:map_source, [:properties, "measurements", :min_items]}]
+        )
+
+      root = Semantic.Object.new(nil, TemplatePath.new!([]), [collection])
+
+      presentation =
+        Presentation.Object.new(NodeId.from_path(TemplatePath.new!([])), [
+          Presentation.Collection.new(collection.id, Presentation.Field.new(item.id),
+            label: "Measurements"
+          )
+        ])
+
+      {:ok, definition} = Finalizer.finalize(root, presentation)
+      %{definition: definition}
+    end
+
+    test "semantic_kind/2 answers :collection and resolves integer segments", %{definition: d} do
+      assert Info.semantic_kind(d, ["measurements"]) == :collection
+      assert Info.semantic_kind(d, ["measurements", 0]) == :field
+      assert Info.semantic_kind(d, ["missing"]) == nil
+    end
+
+    test "item_template/2 returns the item node, nil elsewhere", %{definition: d} do
+      assert %Semantic.Field{name: nil, value_type: :number} =
+               Info.item_template(d, ["measurements"])
+
+      assert Info.item_template(d, ["measurements", 0]) == nil
+      assert Info.item_template(d, ["missing"]) == nil
+    end
+
+    test "constraints/2 answers for collections, %{} otherwise", %{definition: d} do
+      assert Info.constraints(d, ["measurements"]) == %{min_items: 1, max_items: 10}
+      assert Info.constraints(d, ["measurements", 0]) == %{}
+      assert Info.constraints(d, []) == %{}
+      assert Info.constraints(d, ["missing"]) == %{}
+    end
+
+    test "required?/origins/role answer at concrete item instance paths", %{definition: d} do
+      assert Info.required?(d, ["measurements"])
+      refute Info.required?(d, ["measurements", 0])
+      assert Info.role(d, ["measurements", 0]) == :number
+
+      origins = Info.origins(d, ["measurements"])
+      assert origins[:min_items] == {:map_source, [:properties, "measurements", :min_items]}
+    end
+
+    test "fields/1 and unsupported_nodes/1 descend through collections", %{definition: d} do
+      assert [%Semantic.Field{name: nil}] = Info.fields(d)
+      assert Info.unsupported_nodes(d) == []
+    end
+
+    test "node/2 reaches presentation descriptors inside the item slot", %{definition: d} do
+      assert %Presentation.Collection{} = Info.node(d, "layout:collection:/measurements")
+
+      assert %Presentation.Field{semantic_id: "/measurements/~3"} =
+               Info.node(d, "layout:field:/measurements/~3")
+    end
+  end
 end

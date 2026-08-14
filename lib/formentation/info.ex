@@ -71,9 +71,11 @@ defmodule Formentation.Info do
           Semantic.Object.t()
           | Semantic.Field.t()
           | Semantic.Unsupported.t()
+          | Semantic.Collection.t()
           | Formentation.Definition.Presentation.Object.t()
           | Formentation.Definition.Presentation.Field.t()
           | Formentation.Definition.Presentation.Group.t()
+          | Formentation.Definition.Presentation.Collection.t()
           | nil
   def node(%Definition{semantic_index: %{by_id: by_id}, presentation: presentation}, id)
       when is_binary(id) do
@@ -89,7 +91,11 @@ defmodule Formentation.Info do
   `ArgumentError` on invalid segments.
   """
   @spec node_at(Definition.t(), [InstancePath.segment()]) ::
-          Semantic.Object.t() | Semantic.Field.t() | Semantic.Unsupported.t() | nil
+          Semantic.Object.t()
+          | Semantic.Field.t()
+          | Semantic.Unsupported.t()
+          | Semantic.Collection.t()
+          | nil
   def node_at(%Definition{} = definition, segments) when is_list(segments) do
     %InstancePath{segments: segments} = InstancePath.new!(segments)
 
@@ -105,11 +111,12 @@ defmodule Formentation.Info do
   Returns `nil` when the path names no semantic node. Presentation
   group identifiers are never semantic path segments and therefore return
   `nil`. Returns `:object`, `:field`, or `:unsupported` for known semantic
-  nodes. Raises when a malformed hand-built definition makes the path
+  nodes. Collections resolve concrete non-negative integer segments to their
+  static item template. Raises when a malformed hand-built definition makes the path
   ambiguous.
   """
   @spec semantic_kind(Definition.t(), [InstancePath.segment()]) ::
-          :object | :field | :unsupported | nil
+          :object | :field | :unsupported | :collection | nil
   def semantic_kind(%Definition{} = definition, segments) when is_list(segments) do
     %InstancePath{segments: segments} = InstancePath.new!(segments)
 
@@ -120,9 +127,44 @@ defmodule Formentation.Info do
     end
   end
 
+  @doc """
+  Returns the static item-template node of the collection at an instance path,
+  or `nil` when that path does not name a collection.
+  """
+  @spec item_template(Definition.t(), [InstancePath.segment()]) ::
+          Semantic.Object.t()
+          | Semantic.Field.t()
+          | Semantic.Unsupported.t()
+          | Semantic.Collection.t()
+          | nil
+  def item_template(%Definition{} = definition, segments) when is_list(segments) do
+    case node_at(definition, segments) do
+      %Semantic.Collection{item: item} -> item
+      _ -> nil
+    end
+  end
+
+  @doc """
+  Returns compiled field or collection constraints at an instance path.
+
+  Nodes without constraints and missing paths return `%{}`.
+  """
+  @spec constraints(Definition.t(), [InstancePath.segment()]) :: map()
+  def constraints(%Definition{} = definition, segments) when is_list(segments) do
+    case node_at(definition, segments) do
+      %Semantic.Field{constraints: constraints} -> constraints
+      %Semantic.Collection{constraints: constraints} -> constraints
+      _ -> %{}
+    end
+  end
+
   @doc false
   @spec semantic_node_index(Definition.t()) :: %{
-          TemplatePath.t() => Semantic.Object.t() | Semantic.Field.t() | Semantic.Unsupported.t()
+          TemplatePath.t() =>
+            Semantic.Object.t()
+            | Semantic.Field.t()
+            | Semantic.Unsupported.t()
+            | Semantic.Collection.t()
         }
   def semantic_node_index(%Definition{} = definition) do
     definition
@@ -223,6 +265,11 @@ defmodule Formentation.Info do
   defp find_presentation_node(nil, _id), do: nil
 
   defp find_presentation_node(%{id: id} = node, id), do: node
+
+  # A collection stores its nested descriptor in `item`, not `children`.
+  defp find_presentation_node(%Formentation.Definition.Presentation.Collection{item: item}, id) do
+    find_presentation_node(item, id)
+  end
 
   defp find_presentation_node(%{children: children}, id) do
     Enum.find_value(children, &find_presentation_node(&1, id))
