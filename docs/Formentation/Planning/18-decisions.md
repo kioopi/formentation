@@ -1424,6 +1424,35 @@ equivalence. The decision is resolved to MB-D2's exit criterion: the paired
 scalar-collection and object-collection fixtures are now writable in both
 spellings.
 
+## D-055 — `format_version` bumps on any stored-representation vocabulary change
+
+*2026-08-14*
+
+**Context.** `Definition.format_version` (currently `3`) is documented as the
+cache-compatibility marker: it "names the layout of this struct so cached
+definitions can be invalidated across releases." The MB-S1 slice
+([issue #52](https://github.com/kioopi/formentation/issues/52)) adds
+`Semantic.Collection` and a `Presentation.Collection` descriptor — the first
+growth of the stored node vocabulary since the marker was introduced. Left
+implicit, the version's meaning would drift: either additive node kinds are
+silently treated as compatible, or a bump happens by accident with no stated
+rule behind it.
+
+**Decision.** `format_version` names the **stored representation vocabulary**,
+not merely the struct layout: any change to the set of node kinds or stored
+fields a `%Definition{}` may contain — additive changes included — bumps it. A
+cached definition is only readable by code compiled against the same version.
+MB-S1 therefore bumps `format_version` to `4` in the same change that
+introduces `Semantic.Collection` and `Presentation.Collection`.
+
+**Consequences.** Pre-collection code can never encounter a cached definition
+containing node kinds it has no clauses for; the failure mode is a version
+check, not a `FunctionClauseError` mid-traversal. The cost is coarse
+invalidation — cached v3 definitions that contain no collections are
+invalidated too — which is accepted as trivial pre-1.0. Future vocabulary
+growth (runtime occurrence slices, new presentation descriptors) inherits the
+rule instead of re-asking the question.
+
 ## Related notes
 
 - [[19-north-star-architecture|North-star architecture]]
