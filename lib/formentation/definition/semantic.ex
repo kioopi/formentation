@@ -37,6 +37,10 @@ defmodule Formentation.Definition.Semantic do
     Enum.map(node.children, &native_child_entry/1)
   end
 
+  def direct_children(%Entry{kind: :collection, node: %Semantic.Collection{item: item}}) do
+    [native_child_entry(item)]
+  end
+
   def direct_children(%Entry{}), do: []
 
   @spec fields(Definition.t()) :: [entry()]
@@ -63,6 +67,12 @@ defmodule Formentation.Definition.Semantic do
 
   defp find_entry(entry, []), do: entry
 
+  defp find_entry(%Entry{kind: :collection} = entry, [segment | rest])
+       when is_integer(segment) and segment >= 0 do
+    [item] = direct_children(entry)
+    find_entry(item, rest)
+  end
+
   defp find_entry(%Entry{} = entry, [segment | rest]) do
     case Enum.find(direct_children(entry), &(&1.name == segment)) do
       nil -> nil
@@ -71,6 +81,12 @@ defmodule Formentation.Definition.Semantic do
   end
 
   defp find_unique_entry(entry, []), do: {:ok, entry}
+
+  defp find_unique_entry(%Entry{kind: :collection} = entry, [segment | rest])
+       when is_integer(segment) and segment >= 0 do
+    [item] = direct_children(entry)
+    find_unique_entry(item, rest)
+  end
 
   # Finalized definitions cannot contain sibling name ambiguity. The explicit
   # ambiguity result keeps query callers defensive around hand-built structs.
@@ -88,6 +104,7 @@ defmodule Formentation.Definition.Semantic do
     |> Enum.flat_map(fn
       %Entry{kind: :field} = child -> [child]
       %Entry{kind: :object} = child -> scalar_descendants(child)
+      %Entry{kind: :collection} = child -> scalar_descendants(child)
       %Entry{kind: :unsupported} -> []
     end)
   end
@@ -98,6 +115,7 @@ defmodule Formentation.Definition.Semantic do
     |> Enum.flat_map(fn
       %Entry{kind: :unsupported} = child -> [child]
       %Entry{kind: :object} = child -> unsupported_descendants(child)
+      %Entry{kind: :collection} = child -> unsupported_descendants(child)
       %Entry{kind: :field} -> []
     end)
   end
@@ -112,6 +130,10 @@ defmodule Formentation.Definition.Semantic do
 
   defp native_child_entry(%Semantic.Unsupported{} = node) do
     entry(:unsupported, node)
+  end
+
+  defp native_child_entry(%Semantic.Collection{} = node) do
+    entry(:collection, node)
   end
 
   defp entry(kind, node) do
