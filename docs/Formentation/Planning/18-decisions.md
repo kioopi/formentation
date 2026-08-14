@@ -1279,6 +1279,81 @@ travel the diagnostics path, and today `reject_duplicate_child_names/1` is the
 sole one. Milestone B's cardinality and item-template checks are expected to
 join it, which is what makes the single error-handled finalize worth having.
 
+## D-053 — Collections are a dedicated semantic node owning one item template
+
+*2026-08-14*
+
+**Context.** Milestone B introduces homogeneous collections, and its first
+blocking decision ([[phase-1-milestone-b-collections#MB-D1 — Collection semantic model|MB-D1]])
+is the source-neutral static shape of a collection inside `%Definition{}`. The
+north-star rule is fixed: a collection owns a static item template, never
+runtime items — the definition for three measurements and for three hundred is
+identical. The existing model has one struct per semantic shape
+(`Semantic.Object`, `Semantic.Field`, `Semantic.Unsupported`), `:item` already
+reserved in `TemplatePath`, and `~3` already reserved in `NodeId` ([[18-decisions#D-050 — Occurrence is the runtime binding of a template node|D-050]]).
+
+**Decision.**
+
+- **Dedicated struct.** A collection is a new `Semantic.Collection` struct with
+  its own `Semantic.Entry` kind, following the one-struct-per-shape rule. It is
+  not an `Object` with a repeated flag, and array-ness is not a modifier on the
+  item node: the collection and its item are two template locations with
+  distinct paths, ids, and facts.
+- **Fact split.** The collection node owns `id`, `name`, `template_path`,
+  `required?`, `origins`, cardinality constraints, and exactly one anonymous
+  item-template child at `template_path ++ [:item]` (`name: nil`, the
+  root-object precedent). The item template is an ordinary semantic node —
+  `Field`, `Object`, or `Unsupported` — carrying its own facts and origins, so
+  downstream traversal needs no item special cases.
+- **Item-level `required?` is meaningless.** "Every item must be present" is
+  cardinality, spelled `minItems`. A source declaration marking the item
+  template required draws an unconditional compile diagnostic pointing at
+  `minItems` (reachable only from the Map source; JSON Schema `required`
+  inside an `items` object schema applies to the item's properties and is
+  untouched).
+- **`required?` versus cardinality are independent axes.** `required?` is the
+  same boolean every sibling node has — must the array key be present in the
+  parent. Cardinality lives in a `Field.constraints`-style constraints map
+  under `:min_items`/`:max_items`. The finalizer validates the subset it
+  understands: non-negative integers, `min_items <= max_items` — joining the
+  diagnostics-returning path anticipated by [[18-decisions#D-052 — A `%Definition{}` is final|D-052]].
+- **Only `minItems`/`maxItems` compile in Milestone B**, because they are what
+  runtime edit-legality needs. The keyword line is: *validity-only* array
+  keywords (`uniqueItems`, `contains`, `minContains`, …) are not compiled and
+  flow through to authoritative `ValidationPlan` validation, exactly as
+  unmodeled scalar keywords already do; *structural* keywords (`prefixItems`,
+  tuple/dynamic `items`, `unevaluatedItems`) make the node `Unsupported`.
+- **Unsupported item templates are legal and useful.** An array whose item
+  schema is unsupported compiles to a supported collection with an
+  `Unsupported` item template; existing blocker machinery
+  ([[18-decisions#D-028 — Unsupported nodes are a preserve-only capability; blocking is derived at runtime|D-028]])
+  then derives per-item blockers at concrete indexed paths.
+- **Nested collections are legal in the model, deferred by compilation.** The
+  type is recursive and the finalizer has no collection-below-`:item`
+  prohibition to unwind later. In Milestone B the adapters compile any array
+  declaration nested below an `:item` segment — a direct array-of-arrays *or*
+  an array property inside an object item — to `Semantic.Unsupported` with a
+  "nested collections are not yet supported" diagnostic. Deferral is expressed
+  through the unsupported mechanism, not through a runtime that meets shapes
+  it cannot drive.
+- **Origins are per-aspect.** The collection node carries origins for its own
+  declaration and each cardinality constraint; the item template owns its own
+  origins like any node. Differential Map/JSON-Schema fixtures diff "apart
+  from origins" against those aspect keys.
+
+**Consequences.** Every exhaustive match over semantic kinds grows a
+`:collection` clause (`Semantic` traversal, `Info`, finalizer, `Occurrence`,
+`Decoder`, `Materializer`, projection, preparation) — the cost Milestone B pays
+anyway. `Semantic.find/2` learns to resolve an integer instance segment to the
+`:item` child, which name-matching cannot do today. Runtime item identity is
+deliberately absent from this model and remains MB-D4's decision; a
+`uniqueItems` violation surfaces only at whole-instance validation, which is
+intentional, not a gap. Lifting the nested-collection restriction later is
+additive adapter and runtime work with no model change. Since adapters are the
+only producers of finalized definitions ([[18-decisions#D-052 — A `%Definition{}` is final|D-052]]),
+Milestone B runtime modules never meet a nested `Collection` and need no
+defensive clauses for it.
+
 ## Related notes
 
 - [[19-north-star-architecture|North-star architecture]]

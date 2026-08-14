@@ -72,6 +72,18 @@ and validation before the single terminal finalization. Behaviour is
 byte-identical. See [[18-decisions#D-052 — A `%Definition{}` is final|D-052]]
 and [[source-adapters|Source adapters]].
 
+✅ Decided (2026-08-14) — Milestone B's first blocking decision,
+[[phase-1-milestone-b-collections#MB-D1 — Collection semantic model|MB-D1]]
+(collection semantic model), is resolved as
+[[18-decisions#D-053 — Collections are a dedicated semantic node owning one item template|D-053]]:
+a dedicated `Semantic.Collection` struct owning one anonymous item template at
+`:item`; `required?` and `:min_items`/`:max_items` cardinality as independent
+axes; validity-only array keywords flow through to authoritative validation
+while structural ones compile to unsupported; nested collections legal in the
+recursive model but compiled to `Semantic.Unsupported` (with diagnostic) in
+Milestone B. No implementation yet — MB-T1 is the next target after MB-D2
+settles the Map spelling.
+
 Supplementary to the numbered steps: an opt-in, demo-driven browser-real test suite (PhoenixTest + Playwright, [[18-decisions#D-022 — Browser-real tests are an opt-in, demo-driven Playwright suite|D-022]]) now covers truths `Phoenix.LiveViewTest` cannot observe — real `_unused_` marker gating, number-widget raw-text preservation under an actual browser, and error-summary focus movement — and surfaced the pump-inspection demo's native-validation toggle ([[18-decisions#D-023 — The demo keeps native validation, behind a toggle|D-023]]). It runs via `mix test.browser`, stays out of `mix ci` by design, and is not itself a phase-1 step; see [[browser-testing|Techdocs/Browser testing]].
 
 ✅ Done (2026-07-25) — also supplementary, an architecture refactor orthogonal to the numbered steps: instance validation dispatch is now source-neutral. The core-owned `Formentation.Definition.Validation` behaviour and `Formentation.Definition.ValidationPlan` (module + opaque artifact) replace the opaque `Definition.validator` field that `Form` used to dispatch by name straight to `Formentation.Source.JSONSchema.Validator`; `Form` now calls `plan.module.validate(plan.artifact, instance)` and names no adapter, `Issue.source` is `:decode | :validation`, `format_version` bumped 1→2, and the `core↔json_schema` layer cycle [[18-decisions#D-018 — Reach is the architecture gate|D-018]] baselined is removed. See [[18-decisions#D-025 — Instance validation dispatches through a source-neutral behaviour|D-025]] and the refreshed [[Techdocs|Techdocs]] notes ([[definition-and-node|Definition and Node]], [[form-state-and-transitions|Form state and transitions]], [[source-adapters|Source adapters]], [[diagnostics-and-origins|Diagnostics and origins]]).

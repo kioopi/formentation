@@ -421,27 +421,36 @@ occurrences” with existing arrays, then solve identity before add/remove/reord
 
 ### MB-D1 — Collection semantic model
 
-**Status:** open; first blocking decision.
+**Status:** decided — recorded as
+[[18-decisions#D-053 — Collections are a dedicated semantic node owning one item template|D-053]]
+(2026-08-14).
 
 We need the source-neutral semantic representation of a homogeneous
 collection. The shape should reflect the north-star rule: a collection owns a
 static item template, not concrete runtime children.
 
-Questions:
+The settled answers, in full in D-053:
 
-- Is collection a new `Semantic.Entry.kind` backed by its own struct, as the
-  existing one-struct-per-shape rule suggests?
-- Which facts live on the collection node versus its item template?
-- How is collection requiredness represented relative to item cardinality?
-- Which constraints are part of the initial semantic model?
-- How are origins represented for the collection itself, the item declaration,
-  and cardinality constraints?
+- a dedicated `Semantic.Collection` struct with its own `Entry` kind;
+- the collection node owns `id`/`name`/`template_path`/`required?`/origins/
+  cardinality and exactly one anonymous item-template child at `:item`; the
+  item template is an ordinary `Field`/`Object`/`Unsupported` node;
+- item-level `required?` is meaningless and draws an unconditional compile
+  diagnostic pointing at `minItems`;
+- collection `required?` (uniform boolean) and cardinality
+  (`:min_items`/`:max_items` in a `Field.constraints`-style map) are
+  independent axes; the finalizer validates the compiled subset;
+- only `minItems`/`maxItems` compile in B; validity-only array keywords flow
+  through to authoritative validation, structural keywords make the node
+  unsupported;
+- unsupported item templates are legal and yield per-item blockers;
+- nested collections are legal in the recursive model but deferred by
+  compilation: any array below an `:item` segment compiles to
+  `Semantic.Unsupported` with a helpful diagnostic in Milestone B;
+- origins are per-aspect on the collection node; the item template owns its
+  own.
 
-Likely direction: introduce a dedicated collection semantic struct because its
-shape differs materially from field/object/unsupported nodes, and give it a
-single repeated item-template child addressed through `:item`.
-
-This decision should not choose runtime item identity.
+This decision does not choose runtime item identity — that remains MB-D4.
 
 **Unblocks:** MB-T1, MB-D2, MB-D4, MB-D8.
 
@@ -1266,7 +1275,7 @@ issues. Keep graph IDs stable even if an issue covers several adjacent tasks.
 
 | Graph node(s) | Issue | PR | Status | Notes |
 |---|---:|---:|---|---|
-| MB-D1 / MB-T1 | — | — | planned | First design/spec target |
+| MB-D1 / MB-T1 | — | — | planned | MB-D1 decided ([[18-decisions#D-053 — Collections are a dedicated semantic node owning one item template|D-053]]); MB-T1 is the first implementation target |
 | MB-D2 / MB-T2 / MB-T3 | — | — | planned | Both source adapters + differential fixture |
 | MB-D3 / MB-T4 / MB-T5 / MB-G1 | — | — | planned | Existing-data indexed round-trip |
 | MB-D4 / MB-D5 / MB-T6 / MB-T7 / MB-G2 | — | — | planned | Stable identity/reconciliation |
