@@ -53,6 +53,11 @@ defmodule Formentation.Definition.Semantic do
     definition |> root() |> unsupported_descendants()
   end
 
+  @spec collections(Definition.t()) :: [entry()]
+  def collections(%Definition{} = definition) do
+    definition |> root() |> collection_descendants()
+  end
+
   @spec find(Definition.t(), [InstancePath.segment()]) :: entry() | nil
   def find(%Definition{} = definition, segments) when is_list(segments) do
     %InstancePath{segments: segments} = InstancePath.new!(segments)
@@ -106,6 +111,16 @@ defmodule Formentation.Definition.Semantic do
       %Entry{kind: :object} = child -> scalar_descendants(child)
       %Entry{kind: :collection} = child -> scalar_descendants(child)
       %Entry{kind: :unsupported} -> []
+    end)
+  end
+
+  defp collection_descendants(%Entry{} = entry) do
+    entry
+    |> direct_children()
+    |> Enum.flat_map(fn
+      %Entry{kind: :collection} = child -> [child | collection_descendants(child)]
+      %Entry{kind: :object} = child -> collection_descendants(child)
+      %Entry{} -> []
     end)
   end
 
