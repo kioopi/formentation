@@ -1,0 +1,30 @@
+.cm-editor {
+  container: editor / inline-size;
+}
+
+:root {
+  --wide-embded-margin-escape: 85cqw;
+  --border-color: pink;
+}
+
+@container editor (width > 1200px) {
+  .markdown-source-view.mod-cm6 .cm-content  {
+    --wide-embded-margin-escape: 60cqw;
+  }
+}
+
+@container editor (width > 2400px) {
+  .markdown-source-view.mod-cm6 .cm-content  {
+    --wide-embded-margin-escape: 80cqw;
+  }
+}
+
+@container editor (width > 1200px) {
+  .markdown-source-view.mod-cm6 .cm-content  {
+    .bases-embed,.cm-lang-mermaid,.cm-table-widget {
+      width: auto;
+      margin-left: calc(((var(--wide-embded-margin-escape) - var(--file-line-width)) / 2) * -1) !important;
+      margin-right: calc(((var(--wide-embded-margin-escape) - var(--file-line-width)) / 2) * -1) !important;
+    }
+  }
+}
