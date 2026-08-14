@@ -23,7 +23,12 @@ defmodule Formentation.Definition.Semantic.Object do
   @spec new(
           String.t() | nil,
           TemplatePath.t(),
-          [Semantic.Object.t() | Semantic.Field.t() | Semantic.Unsupported.t()],
+          [
+            Semantic.Object.t()
+            | Semantic.Field.t()
+            | Semantic.Unsupported.t()
+            | Semantic.Collection.t()
+          ],
           keyword()
         ) ::
           t()
@@ -44,6 +49,11 @@ defmodule Formentation.Definition.Semantic.Object do
           template_path: TemplatePath.t(),
           required?: boolean(),
           origins: [{atom(), Origin.t()}],
-          children: [Semantic.Object.t() | Semantic.Field.t() | Semantic.Unsupported.t()]
+          children: [
+            Semantic.Object.t()
+            | Semantic.Field.t()
+            | Semantic.Unsupported.t()
+            | Semantic.Collection.t()
+          ]
         }
 end

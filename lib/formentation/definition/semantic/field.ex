@@ -3,7 +3,8 @@ defmodule Formentation.Definition.Semantic.Field do
   Native semantic scalar field occurrence.
 
   This struct intentionally contains no presentation label, help, widget,
-  hidden, or group-containment facts.
+  hidden, or group-containment facts. A `nil` name is reserved for a
+  collection item-template position.
   """
 
   alias Formentation.{NodeId, Origin, TemplatePath}
@@ -25,9 +26,10 @@ defmodule Formentation.Definition.Semantic.Field do
   ]
 
   @doc false
-  @spec new(String.t(), TemplatePath.t(), value_type(), keyword()) :: t()
+  @spec new(String.t() | nil, TemplatePath.t(), value_type(), keyword()) :: t()
   def new(name, %TemplatePath{} = template_path, value_type, opts \\ [])
-      when is_binary(name) and value_type in [:string, :integer, :number, :boolean] do
+      when (is_binary(name) or is_nil(name)) and
+             value_type in [:string, :integer, :number, :boolean] do
     %__MODULE__{
       id: Keyword.get(opts, :id, NodeId.from_path(template_path)),
       name: name,
@@ -57,7 +59,7 @@ defmodule Formentation.Definition.Semantic.Field do
 
   @type t :: %__MODULE__{
           id: String.t(),
-          name: String.t(),
+          name: String.t() | nil,
           role: atom() | nil,
           value_type: value_type(),
           template_path: TemplatePath.t(),

@@ -10,12 +10,16 @@ defmodule Formentation.Definition.Semantic do
     @enforce_keys [:kind, :name, :node, :template_path]
     defstruct [:kind, :name, :node, :template_path]
 
-    @type kind :: :object | :field | :unsupported
+    @type kind :: :object | :field | :unsupported | :collection
 
     @type t :: %__MODULE__{
             kind: kind(),
             name: String.t() | nil,
-            node: Semantic.Object.t() | Semantic.Field.t() | Semantic.Unsupported.t(),
+            node:
+              Semantic.Object.t()
+              | Semantic.Field.t()
+              | Semantic.Unsupported.t()
+              | Semantic.Collection.t(),
             template_path: TemplatePath.t()
           }
   end
