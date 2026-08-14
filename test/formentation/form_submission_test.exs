@@ -10,6 +10,9 @@ defmodule Formentation.FormSubmissionTest do
 
   # ---- JSON Schema fixture: `tags` is an unsupported array whose items the
   # full schema still validates; `title` is an unrelated editable sibling.
+  # `prefixItems` keeps the node in the unsupported subset now that plain
+  # homogeneous arrays compile as collections (MB-S1) — validation still
+  # requires every element to be an integer.
   defp tags_schema(opts) do
     tags_required = Keyword.get(opts, :tags_required, false)
 
@@ -18,7 +21,11 @@ defmodule Formentation.FormSubmissionTest do
       "required" => if(tags_required, do: ["tags"], else: []),
       "properties" => %{
         "title" => %{"type" => "string"},
-        "tags" => %{"type" => "array", "items" => %{"type" => "integer"}}
+        "tags" => %{
+          "type" => "array",
+          "prefixItems" => [%{"type" => "integer"}],
+          "items" => %{"type" => "integer"}
+        }
       }
     }
 

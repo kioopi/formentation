@@ -1535,7 +1535,11 @@ defmodule Formentation.Phoenix.Render.PreparationTest do
             "required" => ["tags"],
             "properties" => %{
               "name" => %{"type" => "string", "minLength" => 3},
-              "tags" => %{"type" => "array", "items" => %{"type" => "integer"}}
+              "tags" => %{
+                "type" => "array",
+                "prefixItems" => [%{"type" => "integer"}],
+                "items" => %{"type" => "integer"}
+              }
             }
           },
           %{},
@@ -1555,7 +1559,13 @@ defmodule Formentation.Phoenix.Render.PreparationTest do
       schema = %{
         "type" => "object",
         "required" => ["tags"],
-        "properties" => %{"tags" => %{"type" => "array", "items" => %{"type" => "integer"}}}
+        "properties" => %{
+          "tags" => %{
+            "type" => "array",
+            "prefixItems" => [%{"type" => "integer"}],
+            "items" => %{"type" => "integer"}
+          }
+        }
       }
 
       {:ok, definition, _diagnostics} =

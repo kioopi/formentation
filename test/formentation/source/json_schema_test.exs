@@ -340,12 +340,14 @@ defmodule Formentation.Source.JSONSchemaTest do
 
   describe "unsupported constructs" do
     test "an unsupported type compiles to an unsupported node plus a warning" do
+      # "null" stays outside the supported subset; arrays compile as
+      # collections since MB-S1.
       {:ok, definition, diagnostics} =
         Formentation.compile(
           %{
             "type" => "object",
             "properties" => %{
-              "tags" => %{"type" => "array", "items" => %{"type" => "string"}},
+              "legacy" => %{"type" => "null"},
               "notes" => %{"type" => "string"}
             }
           },
@@ -355,8 +357,8 @@ defmodule Formentation.Source.JSONSchemaTest do
       assert [%Formentation.Diagnostic{severity: :warning, code: :unsupported_type} = diagnostic] =
                diagnostics
 
-      assert diagnostic.origin == {:json_schema, "/properties/tags/type"}
-      assert %Semantic.Unsupported{name: "tags"} = Info.node_at(definition, ["tags"])
+      assert diagnostic.origin == {:json_schema, "/properties/legacy/type"}
+      assert %Semantic.Unsupported{name: "legacy"} = Info.node_at(definition, ["legacy"])
       assert Enum.map(Info.fields(definition), & &1.name) == ["notes"]
     end
 
@@ -614,7 +616,9 @@ defmodule Formentation.Source.JSONSchemaTest do
           ui: hints
         )
 
-      assert [%Formentation.Diagnostic{severity: :warning, code: :unsupported_type}] =
+      # An items-less array degrades with the sharper array-shape code
+      # since MB-S1.
+      assert [%Formentation.Diagnostic{severity: :warning, code: :unsupported_array_shape}] =
                diagnostics
 
       refute Enum.any?(diagnostics, &(&1.code == :unknown_group_field))
@@ -1252,6 +1256,207 @@ defmodule Formentation.Source.JSONSchemaTest do
       assert [%{severity: :warning, code: :invalid_hint_value} = warning] = diagnostics
       assert warning.message =~ "hidden"
       assert warning.origin == {:ui_hints, "/fields/serial/hidden"}
+    end
+  end
+
+  describe "array schemas" do
+    defp compile_arrays(properties, extra \\ %{}) do
+      schema = Map.merge(%{"type" => "object", "properties" => properties}, extra)
+      Formentation.compile(schema, adapter: Formentation.Source.JSONSchema)
+    end
+
+    # 1. supported homogeneous array
+    test "a homogeneous scalar array compiles to a collection with cardinality origins" do
+      {:ok, definition, []} =
+        compile_arrays(%{
+          "measurements" => %{
+            "type" => "array",
+            "title" => "Measurements",
+            "items" => %{"type" => "number"},
+            "minItems" => 1,
+            "maxItems" => 10
+          }
+        })
+
+      assert Info.semantic_kind(definition, ["measurements"]) == :collection
+
+      assert %Semantic.Field{name: nil, value_type: :number} =
+               Info.item_template(definition, ["measurements"])
+
+      assert Info.constraints(definition, ["measurements"]) == %{min_items: 1, max_items: 10}
+
+      origins = Info.origins(definition, ["measurements"])
+      assert origins[:min_items] == {:json_schema, "/properties/measurements/minItems"}
+      assert origins[:max_items] == {:json_schema, "/properties/measurements/maxItems"}
+
+      assert {:ok, %PresentationInfo.Collection{label: "Measurements"}} =
+               Info.presentation_at(definition, ["measurements"])
+
+      # the JSON source still contributes an authoritative ValidationPlan
+      assert definition.validation != nil
+    end
+
+    test "an object-item array compiles recursively" do
+      {:ok, definition, []} =
+        compile_arrays(%{
+          "addresses" => %{
+            "type" => "array",
+            "items" => %{
+              "type" => "object",
+              "required" => ["street"],
+              "properties" => %{
+                "street" => %{"type" => "string", "minLength" => 1},
+                "zip" => %{"type" => "string"}
+              }
+            }
+          }
+        })
+
+      assert Info.semantic_kind(definition, ["addresses", 0]) == :object
+      assert Info.required?(definition, ["addresses", 0, "street"])
+      refute Info.required?(definition, ["addresses", 0, "zip"])
+    end
+
+    # 2. no items (valid "any items")
+    test "an array without items degrades to Unsupported with a sharp warning" do
+      {:ok, definition, [warning]} = compile_arrays(%{"anything" => %{"type" => "array"}})
+
+      assert Info.semantic_kind(definition, ["anything"]) == :unsupported
+      assert warning.code == :unsupported_array_shape
+      assert warning.origin == {:json_schema, "/properties/anything"}
+      assert warning.template_path.segments == ["anything"]
+    end
+
+    # 3. boolean items
+    test "a boolean items schema degrades to Unsupported at the items origin" do
+      {:ok, definition, [warning]} =
+        compile_arrays(%{"anything" => %{"type" => "array", "items" => true}})
+
+      assert Info.semantic_kind(definition, ["anything"]) == :unsupported
+      assert warning.code == :unsupported_array_shape
+      assert warning.origin == {:json_schema, "/properties/anything/items"}
+      assert warning.template_path.segments == ["anything"]
+    end
+
+    # 4. prefixItems — valid 2020-12 structural tuple feature
+    test "prefixItems degrades to Unsupported even alongside items" do
+      {:ok, definition, [warning]} =
+        compile_arrays(%{
+          "pair" => %{
+            "type" => "array",
+            "prefixItems" => [%{"type" => "string"}],
+            "items" => %{"type" => "number"}
+          }
+        })
+
+      assert Info.semantic_kind(definition, ["pair"]) == :unsupported
+      assert warning.code == :unsupported_array_shape
+      assert warning.message =~ "prefixItems"
+      assert warning.origin == {:json_schema, "/properties/pair/prefixItems"}
+      assert warning.template_path.segments == ["pair"]
+    end
+
+    # 4b. unevaluatedItems — structural per D-053, even alongside items
+    test "unevaluatedItems degrades to Unsupported at its keyword origin" do
+      {:ok, definition, [warning]} =
+        compile_arrays(%{
+          "strict" => %{
+            "type" => "array",
+            "items" => %{"type" => "number"},
+            "unevaluatedItems" => false
+          }
+        })
+
+      assert Info.semantic_kind(definition, ["strict"]) == :unsupported
+      assert warning.code == :unsupported_array_shape
+      assert warning.message =~ "unevaluatedItems"
+      assert warning.origin == {:json_schema, "/properties/strict/unevaluatedItems"}
+      assert warning.template_path.segments == ["strict"]
+    end
+
+    # 5. supported collection + unsupported item schema
+    test "a valid-but-unsupported items subschema yields an Unsupported item template" do
+      {:ok, definition, [warning]} =
+        compile_arrays(%{
+          "files" => %{"type" => "array", "items" => %{"type" => "null"}}
+        })
+
+      assert Info.semantic_kind(definition, ["files"]) == :collection
+
+      assert %Semantic.Unsupported{name: nil} =
+               Info.item_template(definition, ["files"])
+
+      assert warning.code == :unsupported_type
+      assert warning.template_path.segments == ["files", :item]
+    end
+
+    # 6. nested arrays below :item
+    test "a direct array-of-arrays keeps the outer collection, degrades the inner" do
+      {:ok, definition, [warning]} =
+        compile_arrays(%{
+          "matrix" => %{
+            "type" => "array",
+            "items" => %{"type" => "array", "items" => %{"type" => "number"}}
+          }
+        })
+
+      assert Info.semantic_kind(definition, ["matrix"]) == :collection
+      assert %Semantic.Unsupported{} = Info.item_template(definition, ["matrix"])
+      assert warning.code == :nested_collection
+      assert warning.template_path.segments == ["matrix", :item]
+    end
+
+    test "an array property inside an object item degrades with the nested diagnostic" do
+      {:ok, definition, [warning]} =
+        compile_arrays(%{
+          "rows" => %{
+            "type" => "array",
+            "items" => %{
+              "type" => "object",
+              "properties" => %{
+                "tags" => %{"type" => "array", "items" => %{"type" => "string"}}
+              }
+            }
+          }
+        })
+
+      assert Info.semantic_kind(definition, ["rows", 0, "tags"]) == :unsupported
+      assert warning.code == :nested_collection
+      assert warning.template_path.segments == ["rows", :item, "tags"]
+    end
+
+    # 7. schema-invalid array forms fail metaschema validation, not degradation
+    test "metaschema-invalid array spellings error before compilation" do
+      for bad <- [
+            # legacy draft-4 tuple spelling: items as an array of schemas
+            %{"legacy" => %{"type" => "array", "items" => [%{"type" => "string"}]}},
+            %{
+              "negative" => %{
+                "type" => "array",
+                "items" => %{"type" => "string"},
+                "minItems" => -1
+              }
+            }
+          ] do
+        assert {:error, diagnostics} = compile_arrays(bad)
+        assert Enum.all?(diagnostics, &(&1.code == :invalid_schema))
+      end
+    end
+
+    # contradictory-but-valid cardinality reaches the finalizer's D-052 check
+    test "reversed minItems/maxItems surfaces as an :invalid_cardinality diagnostic" do
+      assert {:error, [d]} =
+               compile_arrays(%{
+                 "m" => %{
+                   "type" => "array",
+                   "items" => %{"type" => "number"},
+                   "minItems" => 5,
+                   "maxItems" => 2
+                 }
+               })
+
+      assert d.code == :invalid_cardinality
+      assert d.origin == {:json_schema, "/properties/m/maxItems"}
     end
   end
 end
