@@ -38,7 +38,7 @@ defmodule Formentation.DefinitionTest do
 
     assert {:ok,
             %Definition{
-              format_version: 3,
+              format_version: 4,
               semantic: ^semantic,
               semantic_index: %Semantic.Index{} = index,
               presentation: ^presentation
